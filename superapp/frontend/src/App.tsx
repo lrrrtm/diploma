@@ -312,9 +312,25 @@ function ScheduleTab({ student }: { student: Student }) {
   }
 
   if (error || !schedule) {
+    const isStaleToken = !student.faculty_abbr || !student.study_group_str;
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-        <p className="text-gray-500 text-sm">{error ?? "Расписание недоступно"}</p>
+      <div className="flex flex-col items-center justify-center py-24 text-center px-6 gap-4">
+        <p className="text-gray-500 text-sm">
+          {isStaleToken
+            ? "Для загрузки расписания необходимо войти заново"
+            : (error ?? "Расписание недоступно")}
+        </p>
+        {isStaleToken && (
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              window.location.href = "/login";
+            }}
+            className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Войти заново
+          </button>
+        )}
       </div>
     );
   }

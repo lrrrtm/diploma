@@ -138,9 +138,13 @@ async def _scrape_cas_login(username: str, password: str) -> dict:
     name = " ".join(part for part in [last, first, middle] if part).strip()
     student_id = str(ws_asu["user_id"])
     email = username if "@" in username else f"{username}@edu.spbstu.ru"
-    study_group_str = ws_asu.get("sub_dep", "")
-    grade_book_number = ws_asu.get("number", "")
-    faculty_abbr = ws_asu.get("dep", "")
+
+    # Identity fields live inside structure[0] (active record)
+    structure = ws_asu.get("structure") or []
+    active = next((s for s in structure if s.get("is_active")), structure[0] if structure else {})
+    study_group_str = active.get("sub_dep", "")
+    grade_book_number = active.get("number", "")
+    faculty_abbr = active.get("dep", "")
 
     return {
         "student_id": student_id,
