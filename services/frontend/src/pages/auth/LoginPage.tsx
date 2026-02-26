@@ -59,7 +59,7 @@ export default function LoginPage() {
               <Input
                 id="login"
                 type="text"
-                placeholder="admin или логин структуры"
+                placeholder="Введите логин"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
                 required
@@ -70,6 +70,7 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
+                placeholder="Введите пароль"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

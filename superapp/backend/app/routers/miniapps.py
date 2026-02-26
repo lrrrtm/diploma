@@ -41,7 +41,7 @@ def list_miniapps():
     return [
         {
             "id": "services",
-            "name": "Заявки",
+            "name": "Услуги",
             "description": "Подача заявок в административные подразделения университета",
             "icon": "file-text",
             "url": settings.SERVICES_URL,
