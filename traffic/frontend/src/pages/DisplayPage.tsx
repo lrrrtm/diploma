@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { XCircle } from "lucide-react";
 import api from "@/api/client";
 
 interface CurrentSession {
@@ -18,6 +19,11 @@ export default function DisplayPage() {
   const studentQrValue = session.active
     ? JSON.stringify({ s: session.session_id, t: session.qr_token })
     : null;
+
+  const handleForceClose = async () => {
+    await api.post("/sessions/close-current").catch(() => {});
+    setSession({ active: false });
+  };
 
   useEffect(() => {
     let timerId: ReturnType<typeof setTimeout>;
@@ -95,11 +101,16 @@ export default function DisplayPage() {
             <p className="text-gray-600 text-lg">
               Код обновляется каждые {session.rotate_seconds} секунды
             </p>
+            <button
+              onClick={handleForceClose}
+              className="mt-6 inline-flex items-center gap-2 text-gray-600 text-sm hover:text-red-400 transition-colors w-fit"
+            >
+              <XCircle className="h-4 w-4" />
+              Завершить занятие
+            </button>
           </div>
         </>
       )}
     </div>
   );
-}
-
 }

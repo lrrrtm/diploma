@@ -100,14 +100,14 @@ export default function TeacherSessionPage() {
 
   if (!session) {
     return (
-      <div className="h-screen overflow-hidden flex items-center justify-center bg-gray-50">
+      <div className="h-full overflow-hidden flex items-center justify-center bg-gray-50">
         <p className="text-gray-400 text-sm">Загрузка...</p>
       </div>
     );
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50 flex flex-col">
+    <div className="h-full bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div>

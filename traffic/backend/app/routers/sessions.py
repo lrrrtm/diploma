@@ -22,7 +22,17 @@ _sessions: dict[str, dict] = {}
 
 
 def _get_active_session() -> Optional[dict]:
-    return next((s for s in _sessions.values() if s["is_active"]), None)
+    """Return the active session, auto-closing it if it has expired."""
+    max_age = settings.SESSION_MAX_MINUTES * 60
+    for s in _sessions.values():
+        if not s["is_active"]:
+            continue
+        age = time.time() - s["started_at"]
+        if age > max_age:
+            s["is_active"] = False
+            continue
+        return s
+    return None
 
 
 def _require_teacher(
@@ -98,10 +108,22 @@ def create_session(
         "discipline": data.discipline,
         "teacher": teacher,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": time.time(),
         "is_active": True,
         "attendees": [],
     }
     return _sessions[session_id]
+
+
+@router.post("/close-current")
+def close_current_session():
+    """Emergency: close whatever session is currently active. No auth required
+    (this endpoint is called from the public display screen)."""
+    session = _get_active_session()
+    if not session:
+        return {"status": "no_active_session"}
+    session["is_active"] = False
+    return {"status": "closed"}
 
 
 @router.get("/current")
