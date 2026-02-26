@@ -28,7 +28,13 @@ export default function StudentScanPage() {
       if (!videoRef.current) return;
       try {
         const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } } },
+          {
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
+          },
           videoRef.current,
           async (result, _err, c) => {
             if (!result) return;
@@ -111,36 +117,56 @@ export default function StudentScanPage() {
   }
 
   return (
-    <div className="h-full overflow-hidden bg-black flex flex-col">
-      {/* Camera feed — always mounted */}
+    <div className="h-full overflow-hidden bg-black relative">
+      {/* Camera feed — fullscreen */}
       <video
         ref={videoRef}
-        className="flex-1 w-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover"
         style={{ display: scanState === "idle" ? "block" : "none" }}
         muted
         playsInline
       />
 
-      {/* Overlay states */}
+      {/* QR viewfinder overlay */}
       {scanState === "idle" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 pointer-events-none">
-          <div className="bg-black/50 rounded-2xl px-6 py-3 mx-6 text-center">
-            <p className="text-white text-sm font-medium">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          {/* Semi-transparent dimming outside the frame */}
+          <div className="absolute inset-0 bg-black/50" />
+
+          {/* Viewfinder box */}
+          <div className="relative z-10 w-64 h-64">
+            {/* Clear "hole" */}
+            <div className="absolute inset-0 bg-transparent" />
+
+            {/* Corner brackets */}
+            {/* Top-left */}
+            <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-lg" />
+            {/* Top-right */}
+            <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-lg" />
+            {/* Bottom-left */}
+            <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-lg" />
+            {/* Bottom-right */}
+            <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-lg" />
+          </div>
+
+          {/* Instruction text */}
+          <div className="relative z-10 mt-8 text-center px-6">
+            <p className="text-white text-sm font-medium drop-shadow">
               Наведи камеру на QR-код на экране
             </p>
-            <p className="text-gray-400 text-xs mt-1">{student.student_name}</p>
+            <p className="text-gray-300 text-xs mt-1 drop-shadow">{student.student_name}</p>
           </div>
         </div>
       )}
 
       {scanState === "scanning" && (
-        <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
         </div>
       )}
 
       {(scanState === "success" || scanState === "already") && (
-        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 gap-4 px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 gap-4 px-6 text-center">
           <CheckCircle className="h-16 w-16 text-green-500" />
           <p className="text-lg font-bold text-gray-900">{message}</p>
           <p className="text-sm text-gray-500">{student.student_name}</p>
@@ -148,7 +174,7 @@ export default function StudentScanPage() {
       )}
 
       {scanState === "error" && (
-        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 gap-4 px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 gap-4 px-6 text-center">
           <XCircle className="h-16 w-16 text-red-400" />
           <p className="text-base font-semibold text-gray-900">{message}</p>
           <button

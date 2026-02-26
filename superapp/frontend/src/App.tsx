@@ -252,7 +252,6 @@ function HomeTab({
           <h1 className="text-xl font-bold text-gray-900">
             Привет, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{student.student_email}</p>
         </div>
         <button
           onClick={onScan}
