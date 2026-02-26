@@ -8,19 +8,17 @@ interface CurrentSession {
   discipline?: string;
   qr_token?: string;
   rotate_seconds?: number;
-  next_rotation_at?: number; // unix ms of next window boundary
+  next_rotation_at?: number;
 }
 
 export default function DisplayPage() {
   const [session, setSession] = useState<CurrentSession>({ active: false });
   const teacherUrl = `${window.location.origin}/teacher`;
 
-  // Build student QR payload from current session
   const studentQrValue = session.active
     ? JSON.stringify({ s: session.session_id, t: session.qr_token })
     : null;
 
-  // Fetch once on mount, then schedule next fetch exactly at the window boundary
   useEffect(() => {
     let timerId: ReturnType<typeof setTimeout>;
 
@@ -33,13 +31,10 @@ export default function DisplayPage() {
             const delay = Math.max(res.data.next_rotation_at - Date.now(), 200);
             timerId = setTimeout(fetchSession, delay);
           } else {
-            // No active session — poll every 3s waiting for teacher to start
             timerId = setTimeout(fetchSession, 3000);
           }
         })
-        .catch(() => {
-          timerId = setTimeout(fetchSession, 3000);
-        });
+        .catch(() => { timerId = setTimeout(fetchSession, 3000); });
     };
 
     fetchSession();
@@ -47,35 +42,64 @@ export default function DisplayPage() {
   }, []);
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-950 flex flex-col items-center justify-center gap-6 text-white select-none">
+    <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex">
       {!session.active ? (
+        /* ── No session: teacher auth QR ── */
         <>
-          <p className="text-sm text-gray-500 uppercase tracking-widest font-medium">
-            Авторизация преподавателя
-          </p>
-          <div className="bg-white p-4 rounded-2xl shadow-2xl">
-            <QRCodeSVG value={teacherUrl} size={220} level="M" />
+          {/* Left: QR */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-3xl shadow-2xl">
+              <QRCodeSVG value={teacherUrl} size={320} level="M" />
+            </div>
           </div>
-          <p className="text-gray-400 text-sm text-center px-8">
-            Отсканируйте код в приложении, чтобы запустить занятие
-          </p>
+
+          {/* Right: info */}
+          <div className="flex-1 flex flex-col justify-center px-16 gap-6">
+            <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
+              Система посещаемости
+            </p>
+            <h1 className="text-5xl font-bold leading-tight text-white">
+              Запустите занятие
+            </h1>
+            <p className="text-2xl text-gray-400 leading-relaxed">
+              Отсканируйте QR-код в приложении Политехник, чтобы авторизоваться и начать фиксацию посещаемости.
+            </p>
+            <div className="mt-4 h-px bg-gray-800" />
+            <p className="text-gray-600 text-lg">
+              Откройте приложение → Главная → значок QR
+            </p>
+          </div>
         </>
       ) : (
+        /* ── Active session: student QR ── */
         <>
-          <p className="text-sm text-gray-500 uppercase tracking-widest font-medium">
-            Отметьте посещаемость
-          </p>
-          <div className="bg-white p-4 rounded-2xl shadow-2xl">
-            <QRCodeSVG value={studentQrValue!} size={260} level="M" />
+          {/* Left: QR */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-3xl shadow-2xl">
+              <QRCodeSVG value={studentQrValue!} size={360} level="M" />
+            </div>
           </div>
-          <div className="text-center">
-            <p className="text-white font-semibold text-lg">{session.discipline}</p>
-            <p className="text-gray-500 text-xs mt-1">
-              Код обновляется каждые {session.rotate_seconds} с
+
+          {/* Right: info */}
+          <div className="flex-1 flex flex-col justify-center px-16 gap-6">
+            <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
+              Отметьте посещаемость
+            </p>
+            <h1 className="text-5xl font-bold leading-tight text-white break-words">
+              {session.discipline}
+            </h1>
+            <p className="text-2xl text-gray-400 leading-relaxed">
+              Откройте приложение Политехник, нажмите значок QR и наведите камеру на этот экран.
+            </p>
+            <div className="mt-4 h-px bg-gray-800" />
+            <p className="text-gray-600 text-lg">
+              Код обновляется каждые {session.rotate_seconds} секунды
             </p>
           </div>
         </>
       )}
     </div>
   );
+}
+
 }
