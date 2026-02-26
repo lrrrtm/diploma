@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "/app/uploads"
     ADMIN_PASSWORD: str = "admin"
 
+    # Shared secret for verifying launch tokens from superapp
+    LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
+
     class Config:
         env_file = ".env"
 

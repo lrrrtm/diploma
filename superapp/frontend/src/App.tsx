@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Home, CalendarDays, BookOpen, FileText, User, ArrowLeft } from "lucide-react";
-import { fetchMe, fetchMiniApps } from "./api";
+import { fetchMe, fetchMiniApps, fetchLaunchToken } from "./api";
 import type { MiniApp, Student } from "./types";
 import LoginPage from "./DevLoginPage";
 
@@ -44,13 +44,12 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
 // ---------------------------------------------------------------------------
 
 function ServicesSheet({
-  student,
   app,
 }: {
-  student: Student;
   app: MiniApp | undefined;
 }) {
   const [visible, setVisible] = useState(false);
+  const [href, setHref] = useState<string | null>(null);
   const closingRef = useRef(false);
 
   // Slide in after mount (next frame so CSS transition fires)
@@ -58,6 +57,16 @@ function ServicesSheet({
     const id = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(id);
   }, []);
+
+  // Fetch launch token and build iframe URL
+  useEffect(() => {
+    if (!app) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetchLaunchToken(token).then((launchToken) => {
+      setHref(`${app.url}?launch_token=${encodeURIComponent(launchToken)}`);
+    });
+  }, [app]);
 
   const handleClose = () => {
     if (closingRef.current) return;
@@ -67,15 +76,6 @@ function ServicesSheet({
       window.history.back();
     }, 320);
   };
-
-  const href = app
-    ? `${app.url}?` +
-      new URLSearchParams({
-        student_id: student.student_id,
-        student_name: student.student_name,
-        student_email: student.student_email,
-      }).toString()
-    : null;
 
   return (
     <div
@@ -101,7 +101,7 @@ function ServicesSheet({
         <iframe src={href} className="flex-1 w-full border-0" title="Заявки" />
       ) : (
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-          Сервис недоступен
+          {app ? "Загрузка..." : "Сервис недоступен"}
         </div>
       )}
     </div>
@@ -112,19 +112,18 @@ function ServicesSheet({
 // Mini-app card (Home tab)
 // ---------------------------------------------------------------------------
 
-function MiniAppCard({ app, student }: { app: MiniApp; student: Student }) {
-  const href =
-    `${app.url}?` +
-    new URLSearchParams({
-      student_id: student.student_id,
-      student_name: student.student_name,
-      student_email: student.student_email,
-    }).toString();
+function MiniAppCard({ app }: { app: MiniApp }) {
+  const handleClick = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const launchToken = await fetchLaunchToken(token);
+    window.open(`${app.url}?launch_token=${encodeURIComponent(launchToken)}`, "_blank");
+  };
 
   return (
-    <a
-      href={href}
-      className="group block bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-blue-200 transition-all duration-200"
+    <button
+      onClick={handleClick}
+      className="group block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-blue-200 transition-all duration-200"
     >
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
@@ -139,7 +138,7 @@ function MiniAppCard({ app, student }: { app: MiniApp; student: Student }) {
           )}
         </div>
       </div>
-    </a>
+    </button>
   );
 }
 
@@ -175,7 +174,7 @@ function HomeTab({ student, miniapps }: { student: Student; miniapps: MiniApp[] 
       ) : (
         <div className="space-y-3">
           {miniapps.map((app) => (
-            <MiniAppCard key={app.id} app={app} student={student} />
+            <MiniAppCard key={app.id} app={app} />
           ))}
         </div>
       )}
@@ -299,7 +298,6 @@ function HomePage() {
 
       {servicesOpen && (
         <ServicesSheet
-          student={student}
           app={servicesApp}
         />
       )}

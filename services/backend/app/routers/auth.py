@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 
 from app.config import settings
@@ -63,3 +64,29 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Неверный логин или пароль",
     )
+
+
+class LaunchTokenRequest(BaseModel):
+    token: str
+
+
+@router.post("/verify-launch")
+def verify_launch(body: LaunchTokenRequest):
+    """
+    Verify a launch token signed by the superapp.
+    Returns verified student identity.
+    """
+    try:
+        payload = jwt.decode(
+            body.token, settings.LAUNCH_TOKEN_SECRET, algorithms=["HS256"]
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired launch token",
+        )
+    return {
+        "student_external_id": payload["student_id"],
+        "student_name": payload["student_name"],
+        "student_email": payload["student_email"],
+    }

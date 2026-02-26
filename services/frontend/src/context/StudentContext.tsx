@@ -5,43 +5,39 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { useLocation } from "react-router-dom";
 import type { StudentInfo } from "@/types";
+import api from "@/api/client";
 
 const StudentContext = createContext<StudentInfo | null>(null);
 
-function parseStudentFromSearch(search: string): StudentInfo | null {
-  const params = new URLSearchParams(search);
-  const id = params.get("student_id");
-  const name = params.get("student_name");
-  const email = params.get("student_email");
-  if (id && name) {
-    return { student_external_id: id, student_name: name, student_email: email || "" };
-  }
-  return null;
-}
-
 export function StudentProvider({ children }: { children: ReactNode }) {
-  const location = useLocation();
-
   const [student, setStudent] = useState<StudentInfo | null>(() => {
-    // При инициализации — сначала пробуем URL, потом sessionStorage
-    const fromUrl = parseStudentFromSearch(window.location.search);
-    if (fromUrl) {
-      sessionStorage.setItem("student", JSON.stringify(fromUrl));
-      return fromUrl;
-    }
     const stored = sessionStorage.getItem("student");
     return stored ? JSON.parse(stored) : null;
   });
 
   useEffect(() => {
-    const fromUrl = parseStudentFromSearch(location.search);
-    if (fromUrl) {
-      sessionStorage.setItem("student", JSON.stringify(fromUrl));
-      setStudent(fromUrl);
-    }
-  }, [location.search]);
+    const params = new URLSearchParams(window.location.search);
+    const launchToken = params.get("launch_token");
+    if (!launchToken) return;
+
+    // Clean the URL so the token isn't visible / bookmarkable
+    window.history.replaceState({}, "", window.location.pathname);
+
+    // Verify the launch token via backend
+    api
+      .post("/auth/verify-launch", { token: launchToken })
+      .then((res) => {
+        const info: StudentInfo = res.data;
+        sessionStorage.setItem("student", JSON.stringify(info));
+        setStudent(info);
+      })
+      .catch(() => {
+        // Invalid or expired token — clear student context
+        sessionStorage.removeItem("student");
+        setStudent(null);
+      });
+  }, []);
 
   return (
     <StudentContext.Provider value={student}>
