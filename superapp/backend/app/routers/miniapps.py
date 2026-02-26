@@ -47,6 +47,14 @@ def list_miniapps():
             "url": settings.SERVICES_URL,
             "color": "blue",
         },
+        {
+            "id": "traffic",
+            "name": "Посещаемость",
+            "description": "Отметить присутствие на занятии по QR-коду",
+            "icon": "qr-code",
+            "url": settings.TRAFFIC_URL,
+            "color": "green",
+        },
     ]
 
 
