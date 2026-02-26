@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Home, CalendarDays, BookOpen, FileText, User, X, QrCode } from "lucide-react";
-import { fetchMe, fetchMiniApps, fetchLaunchToken } from "./api";
-import type { MiniApp, Student } from "./types";
+import { Pi, CalendarDays, BookOpen, FileText, User, X, QrCode } from "lucide-react";
+import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule } from "./api";
+import type { MiniApp, Student, WeekSchedule, DaySchedule } from "./types";
 import LoginPage from "./DevLoginPage";
 
 // ---------------------------------------------------------------------------
@@ -11,7 +11,7 @@ import LoginPage from "./DevLoginPage";
 type Tab = "home" | "schedule" | "gradebook" | "services" | "profile";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "home",      label: "Главная",    icon: Home         },
+  { id: "home",      label: "Главная",    icon: Pi         },
   { id: "schedule",  label: "Расписание", icon: CalendarDays },
   { id: "gradebook", label: "Зачётка",    icon: BookOpen     },
   { id: "services",  label: "Услуги",     icon: FileText     },
@@ -220,6 +220,149 @@ function MiniAppCard({ app }: { app: MiniApp }) {
 }
 
 // ---------------------------------------------------------------------------
+// Schedule tab
+// ---------------------------------------------------------------------------
+
+const WEEKDAY_SHORT = ["", "Пн", "Тв", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+function formatDateShort(iso: string) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
+  const loc = lesson.auditories
+    .map((a) => (a.building ? `${a.name} (${a.building})` : a.name))
+    .join(", ");
+  const teacher = lesson.teachers.map((t) => t.full_name).join(", ");
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-3">
+      <div className="flex flex-col items-center text-center w-14 shrink-0">
+        <span className="text-sm font-bold text-gray-900">{lesson.time_start}</span>
+        <span className="text-xs text-gray-400">{lesson.time_end}</span>
+      </div>
+      <div className="w-px bg-gray-100 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 shrink-0">
+            {lesson.type_abbr}
+          </span>
+          <p className="text-sm font-semibold text-gray-900 leading-tight">{lesson.subject}</p>
+        </div>
+        {teacher && <p className="text-xs text-gray-500 mt-1 truncate">{teacher}</p>}
+        {loc && <p className="text-xs text-gray-400 mt-0.5 truncate">{loc}</p>}
+        {lesson.additional_info && (
+          <p className="text-xs text-gray-400 mt-0.5 italic">{lesson.additional_info}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScheduleTab({ student }: { student: Student }) {
+  const [groupId, setGroupId] = useState<number | null>(null);
+  const [schedule, setSchedule] = useState<WeekSchedule | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeDayIdx, setActiveDayIdx] = useState<number>(0);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let gid = groupId;
+        if (!gid) {
+          if (!student.faculty_abbr || !student.study_group_str) {
+            setError("Группа не определена в профиле");
+            setLoading(false);
+            return;
+          }
+          const resolved = await fetchResolveGroup(token, student.faculty_abbr, student.study_group_str);
+          gid = resolved.group_id;
+          setGroupId(gid);
+        }
+        const data = await fetchSchedule(token, gid);
+        setSchedule(data);
+        // Auto-select today's day if present
+        const todayIso = new Date().toISOString().slice(0, 10);
+        const idx = data.days.findIndex((d: DaySchedule) => d.date === todayIso);
+        setActiveDayIdx(idx >= 0 ? idx : 0);
+      } catch (e: unknown) {
+        setError((e as Error).message ?? "Ошибка загрузки расписания");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  if (error || !schedule) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+        <p className="text-gray-500 text-sm">{error ?? "Расписание недоступно"}</p>
+      </div>
+    );
+  }
+
+  const days = schedule.days;
+  const activeDay = days[activeDayIdx];
+
+  return (
+    <div>
+      {/* Sticky day tabs */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 pt-4 pb-0">
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+          {days.map((day, idx) => {
+            const isActive = idx === activeDayIdx;
+            return (
+              <button
+                key={day.date}
+                onClick={() => setActiveDayIdx(idx)}
+                className={`flex flex-col items-center px-3 pb-2 pt-1 rounded-t-xl text-xs font-medium shrink-0 border-b-2 transition-colors ${
+                  isActive
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                <span className="text-base font-bold">{WEEKDAY_SHORT[day.weekday]}</span>
+                <span>{formatDateShort(day.date)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Lessons */}
+      <div className="px-4 py-4 space-y-3">
+        {activeDay?.lessons.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-2xl mb-2">🎉</p>
+            <p className="text-gray-400 text-sm">Занятий нет</p>
+          </div>
+        ) : (
+          activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} />)
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Placeholder
 // ---------------------------------------------------------------------------
 
@@ -245,12 +388,19 @@ function HomeTab({
   miniapps: MiniApp[];
   onScan: () => void;
 }) {
+  const hour = new Date().getHours();
+  const greeting =
+    hour >= 5 && hour < 12 ? "Доброе утро" :
+    hour >= 12 && hour < 18 ? "Добрый день" :
+    hour >= 18 && hour < 23 ? "Добрый вечер" :
+    "Доброй ночи";
+
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
-            Привет, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
+            {greeting}, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
           </h1>
         </div>
         <button
@@ -292,6 +442,24 @@ function ProfileTab({ student }: { student: Student }) {
           <p className="text-xs text-gray-400">ID студента</p>
           <p className="text-sm font-medium text-gray-900 mt-0.5">{student.student_id}</p>
         </div>
+        {student.study_group_str && (
+          <div className="px-4 py-3">
+            <p className="text-xs text-gray-400">Учебная группа</p>
+            <p className="text-sm font-medium text-gray-900 mt-0.5">{student.study_group_str}</p>
+          </div>
+        )}
+        {student.faculty_abbr && (
+          <div className="px-4 py-3">
+            <p className="text-xs text-gray-400">Институт</p>
+            <p className="text-sm font-medium text-gray-900 mt-0.5">{student.faculty_abbr}</p>
+          </div>
+        )}
+        {student.grade_book_number && (
+          <div className="px-4 py-3">
+            <p className="text-xs text-gray-400">Номер зачётной книжки</p>
+            <p className="text-sm font-medium text-gray-900 mt-0.5">{student.grade_book_number}</p>
+          </div>
+        )}
       </div>
 
       <button
@@ -386,7 +554,7 @@ function HomePage() {
     <div className="h-screen overflow-hidden bg-gray-50">
       <div className="h-full overflow-y-auto pb-20">
         {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} />}
-        {tab === "schedule"  && <ComingSoon label="Расписание" />}
+        {tab === "schedule"  && <ScheduleTab student={student} />}
         {tab === "gradebook" && <ComingSoon label="Зачётка" />}
         {tab === "profile"   && <ProfileTab student={student} />}
       </div>

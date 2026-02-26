@@ -40,7 +40,7 @@ bearer = HTTPBearer(auto_error=False)
 # ---------------------------------------------------------------------------
 
 
-def _create_token(student_id: str, email: str, name: str) -> str:
+def _create_token(student_id: str, email: str, name: str, study_group_str: str = "", grade_book_number: str = "", faculty_abbr: str = "") -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -48,6 +48,9 @@ def _create_token(student_id: str, email: str, name: str) -> str:
         "sub": student_id,
         "email": email,
         "name": name,
+        "study_group_str": study_group_str,
+        "grade_book_number": grade_book_number,
+        "faculty_abbr": faculty_abbr,
         "exp": expire,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -135,8 +138,19 @@ async def _scrape_cas_login(username: str, password: str) -> dict:
     name = " ".join(part for part in [last, first, middle] if part).strip()
     student_id = str(ws_asu["user_id"])
     email = username if "@" in username else f"{username}@edu.spbstu.ru"
+    study_group_str = ws_asu.get("sub_dep", "")
+    grade_book_number = ws_asu.get("number", "")
+    faculty_abbr = ws_asu.get("dep", "")
 
-    return {"student_id": student_id, "email": email, "name": name, "ws_asu": ws_asu}
+    return {
+        "student_id": student_id,
+        "email": email,
+        "name": name,
+        "study_group_str": study_group_str,
+        "grade_book_number": grade_book_number,
+        "faculty_abbr": faculty_abbr,
+        "ws_asu": ws_asu,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -161,12 +175,22 @@ async def login(body: LoginRequest):
     Returns a JWT + student identity on success.
     """
     identity = await _scrape_cas_login(body.username, body.password)
-    token = _create_token(identity["student_id"], identity["email"], identity["name"])
+    token = _create_token(
+        identity["student_id"],
+        identity["email"],
+        identity["name"],
+        identity["study_group_str"],
+        identity["grade_book_number"],
+        identity["faculty_abbr"],
+    )
     return {
         "token": token,
         "student_id": identity["student_id"],
         "student_name": identity["name"],
         "student_email": identity["email"],
+        "study_group_str": identity["study_group_str"],
+        "grade_book_number": identity["grade_book_number"],
+        "faculty_abbr": identity["faculty_abbr"],
         "ws_asu": identity["ws_asu"],
     }
 
@@ -242,4 +266,7 @@ def get_me(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
         "student_id": payload["sub"],
         "student_email": payload["email"],
         "student_name": payload["name"],
+        "study_group_str": payload.get("study_group_str", ""),
+        "grade_book_number": payload.get("grade_book_number", ""),
+        "faculty_abbr": payload.get("faculty_abbr", ""),
     }
