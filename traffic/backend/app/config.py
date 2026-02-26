@@ -15,5 +15,8 @@ class Settings(BaseSettings):
     # How often the student QR token rotates (seconds)
     QR_ROTATE_SECONDS: int = 5
 
+    # Sessions auto-expire after this many minutes of inactivity
+    SESSION_MAX_MINUTES: int = 90
+
 
 settings = Settings()

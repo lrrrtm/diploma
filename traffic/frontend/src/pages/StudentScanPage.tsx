@@ -81,7 +81,7 @@ export default function StudentScanPage() {
   // Loading while verifying launch token
   if (loading) {
     return (
-      <div className="h-screen overflow-hidden flex items-center justify-center bg-gray-50">
+      <div className="h-full overflow-hidden flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
       </div>
     );
@@ -90,7 +90,7 @@ export default function StudentScanPage() {
   // No student identity
   if (!student) {
     return (
-      <div className="h-screen overflow-hidden flex flex-col items-center justify-center bg-gray-50 px-6 text-center gap-4">
+      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-gray-50 px-6 text-center gap-4">
         <QrCode className="h-12 w-12 text-gray-300" />
         <p className="font-semibold text-gray-700">Открой через Политехник</p>
         <p className="text-sm text-gray-400">
@@ -103,7 +103,7 @@ export default function StudentScanPage() {
   // Camera error
   if (cameraError) {
     return (
-      <div className="h-screen overflow-hidden flex flex-col items-center justify-center bg-gray-50 px-6 text-center gap-4">
+      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-gray-50 px-6 text-center gap-4">
         <XCircle className="h-12 w-12 text-red-400" />
         <p className="text-sm text-gray-600">{cameraError}</p>
       </div>
@@ -111,7 +111,7 @@ export default function StudentScanPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-black flex flex-col">
+    <div className="h-full overflow-hidden bg-black flex flex-col">
       {/* Camera feed — always mounted */}
       <video
         ref={videoRef}
