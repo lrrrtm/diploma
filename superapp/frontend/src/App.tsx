@@ -311,6 +311,6 @@ function HomePage() {
           onClose={() => setServicesOpen(false)}
         />
       )}
-    </div>  )
+    </div>
   );
 }
