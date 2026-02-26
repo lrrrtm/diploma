@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # URL of the services mini-app (used in miniapps registry)
     SERVICES_URL: str = "http://localhost"
 
+    # URL of the traffic (attendance) mini-app
+    TRAFFIC_URL: str = "http://localhost:3012"
+
     # Shared secret for signing launch tokens (must match services backend)
     LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
 

@@ -10,6 +10,7 @@ services:
       CAS_SERVICE_URL: ${CAS_SERVICE_URL}
       FRONTEND_URL: ${FRONTEND_URL}
       SERVICES_URL: ${SERVICES_URL}
+      TRAFFIC_URL: ${TRAFFIC_URL}
       LAUNCH_TOKEN_SECRET: ${LAUNCH_TOKEN_SECRET}
     networks:
       superapp:
@@ -78,6 +79,29 @@ services:
     networks:
       - services
 
+  # ---- Traffic mini-app (traffic.poly.hex8d.space) ----
+
+  traffic-backend:
+    build: ./traffic/backend
+    restart: unless-stopped
+    environment:
+      LAUNCH_TOKEN_SECRET: ${LAUNCH_TOKEN_SECRET}
+      TEACHER_SECRET: ${TRAFFIC_TEACHER_SECRET}
+    networks:
+      traffic:
+        aliases:
+          - backend
+
+  traffic-frontend:
+    build: ./traffic/frontend
+    restart: unless-stopped
+    ports:
+      - "3012:80"
+    depends_on:
+      - traffic-backend
+    networks:
+      - traffic
+
 volumes:
   services_db_data:
   services_uploads:
@@ -85,3 +109,4 @@ volumes:
 networks:
   superapp:
   services:
+  traffic:

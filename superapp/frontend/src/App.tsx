@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Home, CalendarDays, BookOpen, FileText, User, X } from "lucide-react";
+import { Home, CalendarDays, BookOpen, FileText, User, X, QrCode } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken } from "./api";
 import type { MiniApp, Student } from "./types";
 import LoginPage from "./DevLoginPage";
@@ -116,6 +116,76 @@ function ServicesSheet({
 }
 
 // ---------------------------------------------------------------------------
+// Traffic sheet — camera scanner iframe for attendance
+// ---------------------------------------------------------------------------
+
+function TrafficSheet({
+  app,
+  onClose,
+}: {
+  app: MiniApp | undefined;
+  onClose: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [href, setHref] = useState<string | null>(null);
+  const closingRef = useRef(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  useEffect(() => {
+    if (!app) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetchLaunchToken(token).then((launchToken) => {
+      setHref(`${app.url}/scan?launch_token=${encodeURIComponent(launchToken)}`);
+    });
+  }, [app]);
+
+  const handleClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(() => onClose(), 320);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-white"
+      style={{
+        transform: visible ? "translateY(0)" : "translateY(100%)",
+        transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
+      }}
+    >
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0 bg-white">
+        <span className="font-semibold text-gray-900">Посещаемость</span>
+        <button
+          onClick={handleClose}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {href ? (
+        <iframe
+          src={href}
+          allow="camera"
+          className="flex-1 w-full border-0"
+          title="Посещаемость"
+        />
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+          {app ? "Загрузка..." : "Сервис недоступен"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Mini-app card (Home tab)
 // ---------------------------------------------------------------------------
 
@@ -166,14 +236,31 @@ function ComingSoon({ label }: { label: string }) {
 // Tab screens
 // ---------------------------------------------------------------------------
 
-function HomeTab({ student, miniapps }: { student: Student; miniapps: MiniApp[] }) {
+function HomeTab({
+  student,
+  miniapps,
+  onScan,
+}: {
+  student: Student;
+  miniapps: MiniApp[];
+  onScan: () => void;
+}) {
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">
-          Привет, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
-        </h1>
-        <p className="text-sm text-gray-500 mt-0.5">{student.student_email}</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">
+            Привет, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">{student.student_email}</p>
+        </div>
+        <button
+          onClick={onScan}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors shrink-0"
+          title="Отметить посещаемость"
+        >
+          <QrCode className="h-5 w-5" />
+        </button>
       </div>
 
       {miniapps.length === 0 ? (
@@ -237,6 +324,7 @@ function HomePage() {
   const [miniapps, setMiniApps] = useState<MiniApp[]>([]);
   const [tab, setTab] = useState<Tab>("home");
   const [servicesOpen, setServicesOpen] = useState(false);
+  const [trafficOpen, setTrafficOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -293,11 +381,12 @@ function HomePage() {
   }
 
   const servicesApp = miniapps.find((a) => a.id === "services");
+  const trafficApp = miniapps.find((a) => a.id === "traffic");
 
   return (
     <div className="h-screen overflow-hidden bg-gray-50">
       <div className="h-full overflow-y-auto pb-20">
-        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} />}
+        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} />}
         {tab === "schedule"  && <ComingSoon label="Расписание" />}
         {tab === "gradebook" && <ComingSoon label="Зачётка" />}
         {tab === "profile"   && <ProfileTab student={student} />}
@@ -309,6 +398,13 @@ function HomePage() {
         <ServicesSheet
           app={servicesApp}
           onClose={() => setServicesOpen(false)}
+        />
+      )}
+
+      {trafficOpen && (
+        <TrafficSheet
+          app={trafficApp}
+          onClose={() => setTrafficOpen(false)}
         />
       )}
     </div>
