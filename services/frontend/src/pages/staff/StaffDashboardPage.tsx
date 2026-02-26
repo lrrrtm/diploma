@@ -73,7 +73,7 @@ export default function StaffDashboardPage() {
   }, []);
 
   const serviceOptions = useMemo(() => {
-    const names = Array.from(new Set(applications.map((a) => a.service_name))).sort();
+    const names = Array.from(new Set(applications.map((a) => a.service_name).filter((n): n is string => n != null))).sort();
     return names;
   }, [applications]);
 
