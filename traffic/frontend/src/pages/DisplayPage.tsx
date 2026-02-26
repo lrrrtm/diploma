@@ -8,6 +8,7 @@ interface CurrentSession {
   discipline?: string;
   qr_token?: string;
   rotate_seconds?: number;
+  next_rotation_at?: number; // unix ms of next window boundary
 }
 
 export default function DisplayPage() {
@@ -19,20 +20,31 @@ export default function DisplayPage() {
     ? JSON.stringify({ s: session.session_id, t: session.qr_token })
     : null;
 
-  // Poll for session state and rotating token
+  // Fetch once on mount, then schedule next fetch exactly at the window boundary
   useEffect(() => {
-    const poll = () => {
+    let timerId: ReturnType<typeof setTimeout>;
+
+    const fetchSession = () => {
       api
         .get<CurrentSession>("/sessions/current")
-        .then((res) => setSession(res.data))
-        .catch(() => {});
+        .then((res) => {
+          setSession(res.data);
+          if (res.data.active && res.data.next_rotation_at) {
+            const delay = Math.max(res.data.next_rotation_at - Date.now(), 200);
+            timerId = setTimeout(fetchSession, delay);
+          } else {
+            // No active session — poll every 3s waiting for teacher to start
+            timerId = setTimeout(fetchSession, 3000);
+          }
+        })
+        .catch(() => {
+          timerId = setTimeout(fetchSession, 3000);
+        });
     };
 
-    poll();
-    const interval = setInterval(poll, (session.rotate_seconds ?? 10) * 1000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.active, session.rotate_seconds]);
+    fetchSession();
+    return () => clearTimeout(timerId);
+  }, []);
 
   return (
     <div className="h-screen overflow-hidden bg-gray-950 flex flex-col items-center justify-center gap-6 text-white select-none">

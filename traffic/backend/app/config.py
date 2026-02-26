@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     TEACHER_SECRET: str = "change-me-teacher-secret"
 
     # How often the student QR token rotates (seconds)
-    QR_ROTATE_SECONDS: int = 10
+    QR_ROTATE_SECONDS: int = 5
 
 
 settings = Settings()

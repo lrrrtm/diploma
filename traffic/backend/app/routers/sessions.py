@@ -110,12 +110,16 @@ def get_current_session():
     session = _get_active_session()
     if not session:
         return {"active": False}
+    now = time.time()
+    window_start = int(now) // settings.QR_ROTATE_SECONDS * settings.QR_ROTATE_SECONDS
+    next_rotation_at = int((window_start + settings.QR_ROTATE_SECONDS) * 1000)  # ms
     return {
         "active": True,
         "session_id": session["id"],
         "discipline": session["discipline"],
         "qr_token": _rotating_token(session["id"]),
         "rotate_seconds": settings.QR_ROTATE_SECONDS,
+        "next_rotation_at": next_rotation_at,
     }
 
 
