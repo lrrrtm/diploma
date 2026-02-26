@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FileText, Paperclip } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { FileText, Paperclip, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
@@ -45,30 +44,27 @@ export default function DepartmentDetailPage() {
           <p className="text-muted-foreground">Доступных услуг пока нет</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4">
           {activeServices.map((service) => (
-            <Card key={service.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg">{service.name}</CardTitle>
-                  {service.requires_attachment && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Paperclip className="h-3 w-3" />
-                      Нужны документы
-                    </Badge>
-                  )}
-                </div>
+            <Card
+              key={service.id}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate(`/apply/${service.id}`)}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold">{service.name}</CardTitle>
+                <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
               </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
+              <CardContent>
+                <p className="text-sm text-muted-foreground line-clamp-2">
                   {service.description || "Описание отсутствует"}
                 </p>
-                <Button
-                  className="w-full"
-                  onClick={() => navigate(`/apply/${service.id}`)}
-                >
-                  Подать заявку
-                </Button>
+                {service.requires_attachment && (
+                  <Badge variant="secondary" className="gap-1 mt-2">
+                    <Paperclip className="h-3 w-3" />
+                    Нужны документы
+                  </Badge>
+                )}
               </CardContent>
             </Card>
           ))}
