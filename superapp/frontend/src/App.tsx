@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Home, CalendarDays, BookOpen, FileText, User, ChevronDown } from "lucide-react";
+import { Home, CalendarDays, BookOpen, FileText, User, ArrowLeft } from "lucide-react";
 import { fetchMe, fetchMiniApps } from "./api";
 import type { MiniApp, Student } from "./types";
 import LoginPage from "./DevLoginPage";
@@ -14,7 +14,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "home",      label: "Главная",    icon: Home         },
   { id: "schedule",  label: "Расписание", icon: CalendarDays },
   { id: "gradebook", label: "Зачётка",    icon: BookOpen     },
-  { id: "services",  label: "Заявки",     icon: FileText     },
+  { id: "services",  label: "Услуги",     icon: FileText     },
   { id: "profile",   label: "Профиль",    icon: User         },
 ];
 
@@ -46,11 +46,9 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
 function ServicesSheet({
   student,
   app,
-  onClose,
 }: {
   student: Student;
   app: MiniApp | undefined;
-  onClose: () => void;
 }) {
   const [visible, setVisible] = useState(false);
   const closingRef = useRef(false);
@@ -65,7 +63,9 @@ function ServicesSheet({
     if (closingRef.current) return;
     closingRef.current = true;
     setVisible(false);
-    setTimeout(onClose, 320);
+    setTimeout(() => {
+      window.history.back();
+    }, 320);
   };
 
   const href = app
@@ -91,7 +91,7 @@ function ServicesSheet({
           onClick={handleClose}
           className="p-1 -ml-1 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
         >
-          <ChevronDown className="h-6 w-6" />
+          <ArrowLeft className="h-6 w-6" />
         </button>
         <span className="font-semibold text-gray-900">Заявки</span>
       </div>
@@ -260,14 +260,23 @@ function HomePage() {
   const handleTabChange = (t: Tab) => {
     if (t === "services") {
       setServicesOpen(true);
+      window.history.pushState({ services: true }, "");
     } else {
       setTab(t);
     }
   };
 
-  const handleServicesClose = () => {
-    setServicesOpen(false);
-  };
+  // Close services sheet on browser back
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      if (servicesOpen) {
+        e.preventDefault();
+        setServicesOpen(false);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [servicesOpen]);
 
   if (!student) {
     return (
@@ -292,7 +301,6 @@ function HomePage() {
         <ServicesSheet
           student={student}
           app={servicesApp}
-          onClose={handleServicesClose}
         />
       )}
     </div>
