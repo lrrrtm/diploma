@@ -47,9 +47,9 @@ export default function LoginPage() {
               <LayoutDashboard className="h-7 w-7 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Вход в управление</CardTitle>
+          <CardTitle className="text-2xl">Политехник.Уником</CardTitle>
           <CardDescription>
-            Панель управления структурами университета
+            Панель управления структурами и услугами
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
