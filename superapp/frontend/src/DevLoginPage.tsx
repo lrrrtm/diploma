@@ -42,8 +42,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
         <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">UniComm</h1>
-          <p className="text-sm text-gray-500 mt-1">Войдите через аккаунт СПбПУ</p>
+          <h1 className="text-xl font-bold text-gray-900">Политехник</h1>
+          <p className="text-sm text-gray-500 mt-1">Войди через учётную запись СПбПУ</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

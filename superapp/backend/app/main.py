@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import auth, miniapps
 
-app = FastAPI(title="UniComm Super-App API")
+app = FastAPI(title="Polytech Root App API")
 
 app.add_middleware(
     CORSMiddleware,

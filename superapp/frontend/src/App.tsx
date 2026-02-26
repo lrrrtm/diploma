@@ -22,18 +22,20 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
       <div className="max-w-2xl mx-auto flex">
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => onChange(id)}
-            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              active === id ? "text-blue-600" : "text-gray-400 hover:text-gray-600"
-            }`}
-          >
-            <Icon className="h-5 w-5" />
-            {label}
-          </button>
-        ))}
+        {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+          const isActive = active === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onChange(id)}
+              className="flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors"
+              style={{ color: isActive ? "#2563eb" : "#9ca3af" }}
+            >
+              <Icon className="h-5 w-5" />
+              {label}
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
@@ -45,8 +47,10 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
 
 function ServicesSheet({
   app,
+  onClose,
 }: {
   app: MiniApp | undefined;
+  onClose: () => void;
 }) {
   const [visible, setVisible] = useState(false);
   const [href, setHref] = useState<string | null>(null);
@@ -73,10 +77,13 @@ function ServicesSheet({
     closingRef.current = true;
     setVisible(false);
     setTimeout(() => {
-      window.history.back();
+      onClose();
+      // Also update browser history if we pushed a state on open
+      if (window.history.state?.services) {
+        window.history.back();
+      }
     }, 320);
   };
-
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col bg-white"
@@ -299,6 +306,7 @@ function HomePage() {
       {servicesOpen && (
         <ServicesSheet
           app={servicesApp}
+          onClose={() => setServicesOpen(false)}
         />
       )}
     </div>
