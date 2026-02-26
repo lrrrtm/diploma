@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useStudent } from "@/context/StudentContext";
 import { AppLayout } from "@/components/shared/app-layout";
 
 import LoginPage from "@/pages/auth/LoginPage";
@@ -33,10 +34,12 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 
 function HomePage() {
   const { isAuthenticated, auth } = useAuth();
+  const student = useStudent();
   if (isAuthenticated && auth?.role === "staff") return <Navigate to="/staff" replace />;
   if (isAuthenticated && auth?.role === "admin") return <Navigate to="/admin/departments" replace />;
   if (isAuthenticated && auth?.role === "executor") return <Navigate to="/executor" replace />;
-  return <Navigate to="/departments" replace />;
+  if (student) return <Navigate to="/departments" replace />;
+  return <Navigate to="/login" replace />;
 }
 
 export default function App() {

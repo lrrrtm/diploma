@@ -28,10 +28,10 @@ export default function DepartmentsPage() {
 
   return (
     <div>
-      <PageHeader
+      {/* <PageHeader
         title="Структуры университета"
         description="Выберите структуру для получения услуги"
-      />
+      /> */}
 
       {departments.length === 0 ? (
         <div className="text-center py-12">
@@ -39,7 +39,7 @@ export default function DepartmentsPage() {
           <p className="text-muted-foreground">Структуры пока не добавлены</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4">
           {departments.map((dept) => (
             <Card
               key={dept.id}
