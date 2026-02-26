@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Home, CalendarDays, BookOpen, FileText, User, ArrowLeft } from "lucide-react";
+import { Home, CalendarDays, BookOpen, FileText, User, X } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken } from "./api";
 import type { MiniApp, Student } from "./types";
 import LoginPage from "./DevLoginPage";
@@ -93,14 +93,14 @@ function ServicesSheet({
       }}
     >
       {/* Sheet header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 shrink-0 bg-white">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0 bg-white">
+        <span className="font-semibold text-gray-900">Услуги</span>
         <button
           onClick={handleClose}
-          className="p-1 -ml-1 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900 transition-colors"
         >
-          <ArrowLeft className="h-6 w-6" />
+          <X className="h-4 w-4" />
         </button>
-        <span className="font-semibold text-gray-900">Заявки</span>
       </div>
 
       {/* Mini-app iframe */}
