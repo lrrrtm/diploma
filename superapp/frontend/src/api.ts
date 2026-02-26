@@ -15,3 +15,12 @@ export async function fetchMiniApps(token: string) {
   if (!res.ok) throw new Error("Failed to load mini-apps");
   return res.json();
 }
+
+export async function fetchLaunchToken(token: string): Promise<string> {
+  const res = await fetch(`${BASE}/miniapps/launch-token`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to get launch token");
+  const data = await res.json();
+  return data.launch_token;
+}
