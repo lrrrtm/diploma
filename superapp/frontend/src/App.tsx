@@ -286,7 +286,7 @@ function HomePage() {
 
   if (!student) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-screen overflow-hidden flex items-center justify-center bg-gray-50">
         <p className="text-gray-400 text-sm">Загрузка...</p>
       </div>
     );
@@ -295,11 +295,13 @@ function HomePage() {
   const servicesApp = miniapps.find((a) => a.id === "services");
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {tab === "home"      && <HomeTab student={student} miniapps={miniapps} />}
-      {tab === "schedule"  && <ComingSoon label="Расписание" />}
-      {tab === "gradebook" && <ComingSoon label="Зачётка" />}
-      {tab === "profile"   && <ProfileTab student={student} />}
+    <div className="h-screen overflow-hidden bg-gray-50">
+      <div className="h-full overflow-y-auto pb-20">
+        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} />}
+        {tab === "schedule"  && <ComingSoon label="Расписание" />}
+        {tab === "gradebook" && <ComingSoon label="Зачётка" />}
+        {tab === "profile"   && <ProfileTab student={student} />}
+      </div>
 
       <BottomNav active={servicesOpen ? "services" : tab} onChange={handleTabChange} />
 
@@ -309,6 +311,6 @@ function HomePage() {
           onClose={() => setServicesOpen(false)}
         />
       )}
-    </div>
+    </div>  )
   );
 }
