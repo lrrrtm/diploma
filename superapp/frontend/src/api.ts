@@ -24,3 +24,30 @@ export async function fetchLaunchToken(token: string): Promise<string> {
   const data = await res.json();
   return data.launch_token;
 }
+
+export async function fetchResolveGroup(
+  token: string,
+  facultyAbbr: string,
+  groupName: string,
+): Promise<{ group_id: number; faculty_id: number }> {
+  const params = new URLSearchParams({ faculty_abbr: facultyAbbr, group_name: groupName });
+  const res = await fetch(`${BASE}/schedule/resolve-group?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to resolve group");
+  return res.json();
+}
+
+export async function fetchSchedule(
+  token: string,
+  groupId: number,
+  date?: string,
+) {
+  const params = new URLSearchParams({ group_id: String(groupId) });
+  if (date) params.set("date", date);
+  const res = await fetch(`${BASE}/schedule?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to load schedule");
+  return res.json();
+}

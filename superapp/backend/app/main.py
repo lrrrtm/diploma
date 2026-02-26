@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, miniapps
+from app.routers import auth, miniapps, schedule
 
 app = FastAPI(title="Polytech Root App API")
 
@@ -15,6 +15,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(miniapps.router, prefix="/api/miniapps", tags=["miniapps"])
+app.include_router(schedule.router, prefix="/api/schedule", tags=["schedule"])
 
 
 @app.get("/api/health")
