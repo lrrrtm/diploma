@@ -1,0 +1,14 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    # not exposed to host — only accessible inside Docker network
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "8001:80"   # ngrok http 8001 → nginx → serves SPA + proxies /api/ to backend
+    depends_on:
+      - backend
