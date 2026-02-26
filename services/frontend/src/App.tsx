@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { useStudent } from "@/context/StudentContext";
+import { useStudent, useStudentLoading } from "@/context/StudentContext";
 import { AppLayout } from "@/components/shared/app-layout";
 
 import LoginPage from "@/pages/auth/LoginPage";
@@ -35,6 +35,12 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 function HomePage() {
   const { isAuthenticated, auth } = useAuth();
   const student = useStudent();
+  const isLoading = useStudentLoading();
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+    </div>
+  );
   if (isAuthenticated && auth?.role === "staff") return <Navigate to="/staff" replace />;
   if (isAuthenticated && auth?.role === "admin") return <Navigate to="/admin/departments" replace />;
   if (isAuthenticated && auth?.role === "executor") return <Navigate to="/executor" replace />;

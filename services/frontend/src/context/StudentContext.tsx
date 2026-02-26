@@ -8,12 +8,22 @@ import {
 import type { StudentInfo } from "@/types";
 import api from "@/api/client";
 
-const StudentContext = createContext<StudentInfo | null>(null);
+interface StudentContextValue {
+  student: StudentInfo | null;
+  isLoading: boolean;
+}
+
+const StudentContext = createContext<StudentContextValue>({ student: null, isLoading: false });
 
 export function StudentProvider({ children }: { children: ReactNode }) {
   const [student, setStudent] = useState<StudentInfo | null>(() => {
     const stored = sessionStorage.getItem("student");
     return stored ? JSON.parse(stored) : null;
+  });
+
+  // If there's a launch_token in the URL we need to verify it — start in loading state
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    return new URLSearchParams(window.location.search).has("launch_token");
   });
 
   useEffect(() => {
@@ -36,16 +46,23 @@ export function StudentProvider({ children }: { children: ReactNode }) {
         // Invalid or expired token — clear student context
         sessionStorage.removeItem("student");
         setStudent(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, []);
 
   return (
-    <StudentContext.Provider value={student}>
+    <StudentContext.Provider value={{ student, isLoading }}>
       {children}
     </StudentContext.Provider>
   );
 }
 
 export function useStudent(): StudentInfo | null {
-  return useContext(StudentContext);
+  return useContext(StudentContext).student;
+}
+
+export function useStudentLoading(): boolean {
+  return useContext(StudentContext).isLoading;
 }
