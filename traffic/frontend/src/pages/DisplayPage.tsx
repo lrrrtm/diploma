@@ -55,24 +55,17 @@ export default function DisplayPage() {
           {/* Left: QR */}
           <div className="flex-1 flex items-center justify-center">
             <div className="bg-white p-6 rounded-3xl shadow-2xl">
-              <QRCodeSVG value={teacherUrl} size={320} level="M" />
+              <QRCodeSVG value={teacherUrl} size={640} level="M" />
             </div>
           </div>
 
           {/* Right: info */}
           <div className="flex-1 flex flex-col justify-center px-16 gap-6">
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
-              Система посещаемости
-            </p>
             <h1 className="text-5xl font-bold leading-tight text-white">
               Запустите занятие
             </h1>
             <p className="text-2xl text-gray-400 leading-relaxed">
-              Отсканируйте QR-код в приложении Политехник, чтобы авторизоваться и начать фиксацию посещаемости.
-            </p>
-            <div className="mt-4 h-px bg-gray-800" />
-            <p className="text-gray-600 text-lg">
-              Откройте приложение → Главная → значок QR
+              Отсканируйте QR-код с помощью телефона, чтобы начать фиксацию посещаемости
             </p>
           </div>
         </>
@@ -82,7 +75,7 @@ export default function DisplayPage() {
           {/* Left: QR */}
           <div className="flex-1 flex items-center justify-center">
             <div className="bg-white p-6 rounded-3xl shadow-2xl">
-              <QRCodeSVG value={studentQrValue!} size={360} level="M" />
+              <QRCodeSVG value={studentQrValue!} size={640} level="M" />
             </div>
           </div>
 
@@ -95,11 +88,7 @@ export default function DisplayPage() {
               {session.discipline}
             </h1>
             <p className="text-2xl text-gray-400 leading-relaxed">
-              Откройте приложение Политехник, нажмите значок QR и наведите камеру на этот экран.
-            </p>
-            <div className="mt-4 h-px bg-gray-800" />
-            <p className="text-gray-600 text-lg">
-              Код обновляется каждые {session.rotate_seconds} секунды
+              Открой приложение Политехник, нажми на значок QR и наведи камеру на этот экран
             </p>
             <button
               onClick={handleForceClose}
