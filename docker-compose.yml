@@ -57,7 +57,10 @@ services:
       services-db:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_HOST: db
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
       SECRET_KEY: ${SERVICES_SECRET_KEY}
       UPLOAD_DIR: /app/uploads
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
