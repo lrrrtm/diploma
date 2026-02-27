@@ -11,6 +11,7 @@ import DuckScreen from "@/components/DuckScreen";
 import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
 
 const REFRESH_INTERVAL = 5000;
+let applicationsCache: ApplicationBrief[] | null = null;
 
 function AppCard({ app, onClick }: { app: ApplicationBrief; onClick: () => void }) {
   return (
@@ -37,8 +38,8 @@ function AppCard({ app, onClick }: { app: ApplicationBrief; onClick: () => void 
 
 export default function ApplicationsPage() {
   const student = useStudent();
-  const [applications, setApplications] = useState<ApplicationBrief[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [applications, setApplications] = useState<ApplicationBrief[]>(applicationsCache ?? []);
+  const [loading, setLoading] = useState(applicationsCache === null);
   const navigate = useNavigate();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -49,6 +50,7 @@ export default function ApplicationsPage() {
         params: { student_external_id: student.student_external_id },
       })
       .then((res) => {
+        applicationsCache = res.data;
         setApplications(res.data);
         setLoading(false);
       })

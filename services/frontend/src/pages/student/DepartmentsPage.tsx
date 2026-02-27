@@ -8,13 +8,17 @@ import type { Department } from "@/types";
 import DuckScreen from "@/components/DuckScreen";
 import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
 
+let departmentsCache: Department[] | null = null;
+
 export default function DepartmentsPage() {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [departments, setDepartments] = useState<Department[]>(departmentsCache ?? []);
+  const [loading, setLoading] = useState(departmentsCache === null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (departmentsCache !== null) return;
     api.get<Department[]>("/departments/").then((res) => {
+      departmentsCache = res.data;
       setDepartments(res.data);
       setLoading(false);
     });

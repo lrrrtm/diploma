@@ -17,19 +17,24 @@ import { useStudent } from "@/context/StudentContext";
 import api from "@/api/client";
 import type { ApplicationDetail } from "@/types";
 
+const detailCache: Record<string, ApplicationDetail> = {};
+
 export default function ApplicationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const student = useStudent();
-  const [application, setApplication] = useState<ApplicationDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cached = id ? detailCache[id] : undefined;
+  const [application, setApplication] = useState<ApplicationDetail | null>(cached ?? null);
+  const [loading, setLoading] = useState(!cached);
 
   useEffect(() => {
-    if (!student) return;
+    if (!student || !id) return;
+    if (detailCache[id]) return;
     api
       .get<ApplicationDetail>(`/applications/${id}`, {
         params: { student_external_id: student.student_external_id },
       })
       .then((res) => {
+        detailCache[id] = res.data;
         setApplication(res.data);
         setLoading(false);
       });

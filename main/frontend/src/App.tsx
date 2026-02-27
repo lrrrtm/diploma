@@ -62,9 +62,25 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
 // ---------------------------------------------------------------------------
 
 function IframeLoadOverlay({ app, loaded }: { app: MiniApp | undefined; loaded: boolean }) {
-  if (loaded) return null;
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    if (loaded) {
+      const t = setTimeout(() => setVisible(false), 400);
+      return () => clearTimeout(t);
+    } else {
+      setVisible(true);
+    }
+  }, [loaded]);
+
+  if (!visible) return null;
+
   return (
-    <div className="absolute inset-0 bg-background z-10 flex flex-col items-center justify-center gap-3">
+    <div
+      className={`absolute inset-0 bg-background z-10 flex flex-col items-center justify-center gap-3 transition-opacity duration-300 ${
+        loaded ? "opacity-0 pointer-events-none" : "opacity-100"
+      }`}
+    >
       {app ? (
         <>
           <Spinner className="h-8 w-8 text-primary" />
@@ -122,6 +138,7 @@ function ServicesSheet({
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
         <SheetTitle className="sr-only">Услуги</SheetTitle>
+        <div className="shrink-0 h-14 bg-background border-b border-border" />
         <div className="relative flex-1 min-h-0">
           {href && (
             <iframe
@@ -167,6 +184,7 @@ function TrafficSheet({
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
         <SheetTitle className="sr-only">Посещаемость</SheetTitle>
+        <div className="shrink-0 h-14 bg-background border-b border-border" />
         <div className="relative flex-1 min-h-0">
           {href && (
             <iframe
