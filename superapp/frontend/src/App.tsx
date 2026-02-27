@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, ChevronsUpDown, Check } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule } from "./api";
 import type { MiniApp, Student, WeekSchedule, DaySchedule } from "./types";
 import LoginPage from "./DevLoginPage";
@@ -11,6 +11,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { useTheme, type Theme } from "./context/ThemeContext";
 
 // ---------------------------------------------------------------------------
 // Bottom navbar
@@ -27,7 +30,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
       <div className="max-w-2xl mx-auto flex">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
           const isActive = active === id;
@@ -37,7 +40,7 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
               variant="ghost"
               onClick={() => onChange(id)}
               className="flex-1 flex flex-col items-center justify-center gap-1 py-3 px-0 text-xs h-auto rounded-none whitespace-normal [&_svg]:size-5"
-              style={{ color: isActive ? "#2563eb" : "#9ca3af" }}
+              style={{ color: isActive ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))" }}
             >
               <Icon className="h-5 w-5" />
               {label}
@@ -152,16 +155,16 @@ function MiniAppCard({ app }: { app: MiniApp }) {
 
   return (
     <Card
-      className="cursor-pointer hover:shadow-md hover:border-blue-200 transition-all duration-200"
+      className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all duration-200"
       onClick={handleClick}
     >
       <CardContent className="p-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-            <FileText className="h-5 w-5 text-blue-600" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{app.name}</p>
+            <p className="font-semibold text-foreground truncate">{app.name}</p>
             {app.description && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">{app.description}</p>
             )}
@@ -340,7 +343,7 @@ function ScheduleTab({ student }: { student: Student }) {
   if (loading && !schedule) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -349,7 +352,7 @@ function ScheduleTab({ student }: { student: Student }) {
     const isStaleToken = !student.faculty_abbr || !student.study_group_str;
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center px-6 gap-4">
-        <p className="text-gray-500 text-sm">
+        <p className="text-muted-foreground text-sm">
           {isStaleToken
             ? "Для загрузки расписания необходимо войти заново"
             : (error ?? "Расписание недоступно")}
@@ -383,7 +386,7 @@ function ScheduleTab({ student }: { student: Student }) {
   return (
     <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Sticky header: week nav + day tabs */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+      <div className="sticky top-0 z-10 bg-card border-b border-border">
         {/* Week navigation */}
         <div className="flex items-center justify-between px-4 py-2">
           <Button variant="ghost" size="icon" onClick={() => setWeekOffset((o) => o - 1)}>
@@ -421,8 +424,8 @@ function ScheduleTab({ student }: { student: Student }) {
                 onClick={() => { goToDay(idx, idx > activeDayIdx ? "from-right" : "from-left"); }}
                 className={`flex-1 flex items-center justify-center pb-2 pt-1 text-sm font-semibold border-b-2 transition-colors shrink-0 h-auto rounded-none ${
                   isActive
-                    ? "border-blue-600 text-blue-600 hover:text-blue-600"
-                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-transparent"
+                    ? "border-primary text-primary hover:text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-transparent"
                 }`}
               >
                 {WEEKDAY_SHORT[day.weekday]}
@@ -435,7 +438,7 @@ function ScheduleTab({ student }: { student: Student }) {
       {/* Loading overlay for week switch */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       ) : (
         <div
@@ -445,7 +448,7 @@ function ScheduleTab({ student }: { student: Student }) {
           {activeDay?.lessons.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="text-2xl mb-2">🎉</p>
-              <p className="text-gray-400 text-sm">Занятий нет</p>
+              <p className="text-muted-foreground text-sm">Занятий нет</p>
             </div>
           ) : (
             activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} />)
@@ -464,7 +467,7 @@ function ComingSoon({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <p className="text-2xl mb-2">🚧</p>
-      <p className="text-gray-500 text-sm">{label} — скоро</p>
+      <p className="text-muted-foreground text-sm">{label} — скоро</p>
     </div>
   );
 }
@@ -495,7 +498,7 @@ function HomeTab({
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-foreground">
             {greeting}, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
           </h1>
         </div>
@@ -504,7 +507,7 @@ function HomeTab({
             variant="ghost"
             size="icon"
             onClick={onScan}
-            className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-600 shrink-0"
+            className="rounded-xl bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary shrink-0"
             title="Отметить посещаемость"
           >
             <QrCode className="h-5 w-5" />
@@ -513,7 +516,7 @@ function HomeTab({
             variant="ghost"
             size="icon"
             onClick={onProfile}
-            className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-600 shrink-0"
+            className="rounded-xl bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary shrink-0"
             title="Профиль"
           >
             <User className="h-5 w-5" />
@@ -522,7 +525,7 @@ function HomeTab({
       </div>
 
       {miniapps.length === 0 ? (
-        <p className="text-gray-400 text-sm">Сервисы недоступны</p>
+        <p className="text-muted-foreground text-sm">Сервисы недоступны</p>
       ) : (
         <div className="space-y-3">
           {miniapps.map((app) => (
@@ -534,46 +537,106 @@ function HomeTab({
   );
 }
 
+const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType }[] = [
+  { value: "light",  label: "Светлая",  icon: Sun     },
+  { value: "dark",   label: "Тёмная",   icon: Moon    },
+  { value: "system", label: "Системная", icon: Monitor },
+];
+
+function ThemeCombobox() {
+  const { theme, setTheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const current = THEME_OPTIONS.find((o) => o.value === theme)!;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+        >
+          <span className="flex items-center gap-2">
+            <current.icon className="h-4 w-4" />
+            {current.label}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <CommandItem
+                  key={value}
+                  value={value}
+                  onSelect={() => {
+                    setTheme(value);
+                    setOpen(false);
+                  }}
+                >
+                  <Icon className="h-4 w-4 mr-2" />
+                  {label}
+                  <Check className={cn("ml-auto h-4 w-4", theme === value ? "opacity-100" : "opacity-0")} />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ProfileTab({ student }: { student: Student }) {
+
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Профиль</h2>
-      <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
+      <h2 className="text-lg font-bold text-foreground mb-4">Профиль</h2>
+      <div className="bg-card rounded-2xl border border-border divide-y divide-border">
         <div className="px-4 py-3">
-          <p className="text-xs text-gray-400">ФИО</p>
-          <p className="text-sm font-medium text-gray-900 mt-0.5">{student.student_name}</p>
+          <p className="text-xs text-muted-foreground">ФИО</p>
+          <p className="text-sm font-medium text-foreground mt-0.5">{student.student_name}</p>
         </div>
         <div className="px-4 py-3">
-          <p className="text-xs text-gray-400">Email</p>
-          <p className="text-sm font-medium text-gray-900 mt-0.5">{student.student_email}</p>
+          <p className="text-xs text-muted-foreground">Email</p>
+          <p className="text-sm font-medium text-foreground mt-0.5">{student.student_email}</p>
         </div>
         <div className="px-4 py-3">
-          <p className="text-xs text-gray-400">ID студента</p>
-          <p className="text-sm font-medium text-gray-900 mt-0.5">{student.student_id}</p>
+          <p className="text-xs text-muted-foreground">ID студента</p>
+          <p className="text-sm font-medium text-foreground mt-0.5">{student.student_id}</p>
         </div>
         {student.study_group_str && (
           <div className="px-4 py-3">
-            <p className="text-xs text-gray-400">Учебная группа</p>
-            <p className="text-sm font-medium text-gray-900 mt-0.5">{student.study_group_str}</p>
+            <p className="text-xs text-muted-foreground">Учебная группа</p>
+            <p className="text-sm font-medium text-foreground mt-0.5">{student.study_group_str}</p>
           </div>
         )}
         {student.faculty_abbr && (
           <div className="px-4 py-3">
-            <p className="text-xs text-gray-400">Институт</p>
-            <p className="text-sm font-medium text-gray-900 mt-0.5">{student.faculty_abbr}</p>
+            <p className="text-xs text-muted-foreground">Институт</p>
+            <p className="text-sm font-medium text-foreground mt-0.5">{student.faculty_abbr}</p>
           </div>
         )}
         {student.grade_book_number && (
           <div className="px-4 py-3">
-            <p className="text-xs text-gray-400">Номер зачётной книжки</p>
-            <p className="text-sm font-medium text-gray-900 mt-0.5">{student.grade_book_number}</p>
+            <p className="text-xs text-muted-foreground">Номер зачётной книжки</p>
+            <p className="text-sm font-medium text-foreground mt-0.5">{student.grade_book_number}</p>
           </div>
         )}
       </div>
 
+      {/* Theme selector — combobox */}
+      <div className="mt-6">
+        <p className="text-sm font-medium text-foreground mb-2">Тема оформления</p>
+        <ThemeCombobox />
+      </div>
+
       <Button
         variant="outline"
-        className="mt-6 w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-500"
+        className="mt-6 w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-red-900 dark:hover:bg-red-950"
         onClick={() => {
           localStorage.removeItem("token");
           window.location.href = "/login";
@@ -651,8 +714,8 @@ function HomePage() {
 
   if (!student) {
     return (
-      <div className="h-screen overflow-hidden flex items-center justify-center bg-gray-50">
-        <p className="text-gray-400 text-sm">Загрузка...</p>
+      <div className="h-screen overflow-hidden flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm">Загрузка...</p>
       </div>
     );
   }
@@ -661,7 +724,7 @@ function HomePage() {
   const trafficApp = miniapps.find((a) => a.id === "traffic");
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50">
+    <div className="h-screen overflow-hidden bg-background">
       <div className="h-full overflow-y-auto pb-20">
         {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
         {tab === "schedule"  && <ScheduleTab student={student} />}
