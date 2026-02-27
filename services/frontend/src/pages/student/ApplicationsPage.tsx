@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, Plus, ChevronRight, ArrowLeft } from "lucide-react";
+import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -53,19 +54,14 @@ function AppCard({ app, onClick }: { app: ApplicationBrief; onClick: () => void 
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium truncate">{app.service_name}</span>
-              <StatusBadge status={app.status} />
-            </div>
-            <p className="text-sm text-muted-foreground truncate">{app.department_name}</p>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-            <Clock className="h-3.5 w-3.5" />
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <Badge variant="outline">
             {new Date(app.created_at).toLocaleDateString("ru-RU")}
-          </div>
+          </Badge>
+          <StatusBadge status={app.status} />
         </div>
+        <p className="font-medium leading-snug">{app.service_name}</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{app.department_name}</p>
       </CardContent>
     </Card>
   );
