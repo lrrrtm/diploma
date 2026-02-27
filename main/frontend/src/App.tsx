@@ -33,8 +33,8 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
-      <div className="max-w-2xl mx-auto flex">
+    <nav className="shrink-0 bg-card border-t border-border">
+      <div className="flex">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
           const isActive = active === id;
           return (
@@ -152,8 +152,12 @@ function MiniAppCard({ app }: { app: MiniApp }) {
   const handleClick = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    const launchToken = await fetchLaunchToken(token);
-    window.open(`${app.url}?launch_token=${encodeURIComponent(launchToken)}`, "_blank");
+    try {
+      const launchToken = await fetchLaunchToken(token);
+      window.open(`${app.url}?launch_token=${encodeURIComponent(launchToken)}`, "_blank");
+    } catch {
+      // silently ignore — user can tap again
+    }
   };
 
   return (
@@ -482,7 +486,7 @@ function ScheduleTab({ student }: { student: Student }) {
         ) : (
           <div
             key={slideKey}
-            className={`px-4 pt-4 pb-28 space-y-3 slide-${slideDir}`}
+            className={`px-4 pt-4 pb-6 space-y-3 slide-${slideDir}`}
           >
             {activeDay?.lessons.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -533,8 +537,12 @@ function GradeDetailRow({ icon: Icon, label, value, className }: {
 
 function GradebookTab({ student }: { student: Student }) {
   const [data, setData] = useState<GradebookResponse | null>(() => {
-    const cached = sessionStorage.getItem("gradebook");
-    return cached ? JSON.parse(cached) : null;
+    try {
+      const cached = sessionStorage.getItem("gradebook");
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -647,7 +655,7 @@ function GradebookTab({ student }: { student: Student }) {
 
       {/* Scrollable table area — constrained between header and navbar */}
       <ScrollArea key={idx} className="flex-1 min-h-0">
-        <div className="pb-24">
+        <div className="pb-6">
           {semestersSorted.map((sem) => {
             const semEntries = [...(bySemester.get(sem) ?? [])].sort(
               (a, b) => parseDateNum(b.date) - parseDateNum(a.date)
@@ -927,7 +935,8 @@ function HomePage() {
       return;
     }
 
-    Promise.all([fetchMe(token), fetchMiniApps(token)])
+    // fetchMiniApps failure is non-fatal — show empty list rather than forcing re-login
+    Promise.all([fetchMe(token), fetchMiniApps(token).catch(() => [] as MiniApp[])])
       .then(([me, apps]) => {
         setStudent(me);
         setMiniApps(apps);
@@ -961,22 +970,24 @@ function HomePage() {
 
   if (!student) {
     return (
-      <div className="h-screen overflow-hidden bg-background">
-        <div className="h-full overflow-y-auto pb-20 px-4 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <Skeleton className="h-7 w-52" />
-            <div className="flex gap-2">
-              <Skeleton className="h-9 w-9 rounded-xl" />
-              <Skeleton className="h-9 w-9 rounded-xl" />
+      <div className="min-h-screen bg-muted/30 flex justify-center">
+        <div className="w-full max-w-sm h-screen flex flex-col bg-background overflow-hidden border-x border-border/50">
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="flex items-center justify-between mb-6">
+              <Skeleton className="h-7 w-52" />
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-9 rounded-xl" />
+                <Skeleton className="h-9 w-9 rounded-xl" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full rounded-xl" />
+              ))}
             </div>
           </div>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-xl" />
-            ))}
-          </div>
+          <nav className="shrink-0 bg-card border-t border-border h-16" />
         </div>
-        <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 h-16" />
       </div>
     );
   }
@@ -985,26 +996,28 @@ function HomePage() {
   const trafficApp = miniapps.find((a) => a.id === "traffic");
 
   return (
-    <div className="h-screen overflow-hidden bg-background">
-      <div className={`h-full ${tab === "schedule" || tab === "gradebook" ? "overflow-hidden" : "overflow-y-auto pb-20"}`}>
-        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
-        {tab === "schedule"  && <ScheduleTab student={student} />}
-        {tab === "gradebook" && <GradebookTab student={student} />}
-        {tab === "profile"   && <ProfileTab student={student} />}
+    <div className="min-h-screen bg-muted/30 flex justify-center">
+      <div className="w-full max-w-sm h-screen flex flex-col bg-background overflow-hidden border-x border-border/50">
+        <div className={`flex-1 min-h-0 ${tab === "schedule" || tab === "gradebook" ? "overflow-hidden" : "overflow-y-auto"}`}>
+          {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
+          {tab === "schedule"  && <ScheduleTab student={student} />}
+          {tab === "gradebook" && <GradebookTab student={student} />}
+          {tab === "profile"   && <ProfileTab student={student} />}
+        </div>
+
+        <BottomNav active={servicesOpen ? "services" : tab} onChange={handleTabChange} />
+
+        <ServicesSheet
+          app={servicesApp}
+          open={servicesOpen}
+          onClose={() => setServicesOpen(false)}
+        />
+        <TrafficSheet
+          app={trafficApp}
+          open={trafficOpen}
+          onClose={() => setTrafficOpen(false)}
+        />
       </div>
-
-      <BottomNav active={servicesOpen ? "services" : tab} onChange={handleTabChange} />
-
-      <ServicesSheet
-        app={servicesApp}
-        open={servicesOpen}
-        onClose={() => setServicesOpen(false)}
-      />
-      <TrafficSheet
-        app={trafficApp}
-        open={trafficOpen}
-        onClose={() => setTrafficOpen(false)}
-      />
     </div>
   );
 }
