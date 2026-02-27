@@ -138,7 +138,7 @@ function ServicesSheet({
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
         <SheetTitle className="sr-only">Услуги</SheetTitle>
-        <div className="shrink-0 h-14 bg-background border-b border-border" />
+        <div className="shrink-0 h-14" />
         <div className="relative flex-1 min-h-0">
           {href && (
             <iframe
@@ -184,7 +184,7 @@ function TrafficSheet({
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
         <SheetTitle className="sr-only">Посещаемость</SheetTitle>
-        <div className="shrink-0 h-14 bg-background border-b border-border" />
+        <div className="shrink-0 h-14" />
         <div className="relative flex-1 min-h-0">
           {href && (
             <iframe
