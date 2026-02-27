@@ -5,7 +5,7 @@ Currently a static list. In the future this can be backed by a database
 so admins can add/remove/reorder mini-apps without redeployment.
 
 Each mini-app entry is a card shown on the student home screen.
-The superapp generates a signed launch token and passes it to the
+The main app generates a signed launch token and passes it to the
 mini-app iframe: {url}?launch_token=<jwt>
 """
 
@@ -22,7 +22,7 @@ bearer = HTTPBearer()
 
 
 def _get_student(credentials: HTTPAuthorizationCredentials = Depends(bearer)) -> dict:
-    """Decode superapp JWT and return student identity."""
+    """Decode main app JWT and return student identity."""
     try:
         payload = jwt.decode(
             credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]

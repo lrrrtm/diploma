@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "/app/uploads"
     ADMIN_PASSWORD: str = "admin"
 
-    # Shared secret for verifying launch tokens from superapp
+    # Shared secret for verifying launch tokens from main app
     LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
 
     class Config:

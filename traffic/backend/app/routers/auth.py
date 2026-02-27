@@ -38,7 +38,7 @@ def teacher_login(data: TeacherLoginRequest):
 
 @router.post("/verify-launch")
 def verify_launch(body: LaunchTokenRequest):
-    """Verify a launch token issued by the superapp and return student identity."""
+    """Verify a launch token issued by the main app and return student identity."""
     try:
         payload = jwt.decode(
             body.token, settings.LAUNCH_TOKEN_SECRET, algorithms=[settings.ALGORITHM]

@@ -1,8 +1,8 @@
 services:
-  # ---- Superapp (poly.hex8d.space) ----
+  # ---- Main app (poly.hex8d.space) ----
 
-  superapp-backend:
-    build: ./superapp/backend
+  main-backend:
+    build: ./main/backend
     restart: unless-stopped
     environment:
       SECRET_KEY: ${SECRET_KEY}
@@ -13,19 +13,19 @@ services:
       TRAFFIC_URL: ${TRAFFIC_URL}
       LAUNCH_TOKEN_SECRET: ${LAUNCH_TOKEN_SECRET}
     networks:
-      superapp:
+      main:
         aliases:
           - backend
 
-  superapp-frontend:
-    build: ./superapp/frontend
+  main-frontend:
+    build: ./main/frontend
     restart: unless-stopped
     ports:
       - "3010:80"
     depends_on:
-      - superapp-backend
+      - main-backend
     networks:
-      - superapp
+      - main
 
   # ---- Services mini-app (services.poly.hex8d.space) ----
 
@@ -107,6 +107,6 @@ volumes:
   services_uploads:
 
 networks:
-  superapp:
+  main:
   services:
   traffic:

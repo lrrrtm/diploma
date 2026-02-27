@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     ALGORITHM: str = "HS256"
 
-    # Shared secret for verifying launch tokens from superapp
+    # Shared secret for verifying launch tokens from main app
     LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
 
     # Secret used to sign teacher JWTs and for HMAC-based rotating QR tokens

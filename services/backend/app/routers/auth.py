@@ -73,7 +73,7 @@ class LaunchTokenRequest(BaseModel):
 @router.post("/verify-launch")
 def verify_launch(body: LaunchTokenRequest):
     """
-    Verify a launch token signed by the superapp.
+    Verify a launch token signed by the main app.
     Returns verified student identity.
     """
     try:

@@ -38,6 +38,19 @@ export async function fetchResolveGroup(
   return res.json();
 }
 
+export async function fetchGradebook(
+  token: string,
+): Promise<import("./types").GradebookResponse> {
+  const res = await fetch(`${BASE}/gradebook`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Ошибка загрузки зачётки" }));
+    throw new Error(err.detail || "Ошибка загрузки зачётки");
+  }
+  return res.json();
+}
+
 export async function fetchSchedule(
   token: string,
   groupId: number,

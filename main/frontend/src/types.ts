@@ -32,6 +32,24 @@ export interface WeekSchedule {
   days: DaySchedule[];
 }
 
+export interface GradeEntry {
+  grade: number;
+  grade_name: string;
+  test_type_name: string;
+  discipline: string;
+  lecturer: string;
+  try: number;
+  date: string;
+  semester: number;
+  hours: string;
+  zet: string;
+}
+
+export interface GradebookResponse {
+  orders_type_name: string;
+  record_book_data: GradeEntry[];
+}
+
 export interface MiniApp {
   id: string;
   name: string;

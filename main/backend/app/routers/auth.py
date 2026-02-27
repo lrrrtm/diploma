@@ -34,6 +34,18 @@ from app.config import settings
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
 
+# In-memory credential cache: student_id → (username, password)
+# Lost on server restart — user simply re-logs in.
+_credential_cache: dict[str, tuple[str, str]] = {}
+
+
+def cache_credentials(student_id: str, username: str, password: str) -> None:
+    _credential_cache[student_id] = (username, password)
+
+
+def get_cached_credentials(student_id: str) -> tuple[str, str] | None:
+    return _credential_cache.get(student_id)
+
 
 # ---------------------------------------------------------------------------
 # JWT helpers
@@ -179,6 +191,7 @@ async def login(body: LoginRequest):
     Returns a JWT + student identity on success.
     """
     identity = await _scrape_cas_login(body.username, body.password)
+    cache_credentials(identity["student_id"], body.username, body.password)
     token = _create_token(
         identity["student_id"],
         identity["email"],
