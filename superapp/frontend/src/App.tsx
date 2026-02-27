@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pi, CalendarDays, BookOpen, FileText, User, X, QrCode } from "lucide-react";
+import { Pi, CalendarDays, BookOpen, FileText, User, X, QrCode, ChevronLeft, ChevronRight } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule } from "./api";
 import type { MiniApp, Student, WeekSchedule, DaySchedule } from "./types";
 import LoginPage from "./DevLoginPage";
@@ -231,28 +231,37 @@ function formatDateShort(iso: string) {
   return `${d}.${m}`;
 }
 
+function formatDateFull(iso: string) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
 function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
   const loc = lesson.auditories
-    .map((a) => [a.name, a.building].filter(Boolean).join(", "))
+    .map((a) => {
+      const aud = a.name ? `ауд. ${a.name}` : "";
+      return [aud, a.building].filter(Boolean).join(", ");
+    })
     .join(" / ");
   const teacher = lesson.teachers.map((t) => t.full_name).join(", ");
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-3">
-      <div className="flex flex-col items-center text-center w-14 shrink-0">
-        <span className="text-sm font-bold text-gray-900">{lesson.time_start}</span>
-        <span className="text-xs text-gray-400">{lesson.time_end}</span>
+      <div className="flex flex-col items-center justify-center text-center w-14 shrink-0 gap-0.5">
+        <span className="text-base font-bold text-gray-900">{lesson.time_start}</span>
+        <span className="text-base text-gray-400">{lesson.time_end}</span>
       </div>
       <div className="w-px bg-gray-100 shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-gray-900 leading-tight">{lesson.subject}</p>
-        <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+        <p className="text-base font-semibold text-gray-900 leading-tight">{lesson.subject}</p>
+        <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
           {lesson.type_name}
         </span>
-        {teacher && <p className="text-xs text-gray-500 mt-1">{teacher}</p>}
-        {loc && <p className="text-xs text-gray-400 mt-0.5">{loc}</p>}
+        {teacher && <p className="text-sm text-gray-500 mt-1.5">{teacher}</p>}
+        {loc && <p className="text-sm text-gray-400 mt-0.5">{loc}</p>}
         {lesson.additional_info && (
-          <p className="text-xs text-gray-400 mt-0.5 italic">{lesson.additional_info}</p>
+          <p className="text-sm text-gray-400 mt-0.5 italic">{lesson.additional_info}</p>
         )}
       </div>
     </div>
@@ -265,6 +274,37 @@ function ScheduleTab({ student }: { student: Student }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeDayIdx, setActiveDayIdx] = useState<number>(0);
+  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [slideDir, setSlideDir] = useState<"from-right" | "from-left">("from-right");
+  const [slideKey, setSlideKey] = useState(0);
+  const resolvedGroupId = useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  const goToDay = (idx: number, dir: "from-right" | "from-left") => {
+    setSlideDir(dir);
+    setSlideKey((k) => k + 1);
+    setActiveDayIdx(idx);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(dx) < 40) return;
+    if (dx < 0) {
+      // swipe left → next day
+      if (activeDayIdx < 5) { goToDay(activeDayIdx + 1, "from-right"); }
+      else { setSlideDir("from-right"); setSlideKey((k) => k + 1); setWeekOffset((o) => o + 1); }
+    } else {
+      // swipe right → prev day
+      if (activeDayIdx > 0) { goToDay(activeDayIdx - 1, "from-left"); }
+      else { setSlideDir("from-left"); setSlideKey((k) => k + 1); setWeekOffset((o) => o - 1); }
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -274,7 +314,7 @@ function ScheduleTab({ student }: { student: Student }) {
       setLoading(true);
       setError(null);
       try {
-        let gid = groupId;
+        let gid = resolvedGroupId.current;
         if (!gid) {
           if (!student.faculty_abbr || !student.study_group_str) {
             setError("Группа не определена в профиле");
@@ -283,16 +323,24 @@ function ScheduleTab({ student }: { student: Student }) {
           }
           const resolved = await fetchResolveGroup(token, student.faculty_abbr, student.study_group_str);
           gid = resolved.group_id;
+          resolvedGroupId.current = gid;
           setGroupId(gid);
         }
-        const data = await fetchSchedule(token, gid);
+        const baseDate = new Date();
+        baseDate.setDate(baseDate.getDate() + weekOffset * 7);
+        const dateStr = baseDate.toISOString().slice(0, 10);
+        const data = await fetchSchedule(token, gid, dateStr);
         setSchedule(data);
-        // Auto-select today among Mon-Sat slots
-        const todayIso = new Date().toISOString().slice(0, 10);
-        const weekStartDate = new Date(data.week.date_start);
-        const todayDate = new Date(todayIso);
-        const diff = Math.round((todayDate.getTime() - weekStartDate.getTime()) / 86400000);
-        setActiveDayIdx(diff >= 0 && diff < 6 ? diff : 0);
+        // Auto-select today on current week, else first day
+        if (weekOffset === 0) {
+          const todayIso = new Date().toISOString().slice(0, 10);
+          const weekStartDate = new Date(data.week.date_start);
+          const todayDate = new Date(todayIso);
+          const diff = Math.round((todayDate.getTime() - weekStartDate.getTime()) / 86400000);
+          setActiveDayIdx(diff >= 0 && diff < 6 ? diff : 0);
+        } else {
+          setActiveDayIdx(0);
+        }
       } catch (e: unknown) {
         setError((e as Error).message ?? "Ошибка загрузки расписания");
       } finally {
@@ -301,9 +349,9 @@ function ScheduleTab({ student }: { student: Student }) {
     };
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [weekOffset]);
 
-  if (loading) {
+  if (loading && !schedule) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -345,43 +393,72 @@ function ScheduleTab({ student }: { student: Student }) {
     return days.find((day) => day.date === iso) ?? { weekday: i + 1, date: iso, lessons: [] };
   });
   const activeDay = fixedDays[activeDayIdx];
+  const selectedDate = formatDateFull(activeDay?.date ?? "");
 
   return (
     <div>
-      {/* Sticky day tabs */}
+      {/* Sticky header: week nav + day tabs */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+        {/* Week navigation */}
+        <div className="flex items-center justify-between px-4 py-2">
+          <button
+            onClick={() => setWeekOffset((o) => o - 1)}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <span className="text-sm font-semibold text-gray-800">{selectedDate}</span>
+          <button
+            onClick={() => setWeekOffset((o) => o + 1)}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Day tabs — only weekday label */}
         <div className="flex overflow-x-auto no-scrollbar">
           {fixedDays.map((day, idx) => {
             const isActive = idx === activeDayIdx;
             return (
               <button
                 key={day.date}
-                onClick={() => setActiveDayIdx(idx)}
-                className={`flex-1 flex flex-col items-center px-1 pb-2 pt-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
+                onClick={() => { goToDay(idx, idx > activeDayIdx ? "from-right" : "from-left"); }}
+                className={`flex-1 flex items-center justify-center pb-2 pt-1 text-sm font-semibold border-b-2 transition-colors shrink-0 ${
                   isActive
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-400 hover:text-gray-600"
                 }`}
               >
-                <span className="text-sm font-bold">{WEEKDAY_SHORT[day.weekday]}</span>
-                <span className="text-xs">{formatDateShort(day.date)}</span>
+                {WEEKDAY_SHORT[day.weekday]}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Lessons */}
-      <div className="px-4 py-4 space-y-3">
-        {activeDay?.lessons.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-2xl mb-2">🎉</p>
-            <p className="text-gray-400 text-sm">Занятий нет</p>
-          </div>
-        ) : (
-          activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} />)
-        )}
-      </div>
+      {/* Loading overlay for week switch */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+      ) : (
+        <div
+          key={slideKey}
+          className={`px-4 py-4 space-y-3 overflow-hidden slide-${slideDir}`}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {activeDay?.lessons.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="text-2xl mb-2">🎉</p>
+              <p className="text-gray-400 text-sm">Занятий нет</p>
+            </div>
+          ) : (
+            activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} />)
+          )}
+        </div>
+      )}
     </div>
   );
 }
