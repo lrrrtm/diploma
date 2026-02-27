@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, ChevronsUpDown, Check, AlertCircle } from "lucide-react";
+import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, ChevronsUpDown, Check, AlertCircle, ClipboardList, Star, GraduationCap, Clock, Layers } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule, fetchGradebook } from "./api";
-import type { MiniApp, Student, WeekSchedule, DaySchedule, GradeEntry, GradebookYear, GradebookResponse } from "./types";
+import type { MiniApp, Student, WeekSchedule, DaySchedule, GradeEntry, GradebookResponse } from "./types";
 import LoginPage from "./DevLoginPage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -12,9 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -514,6 +512,25 @@ const GRADE_COLORS_TEXT: Record<string, string> = {
   "не зачтено": "text-red-600 dark:text-red-400",
 };
 
+function GradeDetailRow({ icon: Icon, label, value, className }: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className="flex gap-3 items-start">
+      <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center shrink-0 mt-0.5">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`text-sm font-medium mt-0.5 ${className ?? ""}`}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
 function GradebookTab({ student }: { student: Student }) {
   const [data, setData] = useState<GradebookResponse | null>(() => {
     const cached = sessionStorage.getItem("gradebook");
@@ -521,7 +538,7 @@ function GradebookTab({ student }: { student: Student }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeYear, setActiveYear] = useState<string | null>(null);
+  const [yearIndex, setYearIndex] = useState(0);
   const [selected, setSelected] = useState<GradeEntry | null>(null);
 
   const loadGradebook = async () => {
@@ -548,12 +565,12 @@ function GradebookTab({ student }: { student: Student }) {
   if (loading && !data) {
     return (
       <div className="h-full flex flex-col">
-        <div className="shrink-0 border-b border-border overflow-x-auto no-scrollbar">
-          <div className="flex gap-1 px-3 py-2">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-24 rounded-md shrink-0" />)}
-          </div>
+        <div className="shrink-0 border-b border-border flex items-center px-2 py-2 gap-1">
+          <Skeleton className="h-9 w-9 rounded-md shrink-0" />
+          <Skeleton className="flex-1 h-5 mx-4" />
+          <Skeleton className="h-9 w-9 rounded-md shrink-0" />
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="divide-y divide-border px-4">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="flex items-center py-3 gap-4">
@@ -587,122 +604,118 @@ function GradebookTab({ student }: { student: Student }) {
   if (!data) return null;
 
   const years = data.academic_years;
-  const activeLabel = activeYear ?? years[0]?.label ?? "";
+  const idx = Math.min(yearIndex, Math.max(0, years.length - 1));
+  const activeYearData = years[idx];
 
   const parseDateNum = (d: string) => {
     const [dd, mm, yyyy] = (d ?? "").split(".");
     return parseInt(`${yyyy}${mm}${dd}`, 10) || 0;
   };
 
+  const bySemester = new Map<number, GradeEntry[]>();
+  for (const entry of activeYearData?.entries ?? []) {
+    const list = bySemester.get(entry.semester) ?? [];
+    list.push(entry);
+    bySemester.set(entry.semester, list);
+  }
+  const semestersSorted = [...bySemester.keys()].sort((a, b) => a - b);
+
   return (
-    <Tabs value={activeLabel} onValueChange={setActiveYear} className="h-full flex flex-col">
-      {/* Year selector */}
-      <div className="shrink-0 border-b border-border overflow-x-auto no-scrollbar">
-        <TabsList className="flex h-auto justify-start gap-1 rounded-none bg-transparent px-3 py-2 w-max">
-          {years.map((yr) => (
-            <TabsTrigger key={yr.label} value={yr.label} className="shrink-0 text-xs h-8">
-              {yr.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <div className="h-full flex flex-col">
+      {/* Year navigation */}
+      <div className="shrink-0 border-b border-border flex items-center px-2 py-1 gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={idx >= years.length - 1}
+          onClick={() => setYearIndex(idx + 1)}
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <p className="flex-1 text-center text-sm font-semibold select-none">
+          {activeYearData?.label ?? "—"}
+        </p>
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={idx <= 0}
+          onClick={() => setYearIndex(idx - 1)}
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
       </div>
 
-      {/* Scrollable content */}
-      <ScrollArea className="flex-1">
-        {years.map((yr) => {
-          const bySemester = new Map<number, GradeEntry[]>();
-          for (const entry of yr.entries) {
-            const list = bySemester.get(entry.semester) ?? [];
-            list.push(entry);
-            bySemester.set(entry.semester, list);
-          }
-          const semestersSorted = [...bySemester.keys()].sort((a, b) => a - b);
-
-          return (
-            <TabsContent key={yr.label} value={yr.label} className="mt-0 pb-20">
-              {semestersSorted.map((sem) => {
-                const semEntries = [...(bySemester.get(sem) ?? [])].sort(
-                  (a, b) => parseDateNum(b.date) - parseDateNum(a.date)
-                );
-                return (
-                  <div key={sem}>
-                    <div className="px-4 pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      {sem} семестр
-                    </div>
-                    <Table>
-                      <TableBody>
-                        {semEntries.map((entry, i) => {
-                          const gradeDisplay = entry.grade !== 0 ? String(entry.grade) : entry.grade_name;
-                          return (
-                            <TableRow
-                              key={i}
-                              className="cursor-pointer"
-                              onClick={() => setSelected(entry)}
-                            >
-                              <TableCell className="py-3 pl-4 pr-2 text-sm leading-snug">{entry.discipline}</TableCell>
-                              <TableCell className={`py-3 pl-2 pr-4 text-right text-sm font-semibold w-24 ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
-                                {gradeDisplay}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                );
-              })}
-            </TabsContent>
-          );
-        })}
+      {/* Scrollable table area — constrained between header and navbar */}
+      <ScrollArea key={idx} className="flex-1 min-h-0">
+        <div className="pb-24">
+          {semestersSorted.map((sem) => {
+            const semEntries = [...(bySemester.get(sem) ?? [])].sort(
+              (a, b) => parseDateNum(b.date) - parseDateNum(a.date)
+            );
+            return (
+              <div key={sem}>
+                <div className="px-4 pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {sem} семестр
+                </div>
+                <Table>
+                  <TableBody>
+                    {semEntries.map((entry, i) => {
+                      const gradeDisplay = entry.grade !== 0 ? String(entry.grade) : entry.grade_name;
+                      return (
+                        <TableRow
+                          key={i}
+                          className="cursor-pointer"
+                          onClick={() => setSelected(entry)}
+                        >
+                          <TableCell className="py-3 pl-4 pr-2 text-sm leading-snug">{entry.discipline}</TableCell>
+                          <TableCell className={`py-3 pl-2 pr-4 text-right text-sm font-semibold w-24 ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
+                            {gradeDisplay}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })}
+        </div>
       </ScrollArea>
 
-      {/* Detail dialog */}
-      <Dialog open={selected !== null} onOpenChange={(open) => { if (!open) setSelected(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base leading-snug pr-6">{selected?.discipline}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
+      {/* Detail bottom sheet */}
+      <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh]">
+          <SheetHeader className="text-left mb-6">
+            <SheetTitle className="text-base leading-snug pr-4">{selected?.discipline}</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 overflow-y-auto pb-4">
             {selected?.test_type_name && (
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground shrink-0">Тип контроля</span>
-                <span className="font-medium text-right">{selected.test_type_name}</span>
-              </div>
+              <GradeDetailRow icon={ClipboardList} label="Тип контроля" value={selected.test_type_name} />
             )}
             {selected?.grade_name && (
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground shrink-0">Оценка</span>
-                <span className={`font-semibold ${GRADE_COLORS_TEXT[selected.grade_name] ?? ""}`}>{selected.grade_name}</span>
-              </div>
+              <GradeDetailRow
+                icon={Star}
+                label="Оценка"
+                value={selected.grade_name}
+                className={GRADE_COLORS_TEXT[selected.grade_name]}
+              />
             )}
             {selected?.lecturer && (
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground shrink-0">Преподаватель</span>
-                <span className="font-medium text-right">{selected.lecturer}</span>
-              </div>
+              <GradeDetailRow icon={GraduationCap} label="Преподаватель" value={selected.lecturer} />
             )}
             {selected?.date && (
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground shrink-0">Дата</span>
-                <span className="font-medium">{selected.date}</span>
-              </div>
+              <GradeDetailRow icon={CalendarDays} label="Дата" value={selected.date} />
             )}
             {selected?.hours && (
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground shrink-0">Часов</span>
-                <span className="font-medium">{selected.hours}</span>
-              </div>
+              <GradeDetailRow icon={Clock} label="Часов" value={selected.hours} />
             )}
             {selected?.zet && (
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground shrink-0">ЗЕТ</span>
-                <span className="font-medium">{selected.zet}</span>
-              </div>
+              <GradeDetailRow icon={Layers} label="ЗЕТ" value={selected.zet} />
             )}
           </div>
-        </DialogContent>
-      </Dialog>
-    </Tabs>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
 
