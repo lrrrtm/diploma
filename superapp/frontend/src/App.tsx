@@ -396,7 +396,7 @@ function ScheduleTab({ student }: { student: Student }) {
   const selectedDate = formatDateFull(activeDay?.date ?? "");
 
   return (
-    <div>
+    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Sticky header: week nav + day tabs */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
         {/* Week navigation */}
@@ -445,9 +445,7 @@ function ScheduleTab({ student }: { student: Student }) {
       ) : (
         <div
           key={slideKey}
-          className={`px-4 py-4 space-y-3 overflow-hidden slide-${slideDir}`}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
+          className={`px-4 pt-4 pb-24 space-y-3 overflow-hidden slide-${slideDir}`}
         >
           {activeDay?.lessons.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
