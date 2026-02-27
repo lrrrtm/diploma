@@ -361,7 +361,7 @@ function ScheduleTab({ student }: { student: Student }) {
     if (dx < 0) {
       // swipe left → next day
       if (activeDayIdx < 5) { goToDay(activeDayIdx + 1, "from-right"); }
-      else { setSlideDir("from-right"); setSlideKey((k) => k + 1); setWeekOffset((o) => o + 1); }
+      else { pendingDayIdx.current = 0; setSlideDir("from-right"); setSlideKey((k) => k + 1); setWeekOffset((o) => o + 1); }
     } else {
       // swipe right → prev day
       if (activeDayIdx > 0) { goToDay(activeDayIdx - 1, "from-left"); }
@@ -473,7 +473,7 @@ function ScheduleTab({ student }: { student: Student }) {
       <div className="shrink-0 bg-card border-b border-border">
         {/* Week navigation */}
         <div className="flex items-center justify-between px-4 py-2">
-          <Button variant="ghost" size="icon" onClick={() => setWeekOffset((o) => o - 1)}>
+          <Button variant="ghost" size="icon" onClick={() => { pendingDayIdx.current = 5; setWeekOffset((o) => o - 1); }}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
@@ -492,7 +492,7 @@ function ScheduleTab({ student }: { student: Student }) {
               />
             </PopoverContent>
           </Popover>
-          <Button variant="ghost" size="icon" onClick={() => setWeekOffset((o) => o + 1)}>
+          <Button variant="ghost" size="icon" onClick={() => { pendingDayIdx.current = 0; setWeekOffset((o) => o + 1); }}>
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
