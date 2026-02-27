@@ -61,6 +61,7 @@ export default function TeacherLoginPage() {
                 type="text"
                 required
                 autoComplete="username"
+                placeholder="Введите логин"
               />
             </div>
             <div className="space-y-1.5">
@@ -70,6 +71,7 @@ export default function TeacherLoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
+                placeholder="Введите пароль"
               />
             </div>
 

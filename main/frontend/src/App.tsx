@@ -6,7 +6,7 @@ import LoginPage from "./DevLoginPage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ru } from "date-fns/locale";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,9 +69,11 @@ function ServicesSheet({
   onClose: () => void;
 }) {
   const [href, setHref] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!open || !app) return;
+    setLoaded(false);
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
@@ -82,16 +84,36 @@ function ServicesSheet({
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
-        <SheetHeader className="px-4 py-3 border-b shrink-0">
-          <SheetTitle>Услуги</SheetTitle>
-        </SheetHeader>
-        {href ? (
-          <iframe src={href} className="flex-1 w-full border-0" title="Заявки" />
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            {app ? "Загрузка..." : "Сервис недоступен"}
-          </div>
-        )}
+        <SheetTitle className="sr-only">Услуги</SheetTitle>
+        <div className="relative flex-1 min-h-0">
+          {href && (
+            <iframe
+              src={href}
+              className="absolute inset-0 w-full h-full border-0"
+              title="Заявки"
+              onLoad={() => setLoaded(true)}
+            />
+          )}
+          {!loaded && (
+            <div className="absolute inset-0 bg-background z-10 flex flex-col p-4 gap-3">
+              {app ? (
+                <>
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-8 w-2/3 rounded-xl" />
+                  <div className="space-y-3 mt-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+                  Сервис недоступен
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -111,9 +133,11 @@ function TrafficSheet({
   onClose: () => void;
 }) {
   const [href, setHref] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!open || !app) return;
+    setLoaded(false);
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
@@ -124,21 +148,37 @@ function TrafficSheet({
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
-        <SheetHeader className="px-4 py-3 border-b shrink-0">
-          <SheetTitle>Посещаемость</SheetTitle>
-        </SheetHeader>
-        {href ? (
-          <iframe
-            src={href}
-            allow="camera"
-            className="flex-1 w-full border-0"
-            title="Посещаемость"
-          />
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            {app ? "Загрузка..." : "Сервис недоступен"}
-          </div>
-        )}
+        <SheetTitle className="sr-only">Посещаемость</SheetTitle>
+        <div className="relative flex-1 min-h-0">
+          {href && (
+            <iframe
+              src={href}
+              allow="camera"
+              className="absolute inset-0 w-full h-full border-0"
+              title="Посещаемость"
+              onLoad={() => setLoaded(true)}
+            />
+          )}
+          {!loaded && (
+            <div className="absolute inset-0 bg-background z-10 flex flex-col p-4 gap-3">
+              {app ? (
+                <>
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-8 w-2/3 rounded-xl" />
+                  <div className="space-y-3 mt-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+                  Сервис недоступен
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -845,61 +885,63 @@ function ThemeCombobox() {
   );
 }
 
-function ProfileTab({ student }: { student: Student }) {
+function ProfileSheet({ student, open, onClose }: { student: Student; open: boolean; onClose: () => void }) {
+  const parts = student.student_name.trim().split(/\s+/);
+  const initials = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 
   return (
-    <div className="px-4 py-6 max-w-2xl mx-auto">
-      <h2 className="text-lg font-bold text-foreground mb-4">Профиль</h2>
-      <div className="bg-card rounded-2xl border border-border divide-y divide-border">
-        <div className="px-4 py-3">
-          <p className="text-xs text-muted-foreground">ФИО</p>
-          <p className="text-sm font-medium text-foreground mt-0.5">{student.student_name}</p>
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-xs text-muted-foreground">Email</p>
-          <p className="text-sm font-medium text-foreground mt-0.5">{student.student_email}</p>
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-xs text-muted-foreground">ID студента</p>
-          <p className="text-sm font-medium text-foreground mt-0.5">{student.student_id}</p>
-        </div>
-        {student.study_group_str && (
-          <div className="px-4 py-3">
-            <p className="text-xs text-muted-foreground">Учебная группа</p>
-            <p className="text-sm font-medium text-foreground mt-0.5">{student.study_group_str}</p>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="bottom" className="p-0 rounded-t-2xl">
+        <SheetTitle className="sr-only">Профиль</SheetTitle>
+        <div className="overflow-y-auto max-h-[85dvh] px-4 pt-6 pb-8">
+          {/* Avatar + name + email */}
+          <div className="flex flex-col items-center mb-5 gap-1.5">
+            <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center">
+              <span className="text-xl font-bold text-primary-foreground select-none">{initials}</span>
+            </div>
+            <p className="text-base font-semibold text-foreground text-center mt-1">{student.student_name}</p>
+            <p className="text-sm text-muted-foreground text-center">{student.student_email}</p>
           </div>
-        )}
-        {student.faculty_abbr && (
-          <div className="px-4 py-3">
-            <p className="text-xs text-muted-foreground">Институт</p>
-            <p className="text-sm font-medium text-foreground mt-0.5">{student.faculty_abbr}</p>
-          </div>
-        )}
-        {student.grade_book_number && (
-          <div className="px-4 py-3">
-            <p className="text-xs text-muted-foreground">Номер зачётной книжки</p>
-            <p className="text-sm font-medium text-foreground mt-0.5">{student.grade_book_number}</p>
-          </div>
-        )}
-      </div>
 
-      {/* Theme selector — combobox */}
-      <div className="mt-6">
-        <p className="text-sm font-medium text-foreground mb-2">Тема оформления</p>
-        <ThemeCombobox />
-      </div>
+          <div className="bg-card rounded-2xl border border-border divide-y divide-border">
+            {student.faculty_abbr && (
+              <div className="px-4 py-3">
+                <p className="text-xs text-muted-foreground">Институт</p>
+                <p className="text-sm font-medium text-foreground mt-0.5">{student.faculty_abbr}</p>
+              </div>
+            )}
+            {student.study_group_str && (
+              <div className="px-4 py-3">
+                <p className="text-xs text-muted-foreground">Учебная группа</p>
+                <p className="text-sm font-medium text-foreground mt-0.5">{student.study_group_str}</p>
+              </div>
+            )}
+            {student.grade_book_number && (
+              <div className="px-4 py-3">
+                <p className="text-xs text-muted-foreground">Номер зачётной книжки</p>
+                <p className="text-sm font-medium text-foreground mt-0.5">{student.grade_book_number}</p>
+              </div>
+            )}
+          </div>
 
-      <Button
-        variant="outline"
-        className="mt-6 w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-red-900 dark:hover:bg-red-950"
-        onClick={() => {
-          localStorage.removeItem("token");
-          window.location.href = "/login";
-        }}
-      >
-        Выйти
-      </Button>
-    </div>
+          <div className="mt-6">
+            <p className="text-sm font-medium text-foreground mb-2">Тема оформления</p>
+            <ThemeCombobox />
+          </div>
+
+          <Button
+            variant="outline"
+            className="mt-6 w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-red-900 dark:hover:bg-red-950"
+            onClick={() => {
+              localStorage.removeItem("token");
+              window.location.href = "/login";
+            }}
+          >
+            Выйти
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -920,6 +962,7 @@ function HomePage() {
   const [tab, setTab] = useState<Tab>("home");
   const [servicesOpen, setServicesOpen] = useState(false);
   const [trafficOpen, setTrafficOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -998,14 +1041,14 @@ function HomePage() {
   return (
     <div className="h-screen overflow-hidden bg-background">
       <div className={`h-full ${tab === "schedule" || tab === "gradebook" ? "overflow-hidden" : "overflow-y-auto pb-20"}`}>
-        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
+        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setProfileOpen(true)} />}
         {tab === "schedule"  && <ScheduleTab student={student} />}
         {tab === "gradebook" && <GradebookTab student={student} />}
-        {tab === "profile"   && <ProfileTab student={student} />}
       </div>
 
       <BottomNav active={servicesOpen ? "services" : tab} onChange={handleTabChange} />
 
+      <ProfileSheet student={student} open={profileOpen} onClose={() => setProfileOpen(false)} />
       <ServicesSheet
         app={servicesApp}
         open={servicesOpen}
