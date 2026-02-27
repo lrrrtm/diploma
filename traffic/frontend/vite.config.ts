@@ -9,6 +9,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === "EVAL" && warning.id?.includes("lottie-web")) return;
+        warn(warning);
+      },
+    },
+  },
   server: {
     host: "0.0.0.0",
     port: 5173,

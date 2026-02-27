@@ -11,9 +11,10 @@ import api from "@/api/client";
 interface StudentContextValue {
   student: StudentInfo | null;
   isLoading: boolean;
+  wasLaunchAttempted: boolean;
 }
 
-const StudentContext = createContext<StudentContextValue>({ student: null, isLoading: false });
+const StudentContext = createContext<StudentContextValue>({ student: null, isLoading: false, wasLaunchAttempted: false });
 
 export function StudentProvider({ children }: { children: ReactNode }) {
   const [student, setStudent] = useState<StudentInfo | null>(() => {
@@ -24,6 +25,10 @@ export function StudentProvider({ children }: { children: ReactNode }) {
   // If there's a launch_token in the URL we need to verify it — start in loading state
   const [isLoading, setIsLoading] = useState<boolean>(() => {
     return new URLSearchParams(window.location.search).has("launch_token");
+  });
+  const [wasLaunchAttempted] = useState<boolean>(() => {
+    return new URLSearchParams(window.location.search).has("launch_token") ||
+      sessionStorage.getItem("student") !== null;
   });
 
   useEffect(() => {
@@ -53,7 +58,7 @@ export function StudentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <StudentContext.Provider value={{ student, isLoading }}>
+    <StudentContext.Provider value={{ student, isLoading, wasLaunchAttempted }}>
       {children}
     </StudentContext.Provider>
   );
@@ -65,4 +70,8 @@ export function useStudent(): StudentInfo | null {
 
 export function useStudentLoading(): boolean {
   return useContext(StudentContext).isLoading;
+}
+
+export function useWasLaunchAttempted(): boolean {
+  return useContext(StudentContext).wasLaunchAttempted;
 }

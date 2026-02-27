@@ -1,8 +1,10 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { useStudent, useStudentLoading } from "@/context/StudentContext";
+import { useStudent, useStudentLoading, useWasLaunchAttempted } from "@/context/StudentContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppLayout } from "@/components/shared/app-layout";
+import DuckScreen from "@/components/DuckScreen";
+import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
 
 import LoginPage from "@/pages/auth/LoginPage";
 import DepartmentsPage from "@/pages/student/DepartmentsPage";
@@ -37,6 +39,7 @@ function HomePage() {
   const { isAuthenticated, auth } = useAuth();
   const student = useStudent();
   const isLoading = useStudentLoading();
+  const wasLaunchAttempted = useWasLaunchAttempted();
   if (isLoading) return (
     <div className="flex items-center justify-center h-screen bg-background">
       <div className="w-full max-w-sm px-4 space-y-3">
@@ -49,6 +52,7 @@ function HomePage() {
   if (isAuthenticated && auth?.role === "admin") return <Navigate to="/admin/departments" replace />;
   if (isAuthenticated && auth?.role === "executor") return <Navigate to="/executor" replace />;
   if (student) return <Navigate to="/departments" replace />;
+  if (wasLaunchAttempted) return <DuckScreen animationData={duckAnimation} text="Эта страница открывается только через Политехник" />;
   return <Navigate to="/login" replace />;
 }
 
