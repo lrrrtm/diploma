@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import api from "@/api/client";
 import type { Department } from "@/types";
 import DuckScreen from "@/components/DuckScreen";
@@ -13,6 +14,7 @@ let departmentsCache: Department[] | null = null;
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>(departmentsCache ?? []);
   const [loading, setLoading] = useState(departmentsCache === null);
+  const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,18 +45,34 @@ export default function DepartmentsPage() {
     );
   }
 
-  return (
-    <div>
-      {/* <PageHeader
-        title="Структуры университета"
-        description="Выберите структуру для получения услуги"
-      /> */}
+  if (departments.length === 0) {
+    return <DuckScreen animationData={duckAnimation} text="Пока что нет доступных структур университета" />;
+  }
 
-      {departments.length === 0 ? (
-        <DuckScreen animationData={duckAnimation} text="Пока что нет доступных структур университета" />
+  const filtered = query.trim()
+    ? departments.filter((d) =>
+        d.name.toLowerCase().includes(query.toLowerCase()) ||
+        d.description?.toLowerCase().includes(query.toLowerCase())
+      )
+    : departments;
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          placeholder="Поиск по структурам..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <DuckScreen animationData={duckAnimation} text="Ничего не найдено" />
       ) : (
         <div className="grid gap-4">
-          {departments.map((dept) => (
+          {filtered.map((dept) => (
             <Card
               key={dept.id}
               className="cursor-pointer hover:shadow-md transition-shadow"
