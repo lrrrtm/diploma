@@ -8,6 +8,9 @@ GET /api/gradebook
   4. Return structured gradebook entries
 """
 
+from collections import defaultdict
+from datetime import datetime
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -119,7 +122,29 @@ async def get_gradebook(student: dict = Depends(_get_student)):
     data = rb_resp.json()
     result = data.get("result", {})
 
+    def _academic_year_label(date_str: str) -> str:
+        try:
+            dt = datetime.strptime(date_str.strip(), "%d.%m.%Y")
+            start = dt.year if dt.month >= 9 else dt.year - 1
+            return f"{start}/{start + 1} уч. год"
+        except Exception:
+            return "Другое"
+
+    year_groups: dict[str, list] = defaultdict(list)
+    for entry in result.get("record_book_data", []):
+        label = _academic_year_label(entry.get("date", ""))
+        year_groups[label].append(entry)
+
+    sorted_labels = sorted(
+        (k for k in year_groups if k != "Другое"), reverse=True
+    )
+    if "Другое" in year_groups:
+        sorted_labels.append("Другое")
+
     return {
         "orders_type_name": result.get("orders_type_name", ""),
-        "record_book_data": result.get("record_book_data", []),
+        "academic_years": [
+            {"label": label, "entries": year_groups[label]}
+            for label in sorted_labels
+        ],
     }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, ChevronsUpDown, Check, AlertCircle } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule, fetchGradebook } from "./api";
-import type { MiniApp, Student, WeekSchedule, DaySchedule, GradeEntry, GradebookResponse } from "./types";
+import type { MiniApp, Student, WeekSchedule, DaySchedule, GradeEntry, GradebookYear, GradebookResponse } from "./types";
 import LoginPage from "./DevLoginPage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useTheme, type Theme } from "./context/ThemeContext";
 
@@ -463,13 +464,13 @@ function ScheduleTab({ student }: { student: Student }) {
 // Gradebook tab
 // ---------------------------------------------------------------------------
 
-const GRADE_COLORS: Record<string, string> = {
-  "отлично": "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  "хорошо": "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  "удовлетворительно": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  "зачтено": "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "неудовлетворительно": "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  "не зачтено": "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+const GRADE_COLORS_TEXT: Record<string, string> = {
+  "отлично": "text-green-600 dark:text-green-400",
+  "хорошо": "text-blue-600 dark:text-blue-400",
+  "удовлетворительно": "text-yellow-600 dark:text-yellow-500",
+  "зачтено": "text-emerald-600 dark:text-emerald-400",
+  "неудовлетворительно": "text-red-600 dark:text-red-400",
+  "не зачтено": "text-red-600 dark:text-red-400",
 };
 
 function GradebookTab({ student }: { student: Student }) {
@@ -479,7 +480,8 @@ function GradebookTab({ student }: { student: Student }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSemester, setActiveSemester] = useState<number | null>(null);
+  const [activeYear, setActiveYear] = useState<string | null>(null);
+  const [selected, setSelected] = useState<GradeEntry | null>(null);
 
   const loadGradebook = async () => {
     const token = localStorage.getItem("token");
@@ -529,80 +531,96 @@ function GradebookTab({ student }: { student: Student }) {
 
   if (!data) return null;
 
-  // Group by semester
-  const bySemester = new Map<number, GradeEntry[]>();
-  for (const entry of data.record_book_data) {
-    const list = bySemester.get(entry.semester) || [];
-    list.push(entry);
-    bySemester.set(entry.semester, list);
-  }
-  const semesters = [...bySemester.keys()].sort((a, b) => b - a);
-  const active = activeSemester ?? semesters[0];
-  const entries = bySemester.get(active) || [];
+  const years = data.academic_years;
+  const activeLabel = activeYear ?? years[0]?.label ?? null;
+  const activeGroup = years.find((y) => y.label === activeLabel);
+  const entries = activeGroup?.entries ?? [];
 
   return (
-    <div className="px-4 py-6 max-w-2xl mx-auto pb-24">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-foreground">Зачётная книжка</h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-xs text-muted-foreground"
-          onClick={() => { sessionStorage.removeItem("gradebook"); setData(null); loadGradebook(); }}
-        >
-          Обновить
-        </Button>
-      </div>
-
-      {data.orders_type_name && (
-        <Badge variant="secondary" className="mb-4">{data.orders_type_name}</Badge>
-      )}
-
-      {/* Semester tabs */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
-        {semesters.map((sem) => (
+    <div className="flex flex-col h-full">
+      {/* Year tabs */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 pt-4 pb-2 shrink-0">
+        {years.map((yr) => (
           <Button
-            key={sem}
-            variant={sem === active ? "default" : "outline"}
+            key={yr.label}
+            variant={yr.label === activeLabel ? "default" : "outline"}
             size="sm"
-            onClick={() => setActiveSemester(sem)}
-            className="shrink-0"
+            onClick={() => setActiveYear(yr.label)}
+            className="shrink-0 text-xs"
           >
-            {sem} сем.
+            {yr.label}
           </Button>
         ))}
       </div>
 
-      {/* Entries */}
-      <div className="space-y-3">
-        {entries.map((entry, i) => (
-          <Card key={i}>
-            <CardContent className="p-4">
-              <Badge variant="secondary" className="mb-3">{entry.test_type_name}</Badge>
-              <div className="flex items-center gap-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground leading-tight">{entry.discipline}</p>
-                  {entry.lecturer && (
-                    <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground">
-                      <User className="h-4 w-4 shrink-0" />
-                      <span>{entry.lecturer}</span>
-                    </div>
-                  )}
-                  {entry.date && (
-                    <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
-                      <CalendarDays className="h-4 w-4 shrink-0" />
-                      <span>{entry.date}</span>
-                    </div>
-                  )}
-                </div>
-                <div className={`shrink-0 rounded-xl px-3 py-2 text-center font-bold text-sm max-w-28 leading-tight ${GRADE_COLORS[entry.grade_name] || "bg-secondary text-secondary-foreground"}`}>
-                  {entry.grade_name}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Table */}
+      <div className="flex-1 overflow-y-auto px-4 pb-24">
+        <div className="divide-y divide-border">
+          <div className="flex items-center py-2 gap-4">
+            <span className="flex-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">Дисциплина</span>
+            <span className="w-28 text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">Оценка</span>
+          </div>
+          {entries.map((entry, i) => (
+            <button
+              key={i}
+              className="w-full flex items-center py-3 gap-4 text-left active:bg-muted/50 transition-colors"
+              onClick={() => setSelected(entry)}
+            >
+              <span className="flex-1 text-sm text-foreground leading-snug">{entry.discipline}</span>
+              <span className={`shrink-0 w-28 text-right text-sm font-semibold ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
+                {entry.grade_name}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Detail dialog */}
+      <Dialog open={selected !== null} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base leading-snug pr-6">{selected?.discipline}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            {selected?.test_type_name && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Тип контроля</span>
+                <span className="font-medium text-right">{selected.test_type_name}</span>
+              </div>
+            )}
+            {selected?.grade_name && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Оценка</span>
+                <span className={`font-semibold ${GRADE_COLORS_TEXT[selected.grade_name] ?? ""}`}>{selected.grade_name}</span>
+              </div>
+            )}
+            {selected?.lecturer && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Преподаватель</span>
+                <span className="font-medium text-right">{selected.lecturer}</span>
+              </div>
+            )}
+            {selected?.date && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Дата</span>
+                <span className="font-medium">{selected.date}</span>
+              </div>
+            )}
+            {selected?.hours && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">Часов</span>
+                <span className="font-medium">{selected.hours}</span>
+              </div>
+            )}
+            {selected?.zet && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground shrink-0">ЗЕТ</span>
+                <span className="font-medium">{selected.zet}</span>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

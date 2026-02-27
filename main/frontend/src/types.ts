@@ -45,9 +45,14 @@ export interface GradeEntry {
   zet: string;
 }
 
+export interface GradebookYear {
+  label: string;
+  entries: GradeEntry[];
+}
+
 export interface GradebookResponse {
   orders_type_name: string;
-  record_book_data: GradeEntry[];
+  academic_years: GradebookYear[];
 }
 
 export interface MiniApp {
