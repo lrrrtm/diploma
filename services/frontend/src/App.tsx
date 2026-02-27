@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useStudent, useStudentLoading } from "@/context/StudentContext";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AppLayout } from "@/components/shared/app-layout";
 
 import LoginPage from "@/pages/auth/LoginPage";
@@ -37,8 +38,11 @@ function HomePage() {
   const student = useStudent();
   const isLoading = useStudentLoading();
   if (isLoading) return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    <div className="flex items-center justify-center h-screen bg-background">
+      <div className="w-full max-w-sm px-4 space-y-3">
+        <Skeleton className="h-10 w-full rounded-xl" />
+        <Skeleton className="h-4 w-2/3 mx-auto" />
+      </div>
     </div>
   );
   if (isAuthenticated && auth?.role === "staff") return <Navigate to="/staff" replace />;

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useTheme, type Theme } from "./context/ThemeContext";
 
@@ -458,8 +459,24 @@ function ScheduleTab({ student }: { student: Student }) {
       {/* Scrollable lesson area */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <div className="px-4 pt-4 space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4 flex gap-3">
+                  <div className="flex flex-col items-center justify-center w-14 shrink-0 gap-1.5">
+                    <Skeleton className="h-5 w-10" />
+                    <Skeleton className="h-5 w-10" />
+                  </div>
+                  <Skeleton className="w-px self-stretch" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-4 w-1/3" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         ) : (
           <div
@@ -527,8 +544,20 @@ function GradebookTab({ student }: { student: Student }) {
 
   if (loading && !data) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div>
+        <div className="flex gap-2 px-4 pt-4 pb-2 border-b border-border">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-28 rounded-md" />)}
+        </div>
+        <div className="px-4">
+          <div className="divide-y divide-border">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center py-3 gap-4">
+                <Skeleton className="flex-1 h-4" />
+                <Skeleton className="w-10 h-4 shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -913,8 +942,22 @@ function HomePage() {
 
   if (!student) {
     return (
-      <div className="h-screen overflow-hidden flex items-center justify-center bg-background">
-        <p className="text-muted-foreground text-sm">Загрузка...</p>
+      <div className="h-screen overflow-hidden bg-background">
+        <div className="h-full overflow-y-auto pb-20 px-4 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <Skeleton className="h-7 w-52" />
+            <div className="flex gap-2">
+              <Skeleton className="h-9 w-9 rounded-xl" />
+              <Skeleton className="h-9 w-9 rounded-xl" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
+        <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 h-16" />
       </div>
     );
   }

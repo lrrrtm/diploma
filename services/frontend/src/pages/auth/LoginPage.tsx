@@ -42,10 +42,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
-              <LayoutDashboard className="h-7 w-7 text-white" />
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
+              <LayoutDashboard className="h-6 w-6 text-white" />
             </div>
+            <span className="text-muted-foreground text-xl font-light select-none">×</span>
+            <img src="/Vector.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
           <CardTitle className="text-2xl">Политехник.Уником</CardTitle>
           <CardDescription>

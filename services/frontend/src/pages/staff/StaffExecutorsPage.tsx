@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Users, Trash2, Plus, KeyRound, User } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,8 +87,20 @@ export default function StaffExecutorsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <p className="text-muted-foreground">Загрузка...</p>
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-1.5 flex-1">
+                  <Skeleton className="h-5 w-1/3" />
+                  <Skeleton className="h-4 w-1/4" />
+                </div>
+                <Skeleton className="h-8 w-8 rounded-md shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
