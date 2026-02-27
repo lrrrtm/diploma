@@ -999,17 +999,25 @@ function HomePage() {
     }
   };
 
-  // Close services sheet on browser back
+  // Push history entry when traffic sheet opens so back button can close it
   useEffect(() => {
-    const onPopState = (e: PopStateEvent) => {
-      if (servicesOpen) {
-        e.preventDefault();
+    if (trafficOpen) {
+      window.history.pushState({ traffic: true }, "");
+    }
+  }, [trafficOpen]);
+
+  // Close sheets on browser back
+  useEffect(() => {
+    const onPopState = () => {
+      if (trafficOpen) {
+        setTrafficOpen(false);
+      } else if (servicesOpen) {
         setServicesOpen(false);
       }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [servicesOpen]);
+  }, [trafficOpen, servicesOpen]);
 
   if (!student) {
     return (

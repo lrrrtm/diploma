@@ -37,7 +37,7 @@ export default function LoginPage() {
       }
       const data = await resp.json();
       localStorage.setItem("token", data.token);
-      window.location.href = "/";
+      window.location.replace("/");
     } catch {
       setError("Ошибка соединения с сервером");
     } finally {
