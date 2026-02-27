@@ -14,6 +14,9 @@ import { Separator } from "@/components/ui/separator";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useTheme, type Theme } from "./context/ThemeContext";
 
@@ -544,12 +547,14 @@ function GradebookTab({ student }: { student: Student }) {
 
   if (loading && !data) {
     return (
-      <div>
-        <div className="flex gap-2 px-4 pt-4 pb-2 border-b border-border">
-          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-28 rounded-md" />)}
+      <div className="h-full flex flex-col">
+        <div className="shrink-0 border-b border-border overflow-x-auto no-scrollbar">
+          <div className="flex gap-1 px-3 py-2">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-24 rounded-md shrink-0" />)}
+          </div>
         </div>
-        <div className="px-4">
-          <div className="divide-y divide-border">
+        <ScrollArea className="flex-1">
+          <div className="divide-y divide-border px-4">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="flex items-center py-3 gap-4">
                 <Skeleton className="flex-1 h-4" />
@@ -557,7 +562,7 @@ function GradebookTab({ student }: { student: Student }) {
               </div>
             ))}
           </div>
-        </div>
+        </ScrollArea>
       </div>
     );
   }
@@ -582,18 +587,7 @@ function GradebookTab({ student }: { student: Student }) {
   if (!data) return null;
 
   const years = data.academic_years;
-  const activeLabel = activeYear ?? years[0]?.label ?? null;
-  const activeGroup = years.find((y) => y.label === activeLabel);
-  const entries = activeGroup?.entries ?? [];
-
-  // Group by semester within the active year
-  const bySemester = new Map<number, GradeEntry[]>();
-  for (const entry of entries) {
-    const list = bySemester.get(entry.semester) ?? [];
-    list.push(entry);
-    bySemester.set(entry.semester, list);
-  }
-  const semestersSorted = [...bySemester.keys()].sort((a, b) => b - a);
+  const activeLabel = activeYear ?? years[0]?.label ?? "";
 
   const parseDateNum = (d: string) => {
     const [dd, mm, yyyy] = (d ?? "").split(".");
@@ -601,54 +595,66 @@ function GradebookTab({ student }: { student: Student }) {
   };
 
   return (
-    <div>
-      {/* Year tabs — sticky under top edge */}
-      <div className="sticky top-0 z-10 bg-background flex gap-2 overflow-x-auto no-scrollbar px-4 pt-4 pb-2 border-b border-border">
-        {years.map((yr) => (
-          <Button
-            key={yr.label}
-            variant={yr.label === activeLabel ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveYear(yr.label)}
-            className="shrink-0 text-xs"
-          >
-            {yr.label}
-          </Button>
-        ))}
+    <Tabs value={activeLabel} onValueChange={setActiveYear} className="h-full flex flex-col">
+      {/* Year selector */}
+      <div className="shrink-0 border-b border-border overflow-x-auto no-scrollbar">
+        <TabsList className="flex h-auto justify-start gap-1 rounded-none bg-transparent px-3 py-2 w-max">
+          {years.map((yr) => (
+            <TabsTrigger key={yr.label} value={yr.label} className="shrink-0 text-xs h-8">
+              {yr.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
       </div>
 
-      {/* Table grouped by semester */}
-      <div className="px-4">
-        {semestersSorted.map((sem) => {
-          const semEntries = [...(bySemester.get(sem) ?? [])].sort(
-            (a, b) => parseDateNum(b.date) - parseDateNum(a.date)
-          );
+      {/* Scrollable content */}
+      <ScrollArea className="flex-1">
+        {years.map((yr) => {
+          const bySemester = new Map<number, GradeEntry[]>();
+          for (const entry of yr.entries) {
+            const list = bySemester.get(entry.semester) ?? [];
+            list.push(entry);
+            bySemester.set(entry.semester, list);
+          }
+          const semestersSorted = [...bySemester.keys()].sort((a, b) => a - b);
+
           return (
-            <div key={sem}>
-              <div className="pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                {sem} семестр
-              </div>
-              <div className="divide-y divide-border">
-                {semEntries.map((entry, i) => {
-                  const gradeDisplay = entry.grade !== 0 ? String(entry.grade) : entry.grade_name;
-                  return (
-                    <button
-                      key={i}
-                      className="w-full flex items-center py-3 gap-4 text-left active:bg-muted/50 transition-colors"
-                      onClick={() => setSelected(entry)}
-                    >
-                      <span className="flex-1 text-sm text-foreground leading-snug">{entry.discipline}</span>
-                      <span className={`shrink-0 text-right text-sm font-semibold ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
-                        {gradeDisplay}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <TabsContent key={yr.label} value={yr.label} className="mt-0 pb-20">
+              {semestersSorted.map((sem) => {
+                const semEntries = [...(bySemester.get(sem) ?? [])].sort(
+                  (a, b) => parseDateNum(b.date) - parseDateNum(a.date)
+                );
+                return (
+                  <div key={sem}>
+                    <div className="px-4 pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {sem} семестр
+                    </div>
+                    <Table>
+                      <TableBody>
+                        {semEntries.map((entry, i) => {
+                          const gradeDisplay = entry.grade !== 0 ? String(entry.grade) : entry.grade_name;
+                          return (
+                            <TableRow
+                              key={i}
+                              className="cursor-pointer"
+                              onClick={() => setSelected(entry)}
+                            >
+                              <TableCell className="py-3 pl-4 pr-2 text-sm leading-snug">{entry.discipline}</TableCell>
+                              <TableCell className={`py-3 pl-2 pr-4 text-right text-sm font-semibold w-24 ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
+                                {gradeDisplay}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })}
+            </TabsContent>
           );
         })}
-      </div>
+      </ScrollArea>
 
       {/* Detail dialog */}
       <Dialog open={selected !== null} onOpenChange={(open) => { if (!open) setSelected(null); }}>
@@ -696,7 +702,7 @@ function GradebookTab({ student }: { student: Student }) {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </Tabs>
   );
 }
 
@@ -967,7 +973,7 @@ function HomePage() {
 
   return (
     <div className="h-screen overflow-hidden bg-background">
-      <div className={`h-full ${tab === "schedule" ? "overflow-hidden" : "overflow-y-auto pb-20"}`}>
+      <div className={`h-full ${tab === "schedule" || tab === "gradebook" ? "overflow-hidden" : "overflow-y-auto pb-20"}`}>
         {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
         {tab === "schedule"  && <ScheduleTab student={student} />}
         {tab === "gradebook" && <GradebookTab student={student} />}
