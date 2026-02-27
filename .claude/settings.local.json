@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git mv superapp main)",
+      "Bash(powershell -Command \"Rename-Item -Path ''E:\\\\repos\\\\diploma\\\\superapp'' -NewName ''main'' -Force\")",
+      "Bash(ngrok version)",
+      "Bash(pip --version)",
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(docker --version)",
+      "Bash(docker compose version)",
+      "Bash(pip install -r requirements.txt)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174/)",
+      "Bash(curl -s -w \"\\\\n%{http_code}\" http://127.0.0.1:8001/api/gradebook -H \"Authorization: Bearer test\")",
+      "Bash(find /e/repos/diploma/main/backend -name \"__pycache__\" -type d -exec rm -rf {} +)",
+      "Bash(find /e/repos/diploma/main/backend -name \"*.pyc\" -delete)"
+    ]
+  }
+}

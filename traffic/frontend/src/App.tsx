@@ -15,7 +15,7 @@ export default function App() {
       <Route path="/teacher/login" element={<TeacherLoginPage />} />
       <Route path="/teacher/session" element={<TeacherSessionPage />} />
 
-      {/* Student scanner — opened in iframe from superapp */}
+      {/* Student scanner — opened in iframe from main app */}
       <Route path="/scan" element={<StudentScanPage />} />
 
       {/* Default */}

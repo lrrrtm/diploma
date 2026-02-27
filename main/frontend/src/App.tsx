@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, ChevronsUpDown, Check } from "lucide-react";
-import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule } from "./api";
-import type { MiniApp, Student, WeekSchedule, DaySchedule } from "./types";
+import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, ChevronsUpDown, Check, AlertCircle } from "lucide-react";
+import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule, fetchGradebook } from "./api";
+import type { MiniApp, Student, WeekSchedule, DaySchedule, GradeEntry, GradebookResponse } from "./types";
 import LoginPage from "./DevLoginPage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -460,14 +460,139 @@ function ScheduleTab({ student }: { student: Student }) {
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder
+// Gradebook tab
 // ---------------------------------------------------------------------------
 
-function ComingSoon({ label }: { label: string }) {
+const GRADE_COLORS: Record<string, string> = {
+  "отлично": "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  "хорошо": "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  "удовлетворительно": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  "зачтено": "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+  "неудовлетворительно": "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  "не зачтено": "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+};
+
+function GradebookTab({ student }: { student: Student }) {
+  const [data, setData] = useState<GradebookResponse | null>(() => {
+    const cached = sessionStorage.getItem("gradebook");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeSemester, setActiveSemester] = useState<number | null>(null);
+
+  const loadGradebook = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await fetchGradebook(token);
+      sessionStorage.setItem("gradebook", JSON.stringify(result));
+      setData(result);
+    } catch (err: unknown) {
+      setError((err as Error).message || "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!data) loadGradebook();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading && !data) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    const isSessionExpired = error.includes("Сессия истекла") || error.includes("Войдите заново");
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center px-6 gap-4">
+        <AlertCircle className="h-10 w-10 text-muted-foreground" />
+        <p className="text-muted-foreground text-sm">{error}</p>
+        {isSessionExpired ? (
+          <Button onClick={() => { localStorage.removeItem("token"); window.location.href = "/login"; }}>
+            Войти заново
+          </Button>
+        ) : (
+          <Button variant="outline" onClick={loadGradebook}>Попробовать снова</Button>
+        )}
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // Group by semester
+  const bySemester = new Map<number, GradeEntry[]>();
+  for (const entry of data.record_book_data) {
+    const list = bySemester.get(entry.semester) || [];
+    list.push(entry);
+    bySemester.set(entry.semester, list);
+  }
+  const semesters = [...bySemester.keys()].sort((a, b) => b - a);
+  const active = activeSemester ?? semesters[0];
+  const entries = bySemester.get(active) || [];
+
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <p className="text-2xl mb-2">🚧</p>
-      <p className="text-muted-foreground text-sm">{label} — скоро</p>
+    <div className="px-4 py-6 max-w-2xl mx-auto pb-24">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-foreground">Зачётная книжка</h2>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground"
+          onClick={() => { sessionStorage.removeItem("gradebook"); setData(null); loadGradebook(); }}
+        >
+          Обновить
+        </Button>
+      </div>
+
+      {data.orders_type_name && (
+        <Badge variant="secondary" className="mb-4">{data.orders_type_name}</Badge>
+      )}
+
+      {/* Semester tabs */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">
+        {semesters.map((sem) => (
+          <Button
+            key={sem}
+            variant={sem === active ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveSemester(sem)}
+            className="shrink-0"
+          >
+            {sem} сем.
+          </Button>
+        ))}
+      </div>
+
+      {/* Entries */}
+      <div className="space-y-3">
+        {entries.map((entry, i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground leading-tight">{entry.discipline}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{entry.test_type_name}</p>
+                  {entry.lecturer && <p className="text-xs text-muted-foreground mt-0.5">{entry.lecturer}</p>}
+                  {entry.date && <p className="text-xs text-muted-foreground mt-0.5">{entry.date}</p>}
+                </div>
+                <Badge className={`shrink-0 ${GRADE_COLORS[entry.grade_name] || "bg-secondary text-secondary-foreground"}`}>
+                  {entry.grade_name}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
@@ -728,7 +853,7 @@ function HomePage() {
       <div className="h-full overflow-y-auto pb-20">
         {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
         {tab === "schedule"  && <ScheduleTab student={student} />}
-        {tab === "gradebook" && <ComingSoon label="Зачётка" />}
+        {tab === "gradebook" && <GradebookTab student={student} />}
         {tab === "profile"   && <ProfileTab student={student} />}
       </div>
 
