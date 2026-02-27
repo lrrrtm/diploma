@@ -3,6 +3,9 @@ import { Pi, CalendarDays, BookOpen, FileText, User, X, QrCode, ChevronLeft, Che
 import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule } from "./api";
 import type { MiniApp, Student, WeekSchedule, DaySchedule } from "./types";
 import LoginPage from "./DevLoginPage";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { ru } from "date-fns/locale";
 
 // ---------------------------------------------------------------------------
 // Bottom navbar
@@ -225,16 +228,24 @@ function MiniAppCard({ app }: { app: MiniApp }) {
 
 const WEEKDAY_SHORT = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-function formatDateShort(iso: string) {
-  if (!iso) return "";
-  const [, m, d] = iso.split("-");
-  return `${d}.${m}`;
-}
-
 function formatDateFull(iso: string) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
   return `${d}.${m}.${y}`;
+}
+
+function isoToLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function getMondayOf(d: Date): Date {
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
 }
 
 function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
@@ -279,6 +290,28 @@ function ScheduleTab({ student }: { student: Student }) {
   const [slideKey, setSlideKey] = useState(0);
   const resolvedGroupId = useRef<number | null>(null);
   const touchStartX = useRef<number | null>(null);
+  const pendingDayIdx = useRef<number | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setCalendarOpen(false);
+    const day = date.getDay();
+    const dayIdx = Math.min(5, day === 0 ? 0 : day - 1);
+    const todayMonday = getMondayOf(new Date());
+    const pickedMonday = getMondayOf(date);
+    const newOffset = Math.round(
+      (pickedMonday.getTime() - todayMonday.getTime()) / (7 * 86400000)
+    );
+    if (newOffset === weekOffset) {
+      goToDay(dayIdx, dayIdx > activeDayIdx ? "from-right" : "from-left");
+      return;
+    }
+    pendingDayIdx.current = dayIdx;
+    setSlideDir(newOffset > weekOffset ? "from-right" : "from-left");
+    setSlideKey((k) => k + 1);
+    setWeekOffset(newOffset);
+  };
 
   const goToDay = (idx: number, dir: "from-right" | "from-left") => {
     setSlideDir(dir);
@@ -331,8 +364,11 @@ function ScheduleTab({ student }: { student: Student }) {
         const dateStr = baseDate.toISOString().slice(0, 10);
         const data = await fetchSchedule(token, gid, dateStr);
         setSchedule(data);
-        // Auto-select today on current week, else first day
-        if (weekOffset === 0) {
+        // Auto-select pending date (from calendar pick), today, or first day
+        if (pendingDayIdx.current !== null) {
+          setActiveDayIdx(pendingDayIdx.current);
+          pendingDayIdx.current = null;
+        } else if (weekOffset === 0) {
           const todayIso = new Date().toISOString().slice(0, 10);
           const weekStartDate = new Date(data.week.date_start);
           const todayDate = new Date(todayIso);
@@ -407,7 +443,22 @@ function ScheduleTab({ student }: { student: Student }) {
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <span className="text-sm font-semibold text-gray-800">{selectedDate}</span>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button className="text-sm font-semibold text-gray-800 hover:text-blue-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50">
+                {selectedDate}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="single"
+                selected={activeDay?.date ? isoToLocalDate(activeDay.date) : undefined}
+                onSelect={handleDateSelect}
+                locale={ru}
+                disabled={{ dayOfWeek: [0] }}
+              />
+            </PopoverContent>
+          </Popover>
           <button
             onClick={() => setWeekOffset((o) => o + 1)}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
