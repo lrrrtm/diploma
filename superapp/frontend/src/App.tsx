@@ -223,18 +223,18 @@ function MiniAppCard({ app }: { app: MiniApp }) {
 // Schedule tab
 // ---------------------------------------------------------------------------
 
-const WEEKDAY_SHORT = ["", "Пн", "Тв", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const WEEKDAY_SHORT = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 function formatDateShort(iso: string) {
   if (!iso) return "";
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
+  const [, m, d] = iso.split("-");
+  return `${d}.${m}`;
 }
 
 function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
   const loc = lesson.auditories
-    .map((a) => (a.building ? `${a.name} (${a.building})` : a.name))
-    .join(", ");
+    .map((a) => [a.name, a.building].filter(Boolean).join(", "))
+    .join(" / ");
   const teacher = lesson.teachers.map((t) => t.full_name).join(", ");
 
   return (
@@ -245,14 +245,12 @@ function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
       </div>
       <div className="w-px bg-gray-100 shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-2">
-          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 shrink-0">
-            {lesson.type_abbr}
-          </span>
-          <p className="text-sm font-semibold text-gray-900 leading-tight">{lesson.subject}</p>
-        </div>
-        {teacher && <p className="text-xs text-gray-500 mt-1 truncate">{teacher}</p>}
-        {loc && <p className="text-xs text-gray-400 mt-0.5 truncate">{loc}</p>}
+        <p className="text-sm font-semibold text-gray-900 leading-tight">{lesson.subject}</p>
+        <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+          {lesson.type_name}
+        </span>
+        {teacher && <p className="text-xs text-gray-500 mt-1">{teacher}</p>}
+        {loc && <p className="text-xs text-gray-400 mt-0.5">{loc}</p>}
         {lesson.additional_info && (
           <p className="text-xs text-gray-400 mt-0.5 italic">{lesson.additional_info}</p>
         )}
@@ -289,10 +287,12 @@ function ScheduleTab({ student }: { student: Student }) {
         }
         const data = await fetchSchedule(token, gid);
         setSchedule(data);
-        // Auto-select today's day if present
+        // Auto-select today among Mon-Sat slots
         const todayIso = new Date().toISOString().slice(0, 10);
-        const idx = data.days.findIndex((d: DaySchedule) => d.date === todayIso);
-        setActiveDayIdx(idx >= 0 ? idx : 0);
+        const weekStartDate = new Date(data.week.date_start);
+        const todayDate = new Date(todayIso);
+        const diff = Math.round((todayDate.getTime() - weekStartDate.getTime()) / 86400000);
+        setActiveDayIdx(diff >= 0 && diff < 6 ? diff : 0);
       } catch (e: unknown) {
         setError((e as Error).message ?? "Ошибка загрузки расписания");
       } finally {
@@ -336,27 +336,35 @@ function ScheduleTab({ student }: { student: Student }) {
   }
 
   const days = schedule.days;
-  const activeDay = days[activeDayIdx];
+  // Build a fixed Mon–Sat grid aligned to the week returned by the API
+  const weekStart = schedule.week.date_start; // YYYY-MM-DD (Monday)
+  const fixedDays = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    return days.find((day) => day.date === iso) ?? { weekday: i + 1, date: iso, lessons: [] };
+  });
+  const activeDay = fixedDays[activeDayIdx];
 
   return (
     <div>
       {/* Sticky day tabs */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 pt-4 pb-0">
-        <div className="flex gap-1 overflow-x-auto no-scrollbar">
-          {days.map((day, idx) => {
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
+        <div className="flex overflow-x-auto no-scrollbar">
+          {fixedDays.map((day, idx) => {
             const isActive = idx === activeDayIdx;
             return (
               <button
                 key={day.date}
                 onClick={() => setActiveDayIdx(idx)}
-                className={`flex flex-col items-center px-3 pb-2 pt-1 rounded-t-xl text-xs font-medium shrink-0 border-b-2 transition-colors ${
+                className={`flex-1 flex flex-col items-center px-1 pb-2 pt-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
                   isActive
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-400 hover:text-gray-600"
                 }`}
               >
-                <span className="text-base font-bold">{WEEKDAY_SHORT[day.weekday]}</span>
-                <span>{formatDateShort(day.date)}</span>
+                <span className="text-sm font-bold">{WEEKDAY_SHORT[day.weekday]}</span>
+                <span className="text-xs">{formatDateShort(day.date)}</span>
               </button>
             );
           })}

@@ -137,7 +137,7 @@ async def get_schedule(
                 {
                     "id": a.get("id"),
                     "name": a.get("name", ""),
-                    "building": (a.get("building") or {}).get("abbr", ""),
+                    "building": (a.get("building") or {}).get("name", ""),
                 }
                 for a in (lesson.get("auditories") or [])
             ]
