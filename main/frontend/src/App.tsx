@@ -537,9 +537,9 @@ function GradebookTab({ student }: { student: Student }) {
   const entries = activeGroup?.entries ?? [];
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Year tabs */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 pt-4 pb-2 shrink-0">
+    <div>
+      {/* Year tabs — sticky under top edge */}
+      <div className="sticky top-0 z-10 bg-background flex gap-2 overflow-x-auto no-scrollbar px-4 pt-4 pb-2 border-b border-border">
         {years.map((yr) => (
           <Button
             key={yr.label}
@@ -554,7 +554,7 @@ function GradebookTab({ student }: { student: Student }) {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto px-4 pb-24">
+      <div className="px-4">
         <div className="divide-y divide-border">
           <div className="flex items-center py-2 gap-4">
             <span className="flex-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">Дисциплина</span>
