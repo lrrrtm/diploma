@@ -981,6 +981,8 @@ function HomePage() {
   const [servicesOpen, setServicesOpen] = useState(false);
   const [trafficOpen, setTrafficOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const servicesSavedLength = useRef(0);
+  const trafficSavedLength = useRef(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1010,6 +1012,7 @@ function HomePage() {
 
   const handleTabChange = (t: Tab) => {
     if (t === "services") {
+      servicesSavedLength.current = window.history.length;
       setServicesOpen(true);
       window.history.pushState({ services: true }, "");
     } else {
@@ -1020,17 +1023,22 @@ function HomePage() {
   // Push history entry when traffic sheet opens so back button can close it
   useEffect(() => {
     if (trafficOpen) {
+      trafficSavedLength.current = window.history.length;
       window.history.pushState({ traffic: true }, "");
     }
   }, [trafficOpen]);
 
-  // Close sheets on browser back
+  // Close sheets on browser back, skipping any iframe-internal history entries
   useEffect(() => {
     const onPopState = () => {
       if (trafficOpen) {
         setTrafficOpen(false);
+        const extra = window.history.length - (trafficSavedLength.current + 1);
+        if (extra > 0) window.history.go(-extra);
       } else if (servicesOpen) {
         setServicesOpen(false);
+        const extra = window.history.length - (servicesSavedLength.current + 1);
+        if (extra > 0) window.history.go(-extra);
       }
     };
     window.addEventListener("popstate", onPopState);
