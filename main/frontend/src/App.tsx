@@ -464,7 +464,7 @@ function ScheduleTab({ student }: { student: Student }) {
         ) : (
           <div
             key={slideKey}
-            className={`px-4 pt-4 pb-20 space-y-3 slide-${slideDir}`}
+            className={`px-4 pt-4 pb-28 space-y-3 slide-${slideDir}`}
           >
             {activeDay?.lessons.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
