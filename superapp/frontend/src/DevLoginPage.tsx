@@ -45,7 +45,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-gray-50 flex items-center justify-center px-4">
+    <div className="h-[100dvh] overflow-hidden bg-background flex items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">Политехник</CardTitle>
