@@ -1,4 +1,10 @@
 import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 /**
  * Login page — authenticates via CAS scraping (POST /api/auth/login).
@@ -40,50 +46,48 @@ export default function LoginPage() {
 
   return (
     <div className="h-screen overflow-hidden bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">Политехник</h1>
-          <p className="text-sm text-gray-500 mt-1">Войди через учётную запись СПбПУ</p>
-        </div>
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">Политехник</CardTitle>
+          <CardDescription>Войди через учётную запись СПбПУ</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="username">Логин</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                required
+                autoComplete="username"
+                placeholder="ivan.ivanov"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Пароль</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+              />
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Логин</label>
-            <input
-              name="username"
-              type="text"
-              required
-              autoComplete="username"
-              placeholder="ivan.ivanov"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
-            <input
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-2 rounded-lg text-sm transition-colors"
-          >
-            {loading ? "Вход..." : "Войти"}
-          </button>
-        </form>
-      </div>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? "Вход..." : "Войти"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
