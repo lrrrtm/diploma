@@ -578,16 +578,26 @@ function GradebookTab({ student }: { student: Student }) {
         {entries.map((entry, i) => (
           <Card key={i}>
             <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-3">
+              <Badge variant="secondary" className="mb-3">{entry.test_type_name}</Badge>
+              <div className="flex items-center gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground leading-tight">{entry.discipline}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{entry.test_type_name}</p>
-                  {entry.lecturer && <p className="text-xs text-muted-foreground mt-0.5">{entry.lecturer}</p>}
-                  {entry.date && <p className="text-xs text-muted-foreground mt-0.5">{entry.date}</p>}
+                  {entry.lecturer && (
+                    <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground">
+                      <User className="h-4 w-4 shrink-0" />
+                      <span>{entry.lecturer}</span>
+                    </div>
+                  )}
+                  {entry.date && (
+                    <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
+                      <CalendarDays className="h-4 w-4 shrink-0" />
+                      <span>{entry.date}</span>
+                    </div>
+                  )}
                 </div>
-                <Badge className={`shrink-0 ${GRADE_COLORS[entry.grade_name] || "bg-secondary text-secondary-foreground"}`}>
+                <div className={`shrink-0 rounded-xl px-3 py-2 text-center font-bold text-sm max-w-28 leading-tight ${GRADE_COLORS[entry.grade_name] || "bg-secondary text-secondary-foreground"}`}>
                   {entry.grade_name}
-                </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
