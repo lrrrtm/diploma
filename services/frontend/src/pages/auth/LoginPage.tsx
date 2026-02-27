@@ -47,7 +47,7 @@ export default function LoginPage() {
               <LayoutDashboard className="h-6 w-6 text-white" />
             </div>
             <span className="text-muted-foreground text-xl font-light select-none">×</span>
-            <img src="/Vector.svg" alt="СПбПУ" className="h-11 w-11" />
+            <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
           <CardTitle className="text-2xl">Политехник.Уником</CardTitle>
           <CardDescription>

@@ -54,7 +54,7 @@ export default function LoginPage() {
               <GraduationCap className="h-6 w-6 text-primary-foreground" />
             </div>
             <span className="text-muted-foreground text-xl font-light select-none">×</span>
-            <img src="/Vector.svg" alt="СПбПУ" className="h-11 w-11" />
+            <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
           <CardTitle className="text-2xl">Политехник</CardTitle>
           <CardDescription>Войди через учётную запись СПбПУ</CardDescription>
@@ -69,7 +69,7 @@ export default function LoginPage() {
                 type="text"
                 required
                 autoComplete="username"
-                placeholder="ivan.ivanov"
+                placeholder="Введите логин"
               />
             </div>
             <div className="space-y-1.5">
@@ -80,6 +80,7 @@ export default function LoginPage() {
                 type="password"
                 required
                 autoComplete="current-password"
+                placeholder="Введите пароль"
               />
             </div>
 

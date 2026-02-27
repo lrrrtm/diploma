@@ -46,7 +46,7 @@ export default function TeacherLoginPage() {
               <ScanLine className="h-6 w-6 text-primary-foreground" />
             </div>
             <span className="text-muted-foreground text-xl font-light select-none">×</span>
-            <img src="/Vector.svg" alt="СПбПУ" className="h-11 w-11" />
+            <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
           <CardTitle className="text-2xl">Посещаемость</CardTitle>
           <CardDescription>Вход для преподавателей</CardDescription>
