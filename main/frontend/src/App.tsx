@@ -347,7 +347,7 @@ function ScheduleTab({ student }: { student: Student }) {
     } else {
       // swipe right → prev day
       if (activeDayIdx > 0) { goToDay(activeDayIdx - 1, "from-left"); }
-      else { setSlideDir("from-left"); setSlideKey((k) => k + 1); setWeekOffset((o) => o - 1); }
+      else { pendingDayIdx.current = 5; setSlideDir("from-left"); setSlideKey((k) => k + 1); setWeekOffset((o) => o - 1); }
     }
   };
 
