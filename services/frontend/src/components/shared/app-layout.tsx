@@ -44,13 +44,13 @@ export function AppLayout({ children }: AppLayoutProps) {
     ];
 
     return (
-      <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="min-h-screen bg-background pb-20">
         <main className="max-w-2xl mx-auto px-4 py-6">
           {children}
         </main>
 
         {/* Bottom navbar */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t z-40">
+        <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
           <div className="max-w-2xl mx-auto flex">
             {studentNav.map((item) => (
               <Link key={item.to} to={item.to} className="flex-1">
@@ -95,8 +95,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const displayRole = auth.role === "admin" ? "Администратор" : auth.role === "executor" ? "Исполнитель" : "Сотрудник";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-40">
+    <div className="min-h-screen bg-background">
+      <header className="bg-card border-b border-border sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Users, X } from "lucide-react";
+import { AlertCircle, LogOut, Users, X } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/api/client";
 
 interface Attendee {
@@ -100,62 +105,54 @@ export default function TeacherSessionPage() {
 
   if (!session) {
     return (
-      <div className="h-full overflow-hidden flex items-center justify-center bg-gray-50">
-        <p className="text-gray-400 text-sm">Загрузка...</p>
+      <div className="h-full overflow-hidden flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm">Загрузка...</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-gray-50 flex flex-col">
+    <div className="h-full bg-background flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
+      <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shrink-0">
         <div>
-          <p className="font-semibold text-gray-900 text-sm">Посещаемость</p>
-          <p className="text-xs text-gray-500">{teacherName}</p>
+          <p className="font-semibold text-foreground text-sm">Посещаемость</p>
+          <p className="text-xs text-muted-foreground">{teacherName}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-        >
+        <Button variant="ghost" size="icon" onClick={handleLogout}>
           <LogOut className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 max-w-lg mx-auto w-full">
         {!session.active ? (
           /* ── No active session — create one ── */
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-gray-900">Новое занятие</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Название дисциплины
-              </label>
-              <input
+            <h2 className="text-lg font-bold text-foreground">Новое занятие</h2>
+            <div className="space-y-1.5">
+              <Label htmlFor="discipline">Название дисциплины</Label>
+              <Input
+                id="discipline"
                 type="text"
                 value={discipline}
                 onChange={(e) => setDiscipline(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleStart()}
                 placeholder="Например: Математический анализ"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                {error}
-              </p>
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
-            <button
-              onClick={handleStart}
-              disabled={starting}
-              className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
+            <Button onClick={handleStart} disabled={starting} className="w-full">
               {starting ? "Запуск..." : "Начать занятие"}
-            </button>
+            </Button>
 
-            <p className="text-xs text-gray-400 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               После запуска на экране аудитории появится QR-код для студентов
             </p>
           </div>
@@ -164,49 +161,52 @@ export default function TeacherSessionPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">{session.discipline}</h2>
-                <p className="text-sm text-gray-500">Занятие идёт</p>
+                <h2 className="text-lg font-bold text-foreground">{session.discipline}</h2>
+                <p className="text-sm text-muted-foreground">Занятие идёт</p>
               </div>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleClose}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
+                className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5 mr-1.5" />
                 Завершить
-              </button>
+              </Button>
             </div>
 
             {/* Attendee count */}
-            <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3">
-              <Users className="h-5 w-5 text-blue-500 shrink-0" />
-              <p className="text-sm font-medium text-gray-900">
-                Присутствует: <span className="text-blue-600">{attendees.length}</span>
-              </p>
-            </div>
+            <Card>
+              <CardContent className="px-4 py-3 flex items-center gap-3">
+                <Users className="h-5 w-5 text-primary shrink-0" />
+                <p className="text-sm font-medium text-foreground">
+                  Присутствует: <span className="text-primary">{attendees.length}</span>
+                </p>
+              </CardContent>
+            </Card>
 
             {/* Attendee list */}
             {attendees.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">
+              <p className="text-sm text-muted-foreground text-center py-6">
                 Студенты ещё не отметились
               </p>
             ) : (
               <div className="space-y-2">
                 {attendees.map((a) => (
-                  <div
-                    key={a.student_external_id}
-                    className="bg-white rounded-xl border border-gray-100 px-4 py-2.5 flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{a.student_name}</p>
-                      <p className="text-xs text-gray-400">{a.student_email}</p>
-                    </div>
-                    <p className="text-xs text-gray-400">
-                      {new Date(a.marked_at).toLocaleTimeString("ru-RU", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
+                  <Card key={a.student_external_id}>
+                    <CardContent className="px-4 py-2.5 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{a.student_name}</p>
+                        <p className="text-xs text-muted-foreground">{a.student_email}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(a.marked_at).toLocaleTimeString("ru-RU", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
