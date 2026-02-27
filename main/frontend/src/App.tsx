@@ -6,7 +6,7 @@ import LoginPage from "./DevLoginPage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ru } from "date-fns/locale";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -975,6 +975,24 @@ function HomePage() {
     const token = localStorage.getItem("token");
     if (!token) {
       window.location.href = "/login";
+      return;
+    }
+
+    // Dev mock: skip API calls
+    if (token === "dev-mock") {
+      setStudent({
+        student_id: "123456789",
+        student_name: "Ларионенко Артём Александрович",
+        student_email: "larionenko.aa@edu.spbstu.ru",
+        study_group_id: 0,
+        study_group_str: "5130904/20102",
+        faculty_abbr: "ИКНК",
+        grade_book_number: "22350659",
+      });
+      setMiniApps([
+        { id: "services", name: "Услуги", description: "Подача заявок в административные подразделения", url: "https://services.poly.hex8d.space" },
+        { id: "traffic",  name: "Посещаемость", description: "Отметить присутствие на занятии по QR-коду", url: "https://traffic.poly.hex8d.space" },
+      ]);
       return;
     }
 
