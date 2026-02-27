@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { CheckCircle, QrCode, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useStudent, useStudentLoading } from "@/context/StudentContext";
 import api from "@/api/client";
 
@@ -87,8 +88,8 @@ export default function StudentScanPage() {
   // Loading while verifying launch token
   if (loading) {
     return (
-      <div className="h-full overflow-hidden flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div className="h-full overflow-hidden flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
@@ -96,10 +97,10 @@ export default function StudentScanPage() {
   // No student identity
   if (!student) {
     return (
-      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-gray-50 px-6 text-center gap-4">
-        <QrCode className="h-12 w-12 text-gray-300" />
-        <p className="font-semibold text-gray-700">Открой через Политехник</p>
-        <p className="text-sm text-gray-400">
+      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-background px-6 text-center gap-4">
+        <QrCode className="h-12 w-12 text-muted-foreground/50" />
+        <p className="font-semibold text-foreground">Открой через Политехник</p>
+        <p className="text-sm text-muted-foreground">
           Эта страница открывается через кнопку в приложении суперапп
         </p>
       </div>
@@ -109,9 +110,9 @@ export default function StudentScanPage() {
   // Camera error
   if (cameraError) {
     return (
-      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-gray-50 px-6 text-center gap-4">
-        <XCircle className="h-12 w-12 text-red-400" />
-        <p className="text-sm text-gray-600">{cameraError}</p>
+      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-background px-6 text-center gap-4">
+        <XCircle className="h-12 w-12 text-destructive" />
+        <p className="text-sm text-muted-foreground">{cameraError}</p>
       </div>
     );
   }
@@ -139,13 +140,9 @@ export default function StudentScanPage() {
             <div className="absolute inset-0 bg-transparent" />
 
             {/* Corner brackets */}
-            {/* Top-left */}
             <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-lg" />
-            {/* Top-right */}
             <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-lg" />
-            {/* Bottom-left */}
             <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-lg" />
-            {/* Bottom-right */}
             <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-lg" />
           </div>
 
@@ -160,29 +157,26 @@ export default function StudentScanPage() {
       )}
 
       {scanState === "scanning" && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="absolute inset-0 flex items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       )}
 
       {(scanState === "success" || scanState === "already") && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 gap-4 px-6 text-center">
-          <CheckCircle className="h-16 w-16 text-green-500" />
-          <p className="text-lg font-bold text-gray-900">{message}</p>
-          <p className="text-sm text-gray-500">{student.student_name}</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background gap-4 px-6 text-center">
+          <CheckCircle className="h-16 w-16 text-green-500 dark:text-green-400" />
+          <p className="text-lg font-bold text-foreground">{message}</p>
+          <p className="text-sm text-muted-foreground">{student.student_name}</p>
         </div>
       )}
 
       {scanState === "error" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 gap-4 px-6 text-center">
-          <XCircle className="h-16 w-16 text-red-400" />
-          <p className="text-base font-semibold text-gray-900">{message}</p>
-          <button
-            onClick={handleRetry}
-            className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
-          >
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background gap-4 px-6 text-center">
+          <XCircle className="h-16 w-16 text-destructive" />
+          <p className="text-base font-semibold text-foreground">{message}</p>
+          <Button onClick={handleRetry}>
             Попробовать снова
-          </button>
+          </Button>
         </div>
       )}
     </div>

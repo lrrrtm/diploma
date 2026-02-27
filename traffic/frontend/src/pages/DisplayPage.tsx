@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import api from "@/api/client";
 
 interface CurrentSession {
@@ -90,13 +91,14 @@ export default function DisplayPage() {
             <p className="text-2xl text-gray-400 leading-relaxed">
               Открой приложение Политехник, нажми на значок QR и наведи камеру на этот экран
             </p>
-            <button
+            <Button
+              variant="ghost"
               onClick={handleForceClose}
-              className="mt-6 inline-flex items-center gap-2 text-gray-600 text-sm hover:text-red-400 transition-colors w-fit"
+              className="mt-6 w-fit text-gray-600 hover:text-red-400 hover:bg-transparent"
             >
-              <XCircle className="h-4 w-4" />
+              <XCircle className="h-4 w-4 mr-2" />
               Завершить занятие
-            </button>
+            </Button>
           </div>
         </>
       )}
