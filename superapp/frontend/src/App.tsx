@@ -23,7 +23,6 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "schedule",  label: "Расписание", icon: CalendarDays },
   { id: "gradebook", label: "Зачётка",    icon: BookOpen     },
   { id: "services",  label: "Услуги",     icon: FileText     },
-  { id: "profile",   label: "Профиль",    icon: User         },
 ];
 
 function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
@@ -478,10 +477,12 @@ function HomeTab({
   student,
   miniapps,
   onScan,
+  onProfile,
 }: {
   student: Student;
   miniapps: MiniApp[];
   onScan: () => void;
+  onProfile: () => void;
 }) {
   const hour = new Date().getHours();
   const greeting =
@@ -498,15 +499,26 @@ function HomeTab({
             {greeting}, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
           </h1>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onScan}
-          className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-600 shrink-0"
-          title="Отметить посещаемость"
-        >
-          <QrCode className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onScan}
+            className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-600 shrink-0"
+            title="Отметить посещаемость"
+          >
+            <QrCode className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onProfile}
+            className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-600 shrink-0"
+            title="Профиль"
+          >
+            <User className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {miniapps.length === 0 ? (
@@ -651,7 +663,7 @@ function HomePage() {
   return (
     <div className="h-screen overflow-hidden bg-gray-50">
       <div className="h-full overflow-y-auto pb-20">
-        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} />}
+        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
         {tab === "schedule"  && <ScheduleTab student={student} />}
         {tab === "gradebook" && <ComingSoon label="Зачётка" />}
         {tab === "profile"   && <ProfileTab student={student} />}
