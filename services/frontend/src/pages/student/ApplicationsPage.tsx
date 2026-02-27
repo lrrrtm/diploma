@@ -19,7 +19,35 @@ import DuckScreen from "@/components/DuckScreen";
 import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
 
 const REFRESH_INTERVAL = 5000;
+
+// Module-level caches — survive re-renders and navigation
 let applicationsCache: ApplicationBrief[] | null = null;
+let deptsCache: Department[] | null = null;
+const svcCache = new Map<string, ServiceBrief[]>();
+let prefetchPromise: Promise<void> | null = null;
+
+function prefetchAll(): Promise<void> {
+  if (prefetchPromise) return prefetchPromise;
+  prefetchPromise = api
+    .get<Department[]>("/departments/")
+    .then(async (res) => {
+      deptsCache = res.data;
+      await Promise.all(
+        res.data.map((dept) =>
+          api
+            .get<DepartmentWithServices>(`/departments/${dept.id}`)
+            .then((r) => {
+              svcCache.set(dept.id, r.data.services.filter((s) => s.is_active));
+            })
+            .catch(() => {})
+        )
+      );
+    })
+    .catch(() => {
+      prefetchPromise = null; // allow retry on next open
+    });
+  return prefetchPromise;
+}
 
 function AppCard({ app, onClick }: { app: ApplicationBrief; onClick: () => void }) {
   return (
@@ -55,11 +83,10 @@ export default function ApplicationsPage() {
   // Sheet state
   const [sheetOpen, setSheetOpen] = useState(false);
   const [step, setStep] = useState<SheetStep>("departments");
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [deptLoading, setDeptLoading] = useState(false);
+  const [stepDir, setStepDir] = useState<"forward" | "back">("forward");
+  const [departments, setDepartments] = useState<Department[]>(deptsCache ?? []);
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [services, setServices] = useState<ServiceBrief[]>([]);
-  const [servicesLoading, setServicesLoading] = useState(false);
 
   const fetchApplications = () => {
     if (!student) return;
@@ -74,6 +101,13 @@ export default function ApplicationsPage() {
       })
       .catch(() => setLoading(false));
   };
+
+  useEffect(() => {
+    // Start preloading departments+services immediately
+    prefetchAll().then(() => {
+      if (deptsCache) setDepartments(deptsCache);
+    });
+  }, []);
 
   useEffect(() => {
     if (!student) {
@@ -92,27 +126,22 @@ export default function ApplicationsPage() {
     setSelectedDept(null);
     setServices([]);
     setSheetOpen(true);
-    if (departments.length === 0) {
-      setDeptLoading(true);
-      try {
-        const res = await api.get<Department[]>("/departments/");
-        setDepartments(res.data);
-      } finally {
-        setDeptLoading(false);
-      }
+    if (!deptsCache) {
+      await prefetchAll();
+      setDepartments(deptsCache ?? []);
     }
   };
 
-  const selectDepartment = async (dept: Department) => {
+  const selectDepartment = (dept: Department) => {
+    setStepDir("forward");
     setSelectedDept(dept);
     setStep("services");
-    setServicesLoading(true);
-    try {
-      const res = await api.get<DepartmentWithServices>(`/departments/${dept.id}`);
-      setServices(res.data.services.filter((s) => s.is_active));
-    } finally {
-      setServicesLoading(false);
-    }
+    setServices(svcCache.get(dept.id) ?? []);
+  };
+
+  const goBackToDepts = () => {
+    setStepDir("back");
+    setStep("departments");
   };
 
   const selectService = (serviceId: string) => {
@@ -174,7 +203,7 @@ export default function ApplicationsPage() {
               {step === "services" && (
                 <button
                   className="text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setStep("departments")}
+                  onClick={goBackToDepts}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </button>
@@ -186,15 +215,14 @@ export default function ApplicationsPage() {
             <SheetCloseButton />
           </SheetHeader>
 
-          <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1">
-            {step === "departments" && (
-              deptLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : departments.length === 0 ? (
+          <div
+            key={step}
+            className={`overflow-y-auto flex-1 px-4 py-3 space-y-1 ${
+              stepDir === "forward" ? "step-enter-forward" : "step-enter-back"
+            }`}
+          >
+            {step === "departments" &&
+              (departments.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Нет доступных структур</p>
               ) : (
                 departments.map((dept) => (
@@ -207,17 +235,10 @@ export default function ApplicationsPage() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 ))
-              )
-            )}
+              ))}
 
-            {step === "services" && (
-              servicesLoading ? (
-                <div className="space-y-2">
-                  {[...Array(4)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : services.length === 0 ? (
+            {step === "services" &&
+              (services.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Нет доступных услуг</p>
               ) : (
                 services.map((service) => (
@@ -230,8 +251,7 @@ export default function ApplicationsPage() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 ))
-              )
-            )}
+              ))}
           </div>
         </SheetContent>
       </Sheet>
