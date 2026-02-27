@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -63,6 +69,7 @@ body,
 #root {
   height: 100%;
   overflow: hidden;
+  border: 0;
 }
 
 .no-scrollbar {
