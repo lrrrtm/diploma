@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PageHeader } from "@/components/shared/page-header";
 import api from "@/api/client";
 import type { Department } from "@/types";
+import DuckScreen from "@/components/DuckScreen";
+import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -46,10 +47,7 @@ export default function DepartmentsPage() {
       /> */}
 
       {departments.length === 0 ? (
-        <div className="text-center py-12">
-          <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">Структуры пока не добавлены</p>
-        </div>
+        <DuckScreen animationData={duckAnimation} text="Пока что нет доступных структур университета" />
       ) : (
         <div className="grid gap-4">
           {departments.map((dept) => (

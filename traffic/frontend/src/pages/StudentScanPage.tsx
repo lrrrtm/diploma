@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import { CheckCircle, QrCode, XCircle } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStudent, useStudentLoading } from "@/context/StudentContext";
 import api from "@/api/client";
+import duckAnimation from "../assets/DUCK_PAPER_PLANE.json";
+import duckInnerAnimation from "../assets/DUCK_INNER.json";
+import DuckScreen from "@/components/DuckScreen";
 
 type ScanState = "idle" | "scanning" | "success" | "error" | "already";
 
@@ -98,25 +101,12 @@ export default function StudentScanPage() {
 
   // No student identity
   if (!student) {
-    return (
-      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-background px-6 text-center gap-4">
-        <QrCode className="h-12 w-12 text-muted-foreground/50" />
-        <p className="font-semibold text-foreground">Открой через Политехник</p>
-        <p className="text-sm text-muted-foreground">
-          Эта страница открывается через кнопку в приложении суперапп
-        </p>
-      </div>
-    );
+    return <DuckScreen animationData={duckAnimation} text="Эта страница открывается только через Политехник" />;
   }
 
   // Camera error
   if (cameraError) {
-    return (
-      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-background px-6 text-center gap-4">
-        <XCircle className="h-12 w-12 text-destructive" />
-        <p className="text-sm text-muted-foreground">{cameraError}</p>
-      </div>
-    );
+    return <DuckScreen animationData={duckInnerAnimation} text="Выдай разрешение для использования камеры" />;
   }
 
   return (

@@ -978,24 +978,6 @@ function HomePage() {
       return;
     }
 
-    // Dev mock: skip API calls
-    if (token === "dev-mock") {
-      setStudent({
-        student_id: "123456789",
-        student_name: "Ларионенко Артём Александрович",
-        student_email: "larionenko.aa@edu.spbstu.ru",
-        study_group_id: 0,
-        study_group_str: "5130904/20102",
-        faculty_abbr: "ИКНК",
-        grade_book_number: "22350659",
-      });
-      setMiniApps([
-        { id: "services", name: "Услуги", description: "Подача заявок в административные подразделения", url: "https://services.poly.hex8d.space" },
-        { id: "traffic",  name: "Посещаемость", description: "Отметить присутствие на занятии по QR-коду", url: "https://traffic.poly.hex8d.space" },
-      ]);
-      return;
-    }
-
     // fetchMiniApps failure is non-fatal — show empty list rather than forcing re-login
     Promise.all([fetchMe(token), fetchMiniApps(token).catch(() => [] as MiniApp[])])
       .then(([me, apps]) => {
