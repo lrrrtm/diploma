@@ -122,29 +122,49 @@ async def get_gradebook(student: dict = Depends(_get_student)):
     data = rb_resp.json()
     result = data.get("result", {})
 
-    def _academic_year_label(date_str: str) -> str:
+    def _parse_date(date_str: str):
         try:
-            dt = datetime.strptime(date_str.strip(), "%d.%m.%Y")
-            start = dt.year if dt.month >= 9 else dt.year - 1
-            return f"{start}/{start + 1} уч. год"
+            return datetime.strptime(date_str.strip(), "%d.%m.%Y")
         except Exception:
-            return "Другое"
+            return None
 
-    year_groups: dict[str, list] = defaultdict(list)
+    def _year_label(dt: datetime) -> str:
+        start = dt.year if dt.month >= 9 else dt.year - 1
+        return f"{start}/{start + 1} уч. год"
+
+    # Group entries by semester number
+    semester_map: dict[int, list] = defaultdict(list)
     for entry in result.get("record_book_data", []):
-        label = _academic_year_label(entry.get("date", ""))
-        year_groups[label].append(entry)
+        sem = entry.get("semester") or 0
+        semester_map[sem].append(entry)
 
-    sorted_labels = sorted(
-        (k for k in year_groups if k != "Другое"), reverse=True
-    )
-    if "Другое" in year_groups:
-        sorted_labels.append("Другое")
+    # Pair semesters into academic year groups: (1,2)→0, (3,4)→1, (5,6)→2, ...
+    # This ensures semester 1 always stays with semester 2 in the same year,
+    # regardless of the date the grade was recorded (handles retakes correctly).
+    year_idx_map: dict[int, list] = defaultdict(list)
+    for sem, entries in semester_map.items():
+        group_idx = (sem - 1) // 2 if sem >= 1 else -1
+        year_idx_map[group_idx].extend(entries)
+
+    # Derive calendar year label from the minimum (earliest) date in the group
+    def _label_for_group(entries: list, idx: int) -> str:
+        if idx < 0:
+            return "Другое"
+        valid = [_parse_date(e.get("date", "")) for e in entries]
+        valid = [d for d in valid if d is not None]
+        if not valid:
+            return f"Период {idx + 1}"
+        return _year_label(min(valid))
+
+    sorted_indices = sorted((k for k in year_idx_map if k >= 0), reverse=True)
+    result_years = [
+        {"label": _label_for_group(year_idx_map[idx], idx), "entries": year_idx_map[idx]}
+        for idx in sorted_indices
+    ]
+    if -1 in year_idx_map:
+        result_years.append({"label": "Другое", "entries": year_idx_map[-1]})
 
     return {
         "orders_type_name": result.get("orders_type_name", ""),
-        "academic_years": [
-            {"label": label, "entries": year_groups[label]}
-            for label in sorted_labels
-        ],
+        "academic_years": result_years,
     }
