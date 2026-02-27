@@ -202,7 +202,7 @@ function getMondayOf(d: Date): Date {
   return monday;
 }
 
-function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
+function LessonCard({ lesson, isNow = false }: { lesson: DaySchedule["lessons"][number]; isNow?: boolean }) {
   const loc = lesson.auditories
     .map((a) => {
       const aud = a.name ? `ауд. ${a.name}` : "";
@@ -215,13 +215,19 @@ function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
     <Card>
       <CardContent className="p-4 flex gap-3">
         <div className="flex flex-col items-center justify-center text-center w-14 shrink-0 gap-0.5">
+          {isNow && (
+            <span className="relative flex h-2.5 w-2.5 mb-0.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+            </span>
+          )}
           <span className="text-base font-bold">{lesson.time_start}</span>
           <span className="text-base text-muted-foreground">{lesson.time_end}</span>
         </div>
         <Separator orientation="vertical" className="shrink-0 self-stretch h-auto" />
         <div className="min-w-0 flex-1">
+          <Badge variant="secondary" className="mb-1.5">{lesson.type_name}</Badge>
           <p className="text-base font-semibold leading-tight">{lesson.subject}</p>
-          <Badge variant="secondary" className="mt-1.5">{lesson.type_name}</Badge>
           {teacher && <p className="text-sm text-muted-foreground mt-1.5">{teacher}</p>}
           {loc && <p className="text-sm text-muted-foreground mt-0.5">{loc}</p>}
           {lesson.additional_info && (
@@ -246,6 +252,12 @@ function ScheduleTab({ student }: { student: Student }) {
   const touchStartX = useRef<number | null>(null);
   const pendingDayIdx = useRef<number | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
@@ -384,8 +396,15 @@ function ScheduleTab({ student }: { student: Student }) {
   const activeDay = fixedDays[activeDayIdx];
   const selectedDate = formatDateFull(activeDay?.date ?? "");
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isToday = activeDay?.date === todayIso;
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const isLessonNow = (l: { time_start: string; time_end: string }) =>
+    isToday && nowMinutes >= toMin(l.time_start) && nowMinutes < toMin(l.time_end);
+
   return (
-    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className="min-h-screen" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Sticky header: week nav + day tabs */}
       <div className="sticky top-0 z-10 bg-card border-b border-border">
         {/* Week navigation */}
@@ -452,7 +471,7 @@ function ScheduleTab({ student }: { student: Student }) {
               <p className="text-muted-foreground text-sm">Занятий нет</p>
             </div>
           ) : (
-            activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} />)
+            activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} isNow={isLessonNow(lesson)} />)
           )}
         </div>
       )}
@@ -536,6 +555,20 @@ function GradebookTab({ student }: { student: Student }) {
   const activeGroup = years.find((y) => y.label === activeLabel);
   const entries = activeGroup?.entries ?? [];
 
+  // Group by semester within the active year
+  const bySemester = new Map<number, GradeEntry[]>();
+  for (const entry of entries) {
+    const list = bySemester.get(entry.semester) ?? [];
+    list.push(entry);
+    bySemester.set(entry.semester, list);
+  }
+  const semestersSorted = [...bySemester.keys()].sort((a, b) => b - a);
+
+  const parseDateNum = (d: string) => {
+    const [dd, mm, yyyy] = (d ?? "").split(".");
+    return parseInt(`${yyyy}${mm}${dd}`, 10) || 0;
+  };
+
   return (
     <div>
       {/* Year tabs — sticky under top edge */}
@@ -553,26 +586,37 @@ function GradebookTab({ student }: { student: Student }) {
         ))}
       </div>
 
-      {/* Table */}
+      {/* Table grouped by semester */}
       <div className="px-4">
-        <div className="divide-y divide-border">
-          <div className="flex items-center py-2 gap-4">
-            <span className="flex-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">Дисциплина</span>
-            <span className="w-28 text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">Оценка</span>
-          </div>
-          {entries.map((entry, i) => (
-            <button
-              key={i}
-              className="w-full flex items-center py-3 gap-4 text-left active:bg-muted/50 transition-colors"
-              onClick={() => setSelected(entry)}
-            >
-              <span className="flex-1 text-sm text-foreground leading-snug">{entry.discipline}</span>
-              <span className={`shrink-0 w-28 text-right text-sm font-semibold ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
-                {entry.grade_name}
-              </span>
-            </button>
-          ))}
-        </div>
+        {semestersSorted.map((sem) => {
+          const semEntries = [...(bySemester.get(sem) ?? [])].sort(
+            (a, b) => parseDateNum(b.date) - parseDateNum(a.date)
+          );
+          return (
+            <div key={sem}>
+              <div className="pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {sem} семестр
+              </div>
+              <div className="divide-y divide-border">
+                {semEntries.map((entry, i) => {
+                  const gradeDisplay = entry.grade !== 0 ? String(entry.grade) : entry.grade_name;
+                  return (
+                    <button
+                      key={i}
+                      className="w-full flex items-center py-3 gap-4 text-left active:bg-muted/50 transition-colors"
+                      onClick={() => setSelected(entry)}
+                    >
+                      <span className="flex-1 text-sm text-foreground leading-snug">{entry.discipline}</span>
+                      <span className={`shrink-0 text-right text-sm font-semibold ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
+                        {gradeDisplay}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Detail dialog */}
