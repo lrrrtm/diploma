@@ -7,6 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { ru } from "date-fns/locale";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyTitle } from "@/components/ui/empty";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +61,42 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
 // Services sheet — slides up over the whole screen
 // ---------------------------------------------------------------------------
 
+function IframeLoadOverlay({ app, loaded }: { app: MiniApp | undefined; loaded: boolean }) {
+  if (loaded) return null;
+  return (
+    <div className="absolute inset-0 bg-background z-10 flex flex-col items-center justify-center gap-3">
+      {app ? (
+        <>
+          <Spinner className="h-8 w-8 text-primary" />
+          <EmptyTitle>Загружаем данные</EmptyTitle>
+        </>
+      ) : (
+        <EmptyTitle>Сервис недоступен</EmptyTitle>
+      )}
+    </div>
+  );
+}
+
+function useIframeLoader(open: boolean): [boolean, () => void] {
+  const [loaded, setLoaded] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setLoaded(false);
+      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    }
+    return () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  }, [open]);
+
+  const onLoad = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setLoaded(true), 2000);
+  };
+
+  return [loaded, onLoad];
+}
+
 function ServicesSheet({
   app,
   open,
@@ -69,11 +107,10 @@ function ServicesSheet({
   onClose: () => void;
 }) {
   const [href, setHref] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, onLoad] = useIframeLoader(open);
 
   useEffect(() => {
     if (!open || !app) return;
-    setLoaded(false);
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
@@ -91,28 +128,10 @@ function ServicesSheet({
               src={href}
               className="absolute inset-0 w-full h-full border-0"
               title="Заявки"
-              onLoad={() => setLoaded(true)}
+              onLoad={onLoad}
             />
           )}
-          {!loaded && (
-            <div className="absolute inset-0 bg-background z-10 flex flex-col p-4 gap-3">
-              {app ? (
-                <>
-                  <Skeleton className="h-10 w-full rounded-xl" />
-                  <Skeleton className="h-8 w-2/3 rounded-xl" />
-                  <div className="space-y-3 mt-2">
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-                  Сервис недоступен
-                </div>
-              )}
-            </div>
-          )}
+          <IframeLoadOverlay app={app} loaded={loaded} />
         </div>
       </SheetContent>
     </Sheet>
@@ -133,11 +152,10 @@ function TrafficSheet({
   onClose: () => void;
 }) {
   const [href, setHref] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, onLoad] = useIframeLoader(open);
 
   useEffect(() => {
     if (!open || !app) return;
-    setLoaded(false);
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
@@ -156,28 +174,10 @@ function TrafficSheet({
               allow="camera"
               className="absolute inset-0 w-full h-full border-0"
               title="Посещаемость"
-              onLoad={() => setLoaded(true)}
+              onLoad={onLoad}
             />
           )}
-          {!loaded && (
-            <div className="absolute inset-0 bg-background z-10 flex flex-col p-4 gap-3">
-              {app ? (
-                <>
-                  <Skeleton className="h-10 w-full rounded-xl" />
-                  <Skeleton className="h-8 w-2/3 rounded-xl" />
-                  <div className="space-y-3 mt-2">
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full rounded-xl" />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-                  Сервис недоступен
-                </div>
-              )}
-            </div>
-          )}
+          <IframeLoadOverlay app={app} loaded={loaded} />
         </div>
       </SheetContent>
     </Sheet>
