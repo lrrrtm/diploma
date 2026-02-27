@@ -37,7 +37,7 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
               key={id}
               variant="ghost"
               onClick={() => onChange(id)}
-              className="flex-1 flex flex-col items-center gap-1 py-3 text-xs h-auto rounded-none"
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 px-0 text-xs h-auto rounded-none whitespace-normal [&_svg]:size-5"
               style={{ color: isActive ? "#2563eb" : "#9ca3af" }}
             >
               <Icon className="h-5 w-5" />
@@ -76,7 +76,7 @@ function ServicesSheet({
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="bottom" className="h-[100dvh] p-0 flex flex-col rounded-none">
+      <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
         <SheetHeader className="px-4 py-3 border-b shrink-0">
           <SheetTitle>Услуги</SheetTitle>
         </SheetHeader>
@@ -118,7 +118,7 @@ function TrafficSheet({
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="bottom" className="h-[100dvh] p-0 flex flex-col rounded-none">
+      <SheetContent side="bottom" className="h-[100dvh] p-0 gap-0 flex flex-col rounded-none">
         <SheetHeader className="px-4 py-3 border-b shrink-0">
           <SheetTitle>Посещаемость</SheetTitle>
         </SheetHeader>
