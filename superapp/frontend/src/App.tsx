@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Pi, CalendarDays, BookOpen, FileText, User, X, QrCode, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule } from "./api";
 import type { MiniApp, Student, WeekSchedule, DaySchedule } from "./types";
 import LoginPage from "./DevLoginPage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ru } from "date-fns/locale";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 // ---------------------------------------------------------------------------
 // Bottom navbar
@@ -28,15 +33,16 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
           const isActive = active === id;
           return (
-            <button
+            <Button
               key={id}
+              variant="ghost"
               onClick={() => onChange(id)}
-              className="flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors"
+              className="flex-1 flex flex-col items-center gap-1 py-3 text-xs h-auto rounded-none"
               style={{ color: isActive ? "#2563eb" : "#9ca3af" }}
             >
               <Icon className="h-5 w-5" />
               {label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -50,71 +56,39 @@ function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
 
 function ServicesSheet({
   app,
+  open,
   onClose,
 }: {
   app: MiniApp | undefined;
+  open: boolean;
   onClose: () => void;
 }) {
-  const [visible, setVisible] = useState(false);
   const [href, setHref] = useState<string | null>(null);
-  const closingRef = useRef(false);
 
-  // Slide in after mount (next frame so CSS transition fires)
   useEffect(() => {
-    const id = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  // Fetch launch token and build iframe URL
-  useEffect(() => {
-    if (!app) return;
+    if (!open || !app) return;
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
       setHref(`${app.url}?launch_token=${encodeURIComponent(launchToken)}`);
     });
-  }, [app]);
+  }, [open, app]);
 
-  const handleClose = () => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setVisible(false);
-    setTimeout(() => {
-      onClose();
-      // Also update browser history if we pushed a state on open
-      if (window.history.state?.services) {
-        window.history.back();
-      }
-    }, 320);
-  };
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-white"
-      style={{
-        transform: visible ? "translateY(0)" : "translateY(100%)",
-        transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
-      }}
-    >
-      {/* Sheet header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0 bg-white">
-        <span className="font-semibold text-gray-900">Услуги</span>
-        <button
-          onClick={handleClose}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900 transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Mini-app iframe */}
-      {href ? (
-        <iframe src={href} className="flex-1 w-full border-0" title="Заявки" />
-      ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-          {app ? "Загрузка..." : "Сервис недоступен"}
-        </div>
-      )}
-    </div>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="bottom" className="h-[100dvh] p-0 flex flex-col rounded-none">
+        <SheetHeader className="px-4 py-3 border-b shrink-0">
+          <SheetTitle>Услуги</SheetTitle>
+        </SheetHeader>
+        {href ? (
+          <iframe src={href} className="flex-1 w-full border-0" title="Заявки" />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+            {app ? "Загрузка..." : "Сервис недоступен"}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -124,67 +98,44 @@ function ServicesSheet({
 
 function TrafficSheet({
   app,
+  open,
   onClose,
 }: {
   app: MiniApp | undefined;
+  open: boolean;
   onClose: () => void;
 }) {
-  const [visible, setVisible] = useState(false);
   const [href, setHref] = useState<string | null>(null);
-  const closingRef = useRef(false);
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  useEffect(() => {
-    if (!app) return;
+    if (!open || !app) return;
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
       setHref(`${app.url}/scan?launch_token=${encodeURIComponent(launchToken)}`);
     });
-  }, [app]);
-
-  const handleClose = () => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setVisible(false);
-    setTimeout(() => onClose(), 320);
-  };
+  }, [open, app]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-white"
-      style={{
-        transform: visible ? "translateY(0)" : "translateY(100%)",
-        transition: "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
-      }}
-    >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0 bg-white">
-        <span className="font-semibold text-gray-900">Посещаемость</span>
-        <button
-          onClick={handleClose}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900 transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {href ? (
-        <iframe
-          src={href}
-          allow="camera"
-          className="flex-1 w-full border-0"
-          title="Посещаемость"
-        />
-      ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-          {app ? "Загрузка..." : "Сервис недоступен"}
-        </div>
-      )}
-    </div>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent side="bottom" className="h-[100dvh] p-0 flex flex-col rounded-none">
+        <SheetHeader className="px-4 py-3 border-b shrink-0">
+          <SheetTitle>Посещаемость</SheetTitle>
+        </SheetHeader>
+        {href ? (
+          <iframe
+            src={href}
+            allow="camera"
+            className="flex-1 w-full border-0"
+            title="Посещаемость"
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+            {app ? "Загрузка..." : "Сервис недоступен"}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -201,24 +152,24 @@ function MiniAppCard({ app }: { app: MiniApp }) {
   };
 
   return (
-    <button
+    <Card
+      className="cursor-pointer hover:shadow-md hover:border-blue-200 transition-all duration-200"
       onClick={handleClick}
-      className="group block w-full text-left bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-blue-200 transition-all duration-200"
     >
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-          <FileText className="h-5 w-5 text-blue-600" />
+      <CardContent className="p-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+            <FileText className="h-5 w-5 text-blue-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900 truncate">{app.name}</p>
+            {app.description && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{app.description}</p>
+            )}
+          </div>
         </div>
-        <div className="min-w-0">
-          <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-            {app.name}
-          </h3>
-          {app.description && (
-            <p className="text-xs text-gray-500 truncate mt-0.5">{app.description}</p>
-          )}
-        </div>
-      </div>
-    </button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -258,24 +209,24 @@ function LessonCard({ lesson }: { lesson: DaySchedule["lessons"][number] }) {
   const teacher = lesson.teachers.map((t) => t.full_name).join(", ");
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-3">
-      <div className="flex flex-col items-center justify-center text-center w-14 shrink-0 gap-0.5">
-        <span className="text-base font-bold text-gray-900">{lesson.time_start}</span>
-        <span className="text-base text-gray-400">{lesson.time_end}</span>
-      </div>
-      <div className="w-px bg-gray-100 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <p className="text-base font-semibold text-gray-900 leading-tight">{lesson.subject}</p>
-        <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
-          {lesson.type_name}
-        </span>
-        {teacher && <p className="text-sm text-gray-500 mt-1.5">{teacher}</p>}
-        {loc && <p className="text-sm text-gray-400 mt-0.5">{loc}</p>}
-        {lesson.additional_info && (
-          <p className="text-sm text-gray-400 mt-0.5 italic">{lesson.additional_info}</p>
-        )}
-      </div>
-    </div>
+    <Card>
+      <CardContent className="p-4 flex gap-3">
+        <div className="flex flex-col items-center justify-center text-center w-14 shrink-0 gap-0.5">
+          <span className="text-base font-bold">{lesson.time_start}</span>
+          <span className="text-base text-muted-foreground">{lesson.time_end}</span>
+        </div>
+        <Separator orientation="vertical" className="shrink-0 self-stretch h-auto" />
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold leading-tight">{lesson.subject}</p>
+          <Badge variant="secondary" className="mt-1.5">{lesson.type_name}</Badge>
+          {teacher && <p className="text-sm text-muted-foreground mt-1.5">{teacher}</p>}
+          {loc && <p className="text-sm text-muted-foreground mt-0.5">{loc}</p>}
+          {lesson.additional_info && (
+            <p className="text-sm text-muted-foreground mt-0.5 italic">{lesson.additional_info}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -405,15 +356,14 @@ function ScheduleTab({ student }: { student: Student }) {
             : (error ?? "Расписание недоступно")}
         </p>
         {isStaleToken && (
-          <button
+          <Button
             onClick={() => {
               localStorage.removeItem("token");
               window.location.href = "/login";
             }}
-            className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
           >
             Войти заново
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -437,17 +387,14 @@ function ScheduleTab({ student }: { student: Student }) {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100">
         {/* Week navigation */}
         <div className="flex items-center justify-between px-4 py-2">
-          <button
-            onClick={() => setWeekOffset((o) => o - 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
-          >
+          <Button variant="ghost" size="icon" onClick={() => setWeekOffset((o) => o - 1)}>
             <ChevronLeft className="h-5 w-5" />
-          </button>
+          </Button>
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
-              <button className="text-sm font-semibold text-gray-800 hover:text-blue-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50">
+              <Button variant="ghost" className="text-sm font-semibold">
                 {selectedDate}
-              </button>
+              </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="center">
               <Calendar
@@ -459,12 +406,9 @@ function ScheduleTab({ student }: { student: Student }) {
               />
             </PopoverContent>
           </Popover>
-          <button
-            onClick={() => setWeekOffset((o) => o + 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
-          >
+          <Button variant="ghost" size="icon" onClick={() => setWeekOffset((o) => o + 1)}>
             <ChevronRight className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Day tabs — only weekday label */}
@@ -472,17 +416,18 @@ function ScheduleTab({ student }: { student: Student }) {
           {fixedDays.map((day, idx) => {
             const isActive = idx === activeDayIdx;
             return (
-              <button
+              <Button
                 key={day.date}
+                variant="ghost"
                 onClick={() => { goToDay(idx, idx > activeDayIdx ? "from-right" : "from-left"); }}
-                className={`flex-1 flex items-center justify-center pb-2 pt-1 text-sm font-semibold border-b-2 transition-colors shrink-0 ${
+                className={`flex-1 flex items-center justify-center pb-2 pt-1 text-sm font-semibold border-b-2 transition-colors shrink-0 h-auto rounded-none ${
                   isActive
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-400 hover:text-gray-600"
+                    ? "border-blue-600 text-blue-600 hover:text-blue-600"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-transparent"
                 }`}
               >
                 {WEEKDAY_SHORT[day.weekday]}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -553,13 +498,15 @@ function HomeTab({
             {greeting}, {student.student_name.split(" ")[1] || student.student_name.split(" ")[0]}!
           </h1>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onScan}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors shrink-0"
+          className="rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-600 shrink-0"
           title="Отметить посещаемость"
         >
           <QrCode className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
 
       {miniapps.length === 0 ? (
@@ -612,15 +559,16 @@ function ProfileTab({ student }: { student: Student }) {
         )}
       </div>
 
-      <button
-        className="mt-6 w-full py-2.5 rounded-xl text-sm font-medium text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
+      <Button
+        variant="outline"
+        className="mt-6 w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-500"
         onClick={() => {
           localStorage.removeItem("token");
           window.location.href = "/login";
         }}
       >
         Выйти
-      </button>
+      </Button>
     </div>
   );
 }
@@ -711,19 +659,16 @@ function HomePage() {
 
       <BottomNav active={servicesOpen ? "services" : tab} onChange={handleTabChange} />
 
-      {servicesOpen && (
-        <ServicesSheet
-          app={servicesApp}
-          onClose={() => setServicesOpen(false)}
-        />
-      )}
-
-      {trafficOpen && (
-        <TrafficSheet
-          app={trafficApp}
-          onClose={() => setTrafficOpen(false)}
-        />
-      )}
+      <ServicesSheet
+        app={servicesApp}
+        open={servicesOpen}
+        onClose={() => setServicesOpen(false)}
+      />
+      <TrafficSheet
+        app={trafficApp}
+        open={trafficOpen}
+        onClose={() => setTrafficOpen(false)}
+      />
     </div>
   );
 }
