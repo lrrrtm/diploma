@@ -49,9 +49,9 @@ export default function LoginPage() {
             <span className="text-muted-foreground text-xl font-light select-none">×</span>
             <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
-          <CardTitle className="text-2xl">Политехник.Уником</CardTitle>
+          <CardTitle className="text-2xl">Политехник.Услуги</CardTitle>
           <CardDescription>
-            Панель управления структурами и услугами
+            Панель управления структурами и их услугами
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

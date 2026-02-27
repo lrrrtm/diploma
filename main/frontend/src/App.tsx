@@ -33,8 +33,8 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 function BottomNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
-    <nav className="shrink-0 bg-card border-t border-border">
-      <div className="flex">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
+      <div className="max-w-2xl mx-auto flex">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
           const isActive = active === id;
           return (
@@ -410,7 +410,7 @@ function ScheduleTab({ student }: { student: Student }) {
     isToday && nowMinutes >= toMin(l.time_start) && nowMinutes < toMin(l.time_end);
 
   return (
-    <div className="h-full flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className="h-full flex flex-col max-w-2xl mx-auto w-full" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Header: week nav + day tabs */}
       <div className="shrink-0 bg-card border-b border-border">
         {/* Week navigation */}
@@ -629,7 +629,7 @@ function GradebookTab({ student }: { student: Student }) {
   const semestersSorted = [...bySemester.keys()].sort((a, b) => a - b);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       {/* Year navigation */}
       <div className="shrink-0 border-b border-border flex items-center px-2 py-1 gap-1">
         <Button
@@ -970,9 +970,9 @@ function HomePage() {
 
   if (!student) {
     return (
-      <div className="min-h-screen bg-muted/30 flex justify-center">
-        <div className="w-full max-w-sm h-screen flex flex-col bg-background overflow-hidden border-x border-border/50">
-          <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="h-screen overflow-hidden bg-background">
+        <div className="h-full overflow-y-auto pb-20 px-4 py-6">
+          <div className="max-w-2xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <Skeleton className="h-7 w-52" />
               <div className="flex gap-2">
@@ -986,8 +986,8 @@ function HomePage() {
               ))}
             </div>
           </div>
-          <nav className="shrink-0 bg-card border-t border-border h-16" />
         </div>
+        <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 h-16" />
       </div>
     );
   }
@@ -996,28 +996,26 @@ function HomePage() {
   const trafficApp = miniapps.find((a) => a.id === "traffic");
 
   return (
-    <div className="min-h-screen bg-muted/30 flex justify-center">
-      <div className="w-full max-w-sm h-screen flex flex-col bg-background overflow-hidden border-x border-border/50">
-        <div className={`flex-1 min-h-0 ${tab === "schedule" || tab === "gradebook" ? "overflow-hidden" : "overflow-y-auto"}`}>
-          {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
-          {tab === "schedule"  && <ScheduleTab student={student} />}
-          {tab === "gradebook" && <GradebookTab student={student} />}
-          {tab === "profile"   && <ProfileTab student={student} />}
-        </div>
-
-        <BottomNav active={servicesOpen ? "services" : tab} onChange={handleTabChange} />
-
-        <ServicesSheet
-          app={servicesApp}
-          open={servicesOpen}
-          onClose={() => setServicesOpen(false)}
-        />
-        <TrafficSheet
-          app={trafficApp}
-          open={trafficOpen}
-          onClose={() => setTrafficOpen(false)}
-        />
+    <div className="h-screen overflow-hidden bg-background">
+      <div className={`h-full ${tab === "schedule" || tab === "gradebook" ? "overflow-hidden" : "overflow-y-auto pb-20"}`}>
+        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
+        {tab === "schedule"  && <ScheduleTab student={student} />}
+        {tab === "gradebook" && <GradebookTab student={student} />}
+        {tab === "profile"   && <ProfileTab student={student} />}
       </div>
+
+      <BottomNav active={servicesOpen ? "services" : tab} onChange={handleTabChange} />
+
+      <ServicesSheet
+        app={servicesApp}
+        open={servicesOpen}
+        onClose={() => setServicesOpen(false)}
+      />
+      <TrafficSheet
+        app={trafficApp}
+        open={trafficOpen}
+        onClose={() => setTrafficOpen(false)}
+      />
     </div>
   );
 }

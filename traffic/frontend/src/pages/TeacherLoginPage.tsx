@@ -38,8 +38,8 @@ export default function TeacherLoginPage() {
   };
 
   return (
-    <div className="h-full bg-background flex items-center justify-center px-4">
-      <Card className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
@@ -48,8 +48,8 @@ export default function TeacherLoginPage() {
             <span className="text-muted-foreground text-xl font-light select-none">×</span>
             <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
-          <CardTitle className="text-2xl">Посещаемость</CardTitle>
-          <CardDescription>Вход для преподавателей</CardDescription>
+          <CardTitle className="text-2xl">Политехник.Посещаемость</CardTitle>
+          <CardDescription>Контроль посещаемости студентов</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

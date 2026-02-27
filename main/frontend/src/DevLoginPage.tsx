@@ -46,8 +46,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-[100dvh] overflow-hidden bg-background flex items-center justify-center px-4">
-      <Card className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
@@ -56,7 +56,7 @@ export default function LoginPage() {
             <span className="text-muted-foreground text-xl font-light select-none">×</span>
             <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
-          <CardTitle className="text-2xl">Политехник</CardTitle>
+          <CardTitle className="text-2xl">Политехник.Студент</CardTitle>
           <CardDescription>Войди через учётную запись СПбПУ</CardDescription>
         </CardHeader>
         <CardContent>
