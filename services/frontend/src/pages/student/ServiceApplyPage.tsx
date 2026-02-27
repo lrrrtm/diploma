@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Send } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { PageHeader } from "@/components/shared/page-header";
 import { DynamicForm } from "@/components/shared/dynamic-form";
 import { FileUpload } from "@/components/shared/file-upload";
 import { useStudent } from "@/context/StudentContext";
@@ -77,20 +74,20 @@ export default function ServiceApplyPage() {
 
   if (loading || !service) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Card>
-          <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
-          <CardContent className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="space-y-1.5">
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-10 w-full rounded-md" />
-              </div>
-            ))}
-            <Skeleton className="h-10 w-full rounded-md mt-2" />
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="space-y-1.5">
+              <Skeleton className="h-4 w-1/4" />
+              <Skeleton className="h-10 w-full rounded-md" />
+            </div>
+          ))}
+          <Skeleton className="h-10 w-full rounded-md mt-2" />
+        </div>
       </div>
     );
   }
@@ -104,55 +101,43 @@ export default function ServiceApplyPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <PageHeader
-        title="Подача заявки"
-        description={service.name}
-        backTo={`/departments/${service.department_id}`}
-      />
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-lg font-semibold leading-tight">{service.name}</h1>
+      </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>{service.name}</CardTitle>
-            {service.description && (
-              <CardDescription>{service.description}</CardDescription>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {service.required_fields.length > 0 && (
-              <>
-                <DynamicForm
-                  fields={service.required_fields}
-                  values={formValues}
-                  onChange={setFormValues}
-                />
-                <Separator />
-              </>
-            )}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {service.required_fields.length > 0 && (
+          <DynamicForm
+            fields={service.required_fields}
+            values={formValues}
+            onChange={setFormValues}
+          />
+        )}
 
-            {(service.requires_attachment || true) && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">
-                  Прикрепленные документы
-                  {service.requires_attachment && (
-                    <span className="text-destructive ml-1">*</span>
-                  )}
-                </h3>
-                <FileUpload files={files} onChange={setFiles} />
-              </div>
-            )}
+        {service.requires_attachment && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">
+              Прикреплённые документы
+              <span className="text-destructive ml-1">*</span>
+            </h3>
+            <FileUpload files={files} onChange={setFiles} />
+          </div>
+        )}
 
-            <Button
-              type="submit"
-              className="w-full gap-2"
-              disabled={submitting}
-            >
-              <Send className="h-4 w-4" />
-              {submitting ? "Отправка..." : "Отправить заявку"}
-            </Button>
-          </CardContent>
-        </Card>
+        <Button type="submit" className="w-full gap-2" disabled={submitting}>
+          <Send className="h-4 w-4" />
+          {submitting ? "Отправка..." : "Отправить заявку"}
+        </Button>
       </form>
     </div>
   );

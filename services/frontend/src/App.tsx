@@ -7,8 +7,6 @@ import DuckScreen from "@/components/DuckScreen";
 import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
 
 import LoginPage from "@/pages/auth/LoginPage";
-import DepartmentsPage from "@/pages/student/DepartmentsPage";
-import DepartmentDetailPage from "@/pages/student/DepartmentDetailPage";
 import ServiceApplyPage from "@/pages/student/ServiceApplyPage";
 import ApplicationsPage from "@/pages/student/ApplicationsPage";
 import ApplicationDetailPage from "@/pages/student/ApplicationDetailPage";
@@ -51,7 +49,7 @@ function HomePage() {
   if (isAuthenticated && auth?.role === "staff") return <Navigate to="/staff" replace />;
   if (isAuthenticated && auth?.role === "admin") return <Navigate to="/admin/departments" replace />;
   if (isAuthenticated && auth?.role === "executor") return <Navigate to="/executor" replace />;
-  if (student) return <Navigate to="/departments" replace />;
+  if (student) return <Navigate to="/applications" replace />;
   if (wasLaunchAttempted) return <DuckScreen animationData={duckAnimation} text="Эта страница открывается только через Политехник" />;
   return <Navigate to="/login" replace />;
 }
@@ -73,22 +71,6 @@ export default function App() {
       <Route path="/" element={<HomePage />} />
 
       {/* Student routes — public, wrapped in layout */}
-      <Route
-        path="/departments"
-        element={
-          <AppLayout>
-            <DepartmentsPage />
-          </AppLayout>
-        }
-      />
-      <Route
-        path="/departments/:id"
-        element={
-          <AppLayout>
-            <DepartmentDetailPage />
-          </AppLayout>
-        }
-      />
       <Route
         path="/apply/:serviceId"
         element={

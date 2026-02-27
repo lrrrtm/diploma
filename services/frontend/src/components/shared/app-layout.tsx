@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
-import { useStudent } from "@/context/StudentContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -18,7 +17,6 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { auth, isAuthenticated, logout } = useAuth();
-  const student = useStudent();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -38,36 +36,11 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   // ── Студенческий интерфейс ─────────────────────────────────────────────────
   if (!isStaffOrAdmin) {
-    const studentNav = [
-      { to: "/departments", label: "Структуры", icon: Building2 },
-      { to: "/applications", label: "Заявки", icon: FileText },
-    ];
-
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background">
         <main className="max-w-2xl mx-auto px-4 py-6">
           {children}
         </main>
-
-        {/* Bottom navbar */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
-          <div className="max-w-2xl mx-auto flex">
-            {studentNav.map((item) => (
-              <Link key={item.to} to={item.to} className="flex-1">
-                <button
-                  className={`w-full flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-                    isActive(item.to)
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
-                </button>
-              </Link>
-            ))}
-          </div>
-        </nav>
       </div>
     );
   }
