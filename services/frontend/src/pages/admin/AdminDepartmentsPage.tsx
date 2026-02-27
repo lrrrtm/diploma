@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -122,8 +123,22 @@ export default function AdminDepartmentsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <p className="text-muted-foreground">Загрузка...</p>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="flex flex-row items-start justify-between space-y-0">
+              <Skeleton className="h-5 w-2/3" />
+              <div className="flex gap-1">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }

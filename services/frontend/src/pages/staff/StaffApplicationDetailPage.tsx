@@ -10,6 +10,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -88,8 +89,20 @@ export default function StaffApplicationDetailPage() {
 
   if (loading || !application) {
     return (
-      <div className="flex justify-center py-12">
-        <p className="text-muted-foreground">Загрузка...</p>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="h-4 w-1/3 mt-1" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-4 w-1/4" />
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-md" />
+            ))}
+          </CardContent>
+        </Card>
       </div>
     );
   }

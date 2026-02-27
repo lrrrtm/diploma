@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { FileText, Paperclip, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import api from "@/api/client";
@@ -22,8 +23,16 @@ export default function DepartmentDetailPage() {
 
   if (loading || !department) {
     return (
-      <div className="flex justify-center py-12">
-        <p className="text-muted-foreground">Загрузка...</p>
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48 mb-4" />
+        <div className="grid gap-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader><Skeleton className="h-5 w-2/3" /></CardHeader>
+              <CardContent><Skeleton className="h-4 w-full" /></CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }

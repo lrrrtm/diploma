@@ -4,6 +4,7 @@ import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/shared/page-header";
 import { DynamicForm } from "@/components/shared/dynamic-form";
@@ -76,8 +77,20 @@ export default function ServiceApplyPage() {
 
   if (loading || !service) {
     return (
-      <div className="flex justify-center py-12">
-        <p className="text-muted-foreground">Загрузка...</p>
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Card>
+          <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
+          <CardContent className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+            ))}
+            <Skeleton className="h-10 w-full rounded-md mt-2" />
+          </CardContent>
+        </Card>
       </div>
     );
   }

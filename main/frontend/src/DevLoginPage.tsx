@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { GraduationCap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,8 +48,15 @@ export default function LoginPage() {
   return (
     <div className="h-[100dvh] overflow-hidden bg-background flex items-center justify-center px-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-xl">Политехник</CardTitle>
+        <CardHeader className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
+              <GraduationCap className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <span className="text-muted-foreground text-xl font-light select-none">×</span>
+            <img src="/Vector.svg" alt="СПбПУ" className="h-11 w-11" />
+          </div>
+          <CardTitle className="text-2xl">Политехник</CardTitle>
           <CardDescription>Войди через учётную запись СПбПУ</CardDescription>
         </CardHeader>
         <CardContent>

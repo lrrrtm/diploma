@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ScanLine } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,8 +40,15 @@ export default function TeacherLoginPage() {
   return (
     <div className="h-full bg-background flex items-center justify-center px-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-xl">Посещаемость</CardTitle>
+        <CardHeader className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
+              <ScanLine className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <span className="text-muted-foreground text-xl font-light select-none">×</span>
+            <img src="/Vector.svg" alt="СПбПУ" className="h-11 w-11" />
+          </div>
+          <CardTitle className="text-2xl">Посещаемость</CardTitle>
           <CardDescription>Вход для преподавателей</CardDescription>
         </CardHeader>
         <CardContent>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, Clock, User, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -90,8 +91,27 @@ export default function StaffDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <p className="text-muted-foreground">Загрузка...</p>
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <Skeleton className="h-10 flex-1 rounded-md" />
+          <Skeleton className="h-10 w-32 rounded-md" />
+        </div>
+        {[...Array(5)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-1/2" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-2/5" />
+                </div>
+                <Skeleton className="h-4 w-20 shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }

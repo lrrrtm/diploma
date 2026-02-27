@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, LogOut, Users, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -105,8 +106,10 @@ export default function TeacherSessionPage() {
 
   if (!session) {
     return (
-      <div className="h-full overflow-hidden flex items-center justify-center bg-background">
-        <p className="text-muted-foreground text-sm">Загрузка...</p>
+      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-background gap-4 px-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-48 w-48 rounded-xl" />
+        <Skeleton className="h-5 w-32" />
       </div>
     );
   }

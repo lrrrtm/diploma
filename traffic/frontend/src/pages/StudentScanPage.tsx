@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { CheckCircle, QrCode, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useStudent, useStudentLoading } from "@/context/StudentContext";
 import api from "@/api/client";
 
@@ -88,8 +89,9 @@ export default function StudentScanPage() {
   // Loading while verifying launch token
   if (loading) {
     return (
-      <div className="h-full overflow-hidden flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="h-full overflow-hidden flex flex-col items-center justify-center bg-background gap-4 px-4">
+        <Skeleton className="h-64 w-64 rounded-xl" />
+        <Skeleton className="h-5 w-48" />
       </div>
     );
   }
