@@ -404,9 +404,9 @@ function ScheduleTab({ student }: { student: Student }) {
     isToday && nowMinutes >= toMin(l.time_start) && nowMinutes < toMin(l.time_end);
 
   return (
-    <div className="min-h-screen" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-      {/* Sticky header: week nav + day tabs */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border">
+    <div className="h-full flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {/* Header: week nav + day tabs */}
+      <div className="shrink-0 bg-card border-b border-border">
         {/* Week navigation */}
         <div className="flex items-center justify-between px-4 py-2">
           <Button variant="ghost" size="icon" onClick={() => setWeekOffset((o) => o - 1)}>
@@ -455,26 +455,28 @@ function ScheduleTab({ student }: { student: Student }) {
         </div>
       </div>
 
-      {/* Loading overlay for week switch */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      ) : (
-        <div
-          key={slideKey}
-          className={`px-4 pt-4 pb-24 space-y-3 overflow-hidden slide-${slideDir}`}
-        >
-          {activeDay?.lessons.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-2xl mb-2">🎉</p>
-              <p className="text-muted-foreground text-sm">Занятий нет</p>
-            </div>
-          ) : (
-            activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} isNow={isLessonNow(lesson)} />)
-          )}
-        </div>
-      )}
+      {/* Scrollable lesson area */}
+      <div className="flex-1 overflow-x-hidden overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : (
+          <div
+            key={slideKey}
+            className={`px-4 pt-4 pb-20 space-y-3 slide-${slideDir}`}
+          >
+            {activeDay?.lessons.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <p className="text-2xl mb-2">🎉</p>
+                <p className="text-muted-foreground text-sm">Занятий нет</p>
+              </div>
+            ) : (
+              activeDay?.lessons.map((lesson, i) => <LessonCard key={i} lesson={lesson} isNow={isLessonNow(lesson)} />)
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -922,7 +924,7 @@ function HomePage() {
 
   return (
     <div className="h-screen overflow-hidden bg-background">
-      <div className="h-full overflow-y-auto pb-20">
+      <div className={`h-full ${tab === "schedule" ? "overflow-hidden" : "overflow-y-auto pb-20"}`}>
         {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setTab("profile")} />}
         {tab === "schedule"  && <ScheduleTab student={student} />}
         {tab === "gradebook" && <GradebookTab student={student} />}
