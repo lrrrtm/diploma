@@ -536,6 +536,20 @@ function GradebookTab({ student }: { student: Student }) {
   const activeGroup = years.find((y) => y.label === activeLabel);
   const entries = activeGroup?.entries ?? [];
 
+  // Group by semester within the active year
+  const bySemester = new Map<number, GradeEntry[]>();
+  for (const entry of entries) {
+    const list = bySemester.get(entry.semester) ?? [];
+    list.push(entry);
+    bySemester.set(entry.semester, list);
+  }
+  const semestersSorted = [...bySemester.keys()].sort((a, b) => b - a);
+
+  const parseDateNum = (d: string) => {
+    const [dd, mm, yyyy] = (d ?? "").split(".");
+    return parseInt(`${yyyy}${mm}${dd}`, 10) || 0;
+  };
+
   return (
     <div>
       {/* Year tabs — sticky under top edge */}
@@ -553,26 +567,37 @@ function GradebookTab({ student }: { student: Student }) {
         ))}
       </div>
 
-      {/* Table */}
+      {/* Table grouped by semester */}
       <div className="px-4">
-        <div className="divide-y divide-border">
-          <div className="flex items-center py-2 gap-4">
-            <span className="flex-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">Дисциплина</span>
-            <span className="w-28 text-xs font-medium text-muted-foreground uppercase tracking-wide text-right">Оценка</span>
-          </div>
-          {entries.map((entry, i) => (
-            <button
-              key={i}
-              className="w-full flex items-center py-3 gap-4 text-left active:bg-muted/50 transition-colors"
-              onClick={() => setSelected(entry)}
-            >
-              <span className="flex-1 text-sm text-foreground leading-snug">{entry.discipline}</span>
-              <span className={`shrink-0 w-28 text-right text-sm font-semibold ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
-                {entry.grade_name}
-              </span>
-            </button>
-          ))}
-        </div>
+        {semestersSorted.map((sem) => {
+          const semEntries = [...(bySemester.get(sem) ?? [])].sort(
+            (a, b) => parseDateNum(b.date) - parseDateNum(a.date)
+          );
+          return (
+            <div key={sem}>
+              <div className="pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {sem} семестр
+              </div>
+              <div className="divide-y divide-border">
+                {semEntries.map((entry, i) => {
+                  const gradeDisplay = entry.grade !== 0 ? String(entry.grade) : entry.grade_name;
+                  return (
+                    <button
+                      key={i}
+                      className="w-full flex items-center py-3 gap-4 text-left active:bg-muted/50 transition-colors"
+                      onClick={() => setSelected(entry)}
+                    >
+                      <span className="flex-1 text-sm text-foreground leading-snug">{entry.discipline}</span>
+                      <span className={`shrink-0 text-right text-sm font-semibold ${GRADE_COLORS_TEXT[entry.grade_name] ?? "text-foreground"}`}>
+                        {gradeDisplay}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Detail dialog */}
