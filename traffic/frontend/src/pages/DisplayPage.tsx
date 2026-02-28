@@ -250,14 +250,11 @@ export default function DisplayPage() {
           </div>
         )}
         <div className="flex-1 flex flex-col justify-center px-16 gap-6">
-          <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
-            Новый планшет
-          </p>
           <h1 className="text-5xl font-bold leading-tight">
             Регистрация аудитории
           </h1>
           <p className="text-2xl text-gray-400 leading-relaxed">
-            Администратор должен отсканировать QR-код и привязать этот планшет к аудитории
+            Отсканируйте QR-код, чтобы привязать планшет к аудитории
           </p>
         </div>
       </div>

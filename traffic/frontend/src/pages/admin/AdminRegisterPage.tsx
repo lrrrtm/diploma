@@ -3,11 +3,22 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
+
+type RegStep = "building" | "room";
 
 interface Building {
   id: number;
@@ -29,41 +40,46 @@ interface TabletInfo {
 }
 
 // ---------------------------------------------------------------------------
-// SearchableList
+// StepList — full-page searchable list for a step
 // ---------------------------------------------------------------------------
 
-interface SearchableListProps<T> {
+interface StepListProps<T> {
   items: T[] | null;
-  selected: T | null;
-  onSelect: (item: T) => void;
   getKey: (item: T) => number;
   getLabel: (item: T) => string;
+  getSubLabel?: (item: T) => string | undefined;
   placeholder: string;
+  onSelect: (item: T) => void;
 }
 
-function SearchableList<T>({
+function StepList<T>({
   items,
-  selected,
-  onSelect,
   getKey,
   getLabel,
+  getSubLabel,
   placeholder,
-}: SearchableListProps<T>) {
+  onSelect,
+}: StepListProps<T>) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Auto-focus search on mount (after animation)
+    const t = setTimeout(() => inputRef.current?.focus(), 200);
+    return () => clearTimeout(t);
+  }, []);
 
   const filtered = items
     ? items
         .filter((item) => getLabel(item).toLowerCase().includes(query.toLowerCase()))
         .sort((a, b) => getLabel(a).localeCompare(getLabel(b), "ru", { numeric: true }))
-    : [];
-
-  if (items === null) return <Skeleton className="h-10 w-full rounded-md" />;
+    : null;
 
   return (
-    <div className="space-y-1.5">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+    <div className="flex flex-col h-full">
+      {/* Sticky search bar */}
+      <div className="relative shrink-0 px-4 py-3 border-b border-border bg-background">
+        <Search className="absolute left-7 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           ref={inputRef}
           value={query}
@@ -73,30 +89,29 @@ function SearchableList<T>({
         />
       </div>
 
-      {selected && (
-        <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-medium">
-          {getLabel(selected)}
-        </div>
-      )}
-
-      <div className="border border-input rounded-md overflow-y-auto max-h-56 divide-y divide-border">
-        {filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground px-3 py-2">Ничего не найдено</p>
+      {/* Scrollable list */}
+      <div className="flex-1 overflow-y-auto divide-y divide-border">
+        {filtered === null ? (
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-md" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-10">Ничего не найдено</p>
         ) : (
           filtered.map((item) => {
-            const isSelected = selected !== null && getKey(selected) === getKey(item);
+            const sub = getSubLabel?.(item);
             return (
-              <Button
+              <button
                 key={getKey(item)}
                 type="button"
-                variant="ghost"
                 onClick={() => onSelect(item)}
-                className={`w-full justify-start rounded-none font-normal ${
-                  isSelected ? "bg-primary/10 font-medium" : ""
-                }`}
+                className="w-full text-left px-4 py-3.5 hover:bg-accent transition-colors flex flex-col gap-0.5"
               >
-                {getLabel(item)}
-              </Button>
+                <span className="text-sm font-medium">{getLabel(item)}</span>
+                {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+              </button>
             );
           })
         )}
@@ -114,16 +129,19 @@ export default function AdminRegisterPage() {
   const navigate = useNavigate();
   const { isLoggedIn, role } = useAuth();
 
+  const [step, setStep] = useState<RegStep>("building");
+  const [stepDir, setStepDir] = useState<"forward" | "back">("forward");
+
   const [buildings, setBuildings] = useState<Building[] | null>(null);
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  // building_id → Set of occupied room_ids
   const [occupiedByBuilding, setOccupiedByBuilding] = useState<Map<number, Set<number>>>(new Map());
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn || role !== "admin") { navigate("/admin/login"); return; }
@@ -133,7 +151,6 @@ export default function AdminRegisterPage() {
       api.get<TabletInfo[]>("/tablets/"),
     ]).then(([bRes, tRes]) => {
       setBuildings(bRes.data.buildings ?? []);
-
       const occupied = new Map<number, Set<number>>();
       for (const t of tRes.data) {
         if (t.is_registered && t.building_id !== null && t.room_id !== null) {
@@ -142,29 +159,39 @@ export default function AdminRegisterPage() {
         }
       }
       setOccupiedByBuilding(occupied);
-    }).catch(() => {
-      setBuildings([]);
-    });
+    }).catch(() => setBuildings([]));
   }, [isLoggedIn, role, navigate]);
 
+  // Load rooms when building is selected
   useEffect(() => {
-    if (!selectedBuilding) { setRooms(null); setSelectedRoom(null); return; }
+    if (!selectedBuilding) { setRooms(null); return; }
     setRooms(null);
-    setSelectedRoom(null);
     api
       .get<{ rooms: Room[] }>(`/schedule/buildings/${selectedBuilding.id}/rooms`)
       .then((r) => setRooms(r.data.rooms ?? []))
       .catch(() => setRooms([]));
   }, [selectedBuilding]);
 
-  const availableRooms = rooms
-    ? rooms.filter((r) => !occupiedByBuilding.get(selectedBuilding?.id ?? -1)?.has(r.id))
-    : null;
+  const selectBuilding = (b: Building) => {
+    setStepDir("forward");
+    setSelectedBuilding(b);
+    setSelectedRoom(null);
+    setStep("room");
+  };
+
+  const goBackToBuilding = () => {
+    setStepDir("back");
+    setStep("building");
+  };
+
+  const selectRoom = (r: Room) => {
+    setSelectedRoom(r);
+    setConfirmOpen(true);
+  };
 
   const handleSave = async () => {
     if (!selectedBuilding || !selectedRoom || !deviceId) return;
     setSaving(true);
-    setError(null);
     try {
       await api.post(`/tablets/${deviceId}/register`, {
         building_id: selectedBuilding.id,
@@ -172,79 +199,100 @@ export default function AdminRegisterPage() {
         room_id: selectedRoom.id,
         room_name: selectedRoom.name,
       });
+      setConfirmOpen(false);
       setSuccess(true);
+      toast.success("Аудитория назначена");
       setTimeout(() => navigate("/admin/tablets"), 1500);
     } catch {
-      setError("Не удалось сохранить");
+      toast.error("Не удалось сохранить");
     } finally {
       setSaving(false);
     }
   };
 
+  const availableRooms = rooms
+    ? rooms.filter((r) => !occupiedByBuilding.get(selectedBuilding?.id ?? -1)?.has(r.id))
+    : null;
+
+  const isBack = step === "room";
+  const handleBack = isBack ? goBackToBuilding : () => navigate(-1);
+
+  const stepTitle = step === "building" ? "Выберите корпус" : "Выберите аудиторию";
+  const stepSub =
+    step === "room" && selectedBuilding
+      ? selectedBuilding.name
+      : deviceId;
+
   return (
     <div className="h-full bg-background flex flex-col">
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+      {/* Header */}
+      <div className="bg-card border-b border-border px-2 py-3 flex items-center gap-1 shrink-0">
+        <Button variant="ghost" size="icon" onClick={handleBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="min-w-0">
-          <p className="font-semibold text-sm">Назначить аудиторию</p>
-          <p className="text-xs text-muted-foreground font-mono truncate">{deviceId}</p>
+          <p className="font-semibold text-sm">{stepTitle}</p>
+          <p className="text-xs text-muted-foreground font-mono truncate">{stepSub}</p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 max-w-lg mx-auto w-full space-y-5">
-        {success ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <p className="text-green-500 font-semibold text-lg">Аудитория назначена!</p>
-            <p className="text-muted-foreground text-sm">Планшет зарегистрирован и готов к работе</p>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-1.5">
-              <Label>Корпус</Label>
-              <SearchableList
-                items={buildings}
-                selected={selectedBuilding}
-                onSelect={setSelectedBuilding}
-                getKey={(b) => b.id}
-                getLabel={(b) => b.address ? `${b.name} — ${b.address}` : b.name}
-                placeholder="Поиск корпуса..."
-              />
-            </div>
+      {/* Step content with slide animation */}
+      {success ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 step-enter-forward">
+          <p className="text-green-500 font-semibold text-lg">Аудитория назначена!</p>
+          <p className="text-muted-foreground text-sm">Планшет зарегистрирован и готов к работе</p>
+        </div>
+      ) : (
+        <div
+          key={step}
+          className={`flex-1 overflow-hidden flex flex-col ${
+            stepDir === "forward" ? "step-enter-forward" : "step-enter-back"
+          }`}
+        >
+          {step === "building" ? (
+            <StepList
+              items={buildings}
+              getKey={(b) => b.id}
+              getLabel={(b) => b.name}
+              getSubLabel={(b) => b.address || undefined}
+              placeholder="Поиск корпуса..."
+              onSelect={selectBuilding}
+            />
+          ) : (
+            <StepList
+              items={availableRooms}
+              getKey={(r) => r.id}
+              getLabel={(r) => `ауд. ${r.name}`}
+              placeholder="Поиск аудитории..."
+              onSelect={selectRoom}
+            />
+          )}
+        </div>
+      )}
 
-            <div className="space-y-1.5">
-              <Label>Аудитория</Label>
-              {!selectedBuilding ? (
-                <p className="text-sm text-muted-foreground">Сначала выберите корпус</p>
-              ) : (
-                <SearchableList
-                  items={availableRooms}
-                  selected={selectedRoom}
-                  onSelect={setSelectedRoom}
-                  getKey={(r) => r.id}
-                  getLabel={(r) => `ауд. ${r.name}`}
-                  placeholder="Поиск аудитории..."
-                />
-              )}
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <Button
-              onClick={handleSave}
-              disabled={!selectedBuilding || !selectedRoom || saving}
-              className="w-full"
-            >
-              {saving ? "Сохранение..." : "Назначить аудиторию"}
-            </Button>
-          </>
-        )}
-      </div>
+      {/* Confirmation dialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Подтвердите назначение</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 mt-1">
+                <p><span className="text-foreground font-medium">Корпус:</span> {selectedBuilding?.name}</p>
+                {selectedBuilding?.address && (
+                  <p className="text-xs">{selectedBuilding.address}</p>
+                )}
+                <p><span className="text-foreground font-medium">Аудитория:</span> ауд. {selectedRoom?.name}</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSave} disabled={saving}>
+              {saving ? "Сохранение..." : "Назначить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
