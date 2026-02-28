@@ -60,6 +60,18 @@ const SheetTitle = React.forwardRef<
 ));
 SheetTitle.displayName = "SheetTitle";
 
+const SheetDescription = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Description
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+));
+SheetDescription.displayName = "SheetDescription";
+
 const SheetCloseButton = () => (
   <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
     <X className="h-5 w-5" />
@@ -74,5 +86,6 @@ export {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
   SheetCloseButton,
 };
