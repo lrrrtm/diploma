@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, Plus, ChevronRight, ArrowLeft } from "lucide-react";
+import { Plus, ChevronRight, ArrowLeft, Download } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { ResponsesList } from "@/components/shared/responses-list";
 import {
   Sheet,
   SheetContent,
@@ -14,36 +17,66 @@ import {
 } from "@/components/ui/sheet";
 import { useStudent } from "@/context/StudentContext";
 import api from "@/api/client";
-import type { ApplicationBrief, Department, DepartmentWithServices, ServiceBrief } from "@/types";
+import type {
+  ApplicationBrief,
+  ApplicationDetail,
+  Department,
+  DepartmentWithServices,
+  ServiceBrief,
+} from "@/types";
 import DuckScreen from "@/components/DuckScreen";
 import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
 
 const REFRESH_INTERVAL = 5000;
+
+// Module-level caches — survive re-renders and navigation
 let applicationsCache: ApplicationBrief[] | null = null;
+let deptsCache: Department[] | null = null;
+const svcCache = new Map<string, ServiceBrief[]>();
+let prefetchPromise: Promise<void> | null = null;
+const detailCache: Record<string, ApplicationDetail> = {};
+
+function prefetchAll(): Promise<void> {
+  if (prefetchPromise) return prefetchPromise;
+  prefetchPromise = api
+    .get<Department[]>("/departments/")
+    .then(async (res) => {
+      deptsCache = res.data;
+      await Promise.all(
+        res.data.map((dept) =>
+          api
+            .get<DepartmentWithServices>(`/departments/${dept.id}`)
+            .then((r) => {
+              svcCache.set(dept.id, r.data.services.filter((s) => s.is_active));
+            })
+            .catch(() => {})
+        )
+      );
+    })
+    .catch(() => {
+      prefetchPromise = null;
+    });
+  return prefetchPromise;
+}
 
 function AppCard({ app, onClick }: { app: ApplicationBrief; onClick: () => void }) {
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="space-y-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium truncate">{app.service_name}</span>
-              <StatusBadge status={app.status} />
-            </div>
-            <p className="text-sm text-muted-foreground truncate">{app.department_name}</p>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-            <Clock className="h-3.5 w-3.5" />
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <Badge variant="outline">
             {new Date(app.created_at).toLocaleDateString("ru-RU")}
-          </div>
+          </Badge>
+          <StatusBadge status={app.status} />
         </div>
+        <p className="font-medium leading-snug">{app.service_name}</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{app.department_name}</p>
       </CardContent>
     </Card>
   );
 }
 
-type SheetStep = "departments" | "services";
+type NewAppStep = "departments" | "services";
 
 export default function ApplicationsPage() {
   const student = useStudent();
@@ -52,14 +85,18 @@ export default function ApplicationsPage() {
   const navigate = useNavigate();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Sheet state
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [step, setStep] = useState<SheetStep>("departments");
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [deptLoading, setDeptLoading] = useState(false);
+  // Detail sheet
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<ApplicationDetail | null>(null);
+
+  // New application sheet
+  const [newAppOpen, setNewAppOpen] = useState(false);
+  const [step, setStep] = useState<NewAppStep>("departments");
+  const [stepDir, setStepDir] = useState<"forward" | "back">("forward");
+  const [departments, setDepartments] = useState<Department[]>(deptsCache ?? []);
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [services, setServices] = useState<ServiceBrief[]>([]);
-  const [servicesLoading, setServicesLoading] = useState(false);
 
   const fetchApplications = () => {
     if (!student) return;
@@ -76,6 +113,12 @@ export default function ApplicationsPage() {
   };
 
   useEffect(() => {
+    prefetchAll().then(() => {
+      if (deptsCache) setDepartments(deptsCache);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!student) {
       setLoading(false);
       return;
@@ -87,36 +130,50 @@ export default function ApplicationsPage() {
     };
   }, [student]);
 
-  const openSheet = async () => {
+  const openDetail = (app: ApplicationBrief) => {
+    setDetailOpen(true);
+    if (detailCache[app.id]) {
+      setSelectedApp(detailCache[app.id]);
+      return;
+    }
+    setSelectedApp(null);
+    setDetailLoading(true);
+    api
+      .get<ApplicationDetail>(`/applications/${app.id}`, {
+        params: { student_external_id: student?.student_external_id },
+      })
+      .then((res) => {
+        detailCache[app.id] = res.data;
+        setSelectedApp(res.data);
+      })
+      .finally(() => setDetailLoading(false));
+  };
+
+  const openNewApp = async () => {
     setStep("departments");
     setSelectedDept(null);
     setServices([]);
-    setSheetOpen(true);
-    if (departments.length === 0) {
-      setDeptLoading(true);
-      try {
-        const res = await api.get<Department[]>("/departments/");
-        setDepartments(res.data);
-      } finally {
-        setDeptLoading(false);
-      }
+    setNewAppOpen(true);
+    if (!deptsCache) {
+      await prefetchAll();
+      setDepartments(deptsCache ?? []);
     }
   };
 
-  const selectDepartment = async (dept: Department) => {
+  const selectDepartment = (dept: Department) => {
+    setStepDir("forward");
     setSelectedDept(dept);
     setStep("services");
-    setServicesLoading(true);
-    try {
-      const res = await api.get<DepartmentWithServices>(`/departments/${dept.id}`);
-      setServices(res.data.services.filter((s) => s.is_active));
-    } finally {
-      setServicesLoading(false);
-    }
+    setServices(svcCache.get(dept.id) ?? []);
+  };
+
+  const goBackToDepts = () => {
+    setStepDir("back");
+    setStep("departments");
   };
 
   const selectService = (serviceId: string) => {
-    setSheetOpen(false);
+    setNewAppOpen(false);
     navigate(`/apply/${serviceId}`);
   };
 
@@ -132,7 +189,7 @@ export default function ApplicationsPage() {
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Мои заявки</h1>
-        <Button size="sm" className="gap-1.5" onClick={openSheet}>
+        <Button size="sm" className="gap-1.5" onClick={openNewApp}>
           <Plus className="h-4 w-4" />
           Новая заявка
         </Button>
@@ -143,16 +200,12 @@ export default function ApplicationsPage() {
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Skeleton className="h-5 w-1/2" />
-                      <Skeleton className="h-5 w-16 rounded-full" />
-                    </div>
-                    <Skeleton className="h-4 w-1/3" />
-                  </div>
-                  <Skeleton className="h-4 w-20 shrink-0" />
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
                 </div>
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-4 w-1/3 mt-1" />
               </CardContent>
             </Card>
           ))}
@@ -162,40 +215,138 @@ export default function ApplicationsPage() {
       ) : (
         <div className="space-y-3">
           {applications.map((app) => (
-            <AppCard key={app.id} app={app} onClick={() => navigate(`/applications/${app.id}`)} />
+            <AppCard key={app.id} app={app} onClick={() => openDetail(app)} />
           ))}
         </div>
       )}
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      {/* ── Detail sheet ─────────────────────────────────────────────── */}
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>
+              {detailLoading || !selectedApp ? "\u00a0" : selectedApp.service_name}
+            </SheetTitle>
+            <SheetCloseButton />
+          </SheetHeader>
+
+          <div className="overflow-y-auto flex-1 px-4 py-4">
+            {detailLoading || !selectedApp ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+                <Skeleton className="h-4 w-1/2" />
+                <Separator />
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="space-y-1">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-5 w-3/4" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Status + date */}
+                <div className="flex items-center justify-between gap-2">
+                  <StatusBadge status={selectedApp.status} />
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(selectedApp.created_at).toLocaleString("ru-RU")}
+                  </span>
+                </div>
+
+                <p className="text-sm text-muted-foreground -mt-2">{selectedApp.department_name}</p>
+
+                {/* Form data */}
+                {Object.keys(selectedApp.form_data).length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      {Object.entries(selectedApp.form_data).map(([key, value]) => {
+                        const label =
+                          selectedApp.service_fields.find((f) => f.name === key)?.label ?? key;
+                        return (
+                          <div key={key}>
+                            <p className="text-xs text-muted-foreground">{label}</p>
+                            <p className="text-sm font-medium mt-0.5">{value}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* Attachments */}
+                {selectedApp.attachments.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Прикреплённые файлы
+                      </p>
+                      {selectedApp.attachments.map((att) => (
+                        <a
+                          key={att.id}
+                          href={`/uploads/${att.file_path}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 bg-secondary rounded-md text-sm hover:bg-secondary/80 transition-colors"
+                        >
+                          <Download className="h-4 w-4 text-muted-foreground shrink-0" />
+                          {att.filename}
+                        </a>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Responses */}
+                {selectedApp.responses.length > 0 && (
+                  <>
+                    <Separator />
+                    <ResponsesList responses={selectedApp.responses} title="Ответы" />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── New application sheet ─────────────────────────────────────── */}
+      <Sheet open={newAppOpen} onOpenChange={setNewAppOpen}>
         <SheetContent>
           <SheetHeader>
             <div className="flex items-center gap-2">
               {step === "services" && (
                 <button
                   className="text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setStep("departments")}
+                  onClick={goBackToDepts}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </button>
               )}
               <SheetTitle>
-                {step === "departments" ? "Выберите структуру" : selectedDept?.name ?? "Выберите услугу"}
+                {step === "departments"
+                  ? "Выберите структуру"
+                  : selectedDept?.name ?? "Выберите услугу"}
               </SheetTitle>
             </div>
             <SheetCloseButton />
           </SheetHeader>
 
-          <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1">
-            {step === "departments" && (
-              deptLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : departments.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Нет доступных структур</p>
+          <div
+            key={step}
+            className={`overflow-y-auto flex-1 px-4 py-3 space-y-1 ${
+              stepDir === "forward" ? "step-enter-forward" : "step-enter-back"
+            }`}
+          >
+            {step === "departments" &&
+              (departments.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Нет доступных структур
+                </p>
               ) : (
                 departments.map((dept) => (
                   <button
@@ -207,18 +358,13 @@ export default function ApplicationsPage() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 ))
-              )
-            )}
+              ))}
 
-            {step === "services" && (
-              servicesLoading ? (
-                <div className="space-y-2">
-                  {[...Array(4)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : services.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">Нет доступных услуг</p>
+            {step === "services" &&
+              (services.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Нет доступных услуг
+                </p>
               ) : (
                 services.map((service) => (
                   <button
@@ -230,8 +376,7 @@ export default function ApplicationsPage() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 ))
-              )
-            )}
+              ))}
           </div>
         </SheetContent>
       </Sheet>
