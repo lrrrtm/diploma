@@ -38,7 +38,7 @@ interface RuzLesson {
 
 export default function TeacherSessionPage() {
   const [params] = useSearchParams();
-  const { teacherName, isLoggedIn } = useAuth();
+  const { isLoggedIn } = useAuth();
 
   const deviceId = params.get("device") ?? "";
 

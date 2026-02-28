@@ -11,7 +11,6 @@ import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -208,7 +207,6 @@ const Sidebar = React.forwardRef<
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
               } as React.CSSProperties
             }
-            side={side}
           >
             <SheetHeader className="sr-only">
               <SheetTitle>Sidebar</SheetTitle>
