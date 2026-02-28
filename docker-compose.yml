@@ -84,12 +84,39 @@ services:
 
   # ---- Traffic mini-app (traffic.poly.hex8d.space) ----
 
+  traffic-db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TRAFFIC_MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${TRAFFIC_MYSQL_DATABASE}
+      MYSQL_USER: ${TRAFFIC_MYSQL_USER}
+      MYSQL_PASSWORD: ${TRAFFIC_MYSQL_PASSWORD}
+    volumes:
+      - traffic_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      traffic:
+        aliases:
+          - db
+
   traffic-backend:
     build: ./traffic/backend
     restart: unless-stopped
+    depends_on:
+      traffic-db:
+        condition: service_healthy
     environment:
       LAUNCH_TOKEN_SECRET: ${LAUNCH_TOKEN_SECRET}
       TEACHER_SECRET: ${TRAFFIC_TEACHER_SECRET}
+      ADMIN_SECRET: ${TRAFFIC_ADMIN_SECRET}
+      ADMIN_PASSWORD: ${TRAFFIC_ADMIN_PASSWORD}
+      DATABASE_URL: mysql+pymysql://${TRAFFIC_MYSQL_USER}:${TRAFFIC_MYSQL_PASSWORD}@db:3306/${TRAFFIC_MYSQL_DATABASE}
     networks:
       traffic:
         aliases:
@@ -108,6 +135,7 @@ services:
 volumes:
   services_db_data:
   services_uploads:
+  traffic_db_data:
 
 networks:
   main:
