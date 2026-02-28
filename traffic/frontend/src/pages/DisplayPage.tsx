@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { XCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import api from "@/api/client";
 import { computeQrToken, currentWindow, msUntilNextWindow } from "@/lib/hmac";
@@ -241,7 +242,13 @@ export default function DisplayPage() {
   if (displayState === "unregistered") {
     return (
       <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex">
-        <QrPanel value={registrationQr || "no-device"} />
+        {deviceId ? (
+          <QrPanel value={registrationQr} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <Spinner className="h-16 w-16 text-gray-600" />
+          </div>
+        )}
         <div className="flex-1 flex flex-col justify-center px-16 gap-6">
           <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
             Новый планшет
