@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FileText, Clock, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -109,23 +109,23 @@ export default function ExecutorDashboardPage() {
       <PageHeader title="Мои заявки" />
 
       {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
+      <InputGroup className="mb-4">
+        <InputGroupAddon align="inline-start">
+          <Search className="h-4 w-4" />
+        </InputGroupAddon>
+        <InputGroupInput
           placeholder="Поиск по студенту или услуге..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-9"
         />
         {search && (
-          <button
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            onClick={() => setSearch("")}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton size="icon-sm" onClick={() => setSearch("")} aria-label="Очистить">
+              <X className="h-4 w-4" />
+            </InputGroupButton>
+          </InputGroupAddon>
         )}
-      </div>
+      </InputGroup>
 
       <Tabs defaultValue="pending">
         <TabsList className="w-full">

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Building2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import {
   Card,
   CardContent,
@@ -19,16 +20,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/shared/page-header";
 import api from "@/api/client";
@@ -44,6 +36,7 @@ export default function AdminDepartmentsPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
 
   const fetchDepartments = () => {
     api.get<Department[]>("/departments/").then((res) => {
@@ -245,14 +238,21 @@ export default function AdminDepartmentsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dept-password">Пароль сотрудника</Label>
-                  <Input
-                    id="dept-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Пароль"
-                    autoComplete="new-password"
-                  />
+                  <InputGroup>
+                    <InputGroupInput
+                      id="dept-password"
+                      type={showPw ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Пароль"
+                      autoComplete="new-password"
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupButton size="icon-sm" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Скрыть пароль" : "Показать пароль"}>
+                        {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </InputGroupButton>
+                    </InputGroupAddon>
+                  </InputGroup>
                 </div>
               </>
             )}
@@ -264,21 +264,13 @@ export default function AdminDepartmentsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Удалить структуру?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Все связанные услуги и заявки также будут удалены. Это действие необратимо.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Удалить</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open) => !open && setDeleteTargetId(null)}
+        title="Удалить структуру?"
+        description="Все связанные услуги и заявки также будут удалены. Это действие необратимо."
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { goToSSOLogin } from "@/lib/sso";
-import { ArrowLeft, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -51,30 +50,23 @@ export default function TeacherSessionDetailPage() {
   }
 
   return (
-    <div className="h-full bg-background flex flex-col">
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-sm truncate">{session?.discipline ?? "..."}</p>
-            {session?.is_active && (
-              <Badge className="shrink-0 bg-green-500 hover:bg-green-500 text-white text-xs">идёт</Badge>
-            )}
-          </div>
-          {session && (
-            <p className="text-xs text-muted-foreground">
-              {new Date(session.started_at).toLocaleDateString("ru-RU", {
-                day: "numeric", month: "long",
-              })} · {fmt(session.started_at)}
-              {session.ended_at ? `–${fmt(session.ended_at)}` : ""}
-            </p>
+    <div className="max-w-lg mx-auto w-full space-y-4">
+      <div className="mb-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold truncate">{session?.discipline ?? "..."}</h1>
+          {session?.is_active && (
+            <Badge className="shrink-0 bg-green-500 hover:bg-green-500 text-white text-xs">идёт</Badge>
           )}
         </div>
+        {session && (
+          <p className="text-sm text-muted-foreground">
+            {new Date(session.started_at).toLocaleDateString("ru-RU", {
+              day: "numeric", month: "long",
+            })} · {fmt(session.started_at)}
+            {session.ended_at ? `–${fmt(session.ended_at)}` : ""}
+          </p>
+        )}
       </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-lg mx-auto w-full">
         {attendees === null ? (
           <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
@@ -114,7 +106,6 @@ export default function TeacherSessionDetailPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -20,16 +20,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/shared/page-header";
@@ -363,13 +354,18 @@ export default function ManageServicesPage() {
                         <Label className="text-xs">Тип</Label>
                         <Select
                           value={field.type}
-                          onChange={(e) => updateField(idx, "type", e.target.value)}
+                          onValueChange={(v) => updateField(idx, "type", v)}
                         >
-                          <option value="text">Текст</option>
-                          <option value="textarea">Многострочный текст</option>
-                          <option value="number">Число</option>
-                          <option value="date">Дата</option>
-                          <option value="select">Выпадающий список</option>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="text">Текст</SelectItem>
+                            <SelectItem value="textarea">Многострочный текст</SelectItem>
+                            <SelectItem value="number">Число</SelectItem>
+                            <SelectItem value="date">Дата</SelectItem>
+                            <SelectItem value="select">Выпадающий список</SelectItem>
+                          </SelectContent>
                         </Select>
                       </div>
                     </div>
@@ -406,21 +402,13 @@ export default function ManageServicesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Удалить услугу?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Это действие необратимо.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Удалить</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open) => !open && setDeleteTargetId(null)}
+        title="Удалить услугу?"
+        description="Это действие необратимо."
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

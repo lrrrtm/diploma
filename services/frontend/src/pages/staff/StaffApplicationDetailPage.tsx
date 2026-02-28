@@ -11,7 +11,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/shared/page-header";
@@ -128,14 +128,18 @@ export default function StaffApplicationDetailPage() {
             <CardContent>
               <div className="flex gap-2 items-center">
                 <Select
-                  value={selectedExecutorId}
-                  onChange={(e) => setSelectedExecutorId(e.target.value)}
-                  className="flex-1"
+                  value={selectedExecutorId || "__none__"}
+                  onValueChange={(v) => setSelectedExecutorId(v === "__none__" ? "" : v)}
                 >
-                  <option value="">— Не назначен</option>
-                  {executors.map((ex) => (
-                    <option key={ex.id} value={ex.id}>{ex.name}</option>
-                  ))}
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Не назначен</SelectItem>
+                    {executors.map((ex) => (
+                      <SelectItem key={ex.id} value={ex.id}>{ex.name}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
                 <Button
                   size="sm"

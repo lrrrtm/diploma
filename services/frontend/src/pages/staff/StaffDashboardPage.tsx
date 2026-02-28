@@ -4,8 +4,8 @@ import { FileText, Clock, User, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import api from "@/api/client";
@@ -126,32 +126,36 @@ export default function StaffDashboardPage() {
 
       {/* Поиск и фильтр */}
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
+        <InputGroup className="flex-1">
+          <InputGroupAddon align="inline-start">
+            <Search className="h-4 w-4" />
+          </InputGroupAddon>
+          <InputGroupInput
             placeholder="Поиск по студенту..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-9"
           />
           {search && (
-            <button
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              onClick={() => setSearch("")}
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton size="icon-sm" onClick={() => setSearch("")} aria-label="Очистить">
+                <X className="h-4 w-4" />
+              </InputGroupButton>
+            </InputGroupAddon>
           )}
-        </div>
+        </InputGroup>
         <Select
-          value={serviceFilter}
-          onChange={(e) => setServiceFilter(e.target.value)}
-          className="sm:w-56"
+          value={serviceFilter || "__all__"}
+          onValueChange={(v) => setServiceFilter(v === "__all__" ? "" : v)}
         >
-          <option value="">Все услуги</option>
-          {serviceOptions.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
+          <SelectTrigger className="sm:w-56">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Все услуги</SelectItem>
+            {serviceOptions.map((name) => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
 

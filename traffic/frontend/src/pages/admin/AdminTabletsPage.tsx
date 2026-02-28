@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { LogOut, Monitor, Trash2, Users } from "lucide-react";
+import { Monitor, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { goToSSOLogin } from "@/lib/sso";
@@ -19,50 +19,37 @@ interface Tablet {
 }
 
 export default function AdminTabletsPage() {
-  const navigate = useNavigate();
-  const { isLoggedIn, role, logout } = useAuth();
+  const { isLoggedIn, role } = useAuth();
   const [tablets, setTablets] = useState<Tablet[] | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn || role !== "admin") { goToSSOLogin(); return; }
     load();
-  }, [isLoggedIn, role, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function load() {
     api.get<Tablet[]>("/tablets/").then((r) => setTablets(r.data)).catch(() => setTablets([]));
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Удалить этот киоск?")) return;
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
     try {
-      await api.delete(`/tablets/${id}`);
+      await api.delete(`/tablets/${pendingDeleteId}`);
       toast.success("Киоск удалён");
       load();
     } catch {
       toast.error("Не удалось удалить киоск");
+    } finally {
+      setPendingDeleteId(null);
     }
   }
-
-  const handleLogout = () => { logout(); goToSSOLogin(); };
 
   const registered = tablets?.filter((t) => t.is_registered) ?? null;
 
   return (
-    <div className="h-full bg-background flex flex-col">
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shrink-0">
-        <p className="font-semibold text-sm">Киоски</p>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/admin/teachers"><Users className="h-4 w-4 mr-1.5" />Преподаватели</Link>
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-5xl mx-auto w-full">
-        {registered === null ? (
+    <>
+      {registered === null ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-16 w-full rounded-lg" />
@@ -87,7 +74,7 @@ export default function AdminTabletsPage() {
                     variant="ghost"
                     size="icon"
                     className="text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => handleDelete(t.id)}
+                    onClick={() => setPendingDeleteId(t.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -96,7 +83,13 @@ export default function AdminTabletsPage() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+        title="Удалить этот киоск?"
+        onConfirm={confirmDelete}
+      />
+    </>
   );
 }

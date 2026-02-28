@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import api from "@/api/client";
 import type { Department } from "@/types";
 import DuckScreen from "@/components/DuckScreen";
@@ -58,15 +58,16 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
+      <InputGroup>
+        <InputGroupAddon align="inline-start">
+          <Search className="h-4 w-4" />
+        </InputGroupAddon>
+        <InputGroupInput
           placeholder="Поиск по структурам..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
         />
-      </div>
+      </InputGroup>
 
       {filtered.length === 0 ? (
         <DuckScreen animationData={duckAnimation} text="Ничего не найдено" />

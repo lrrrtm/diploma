@@ -1,9 +1,10 @@
 import { useState, FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ShieldCheck, FileText, ClipboardList } from "lucide-react";
+import { ShieldCheck, FileText, ClipboardList, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import {
   Card,
   CardContent,
@@ -28,6 +29,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
 
   const appLabel = params.get("app_name") ?? (app === "sso" ? "Политехник.SSO" : app);
   const AppIcon = APP_ICONS[app] ?? ShieldCheck;
@@ -103,13 +105,20 @@ export default function LoginPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Пароль</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-              />
+              <InputGroup>
+                <InputGroupInput
+                  id="password"
+                  name="password"
+                  type={showPw ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton size="icon-sm" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Скрыть пароль" : "Показать пароль"}>
+                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
             </div>
             {error && (
               <p className="text-sm text-destructive">{error}</p>

@@ -3,7 +3,7 @@ import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { FileUpload } from "@/components/shared/file-upload";
 
@@ -54,15 +54,15 @@ export function RespondForm({ onSubmit }: RespondFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="respond-status">Изменить статус</Label>
-            <Select
-              id="respond-status"
-              value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value)}
-            >
-              <option value="">Без изменений</option>
-              <option value="in_progress">В обработке</option>
-              <option value="completed">Выполнено</option>
-              <option value="rejected">Отклонено</option>
+            <Select value={newStatus || undefined} onValueChange={setNewStatus}>
+              <SelectTrigger id="respond-status">
+                <SelectValue placeholder="Без изменений" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="in_progress">В обработке</SelectItem>
+                <SelectItem value="completed">Выполнено</SelectItem>
+                <SelectItem value="rejected">Отклонено</SelectItem>
+              </SelectContent>
             </Select>
           </div>
 

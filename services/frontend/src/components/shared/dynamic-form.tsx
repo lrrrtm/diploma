@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FieldDefinition } from "@/types";
 
 interface DynamicFormProps {
@@ -41,18 +41,20 @@ export function DynamicForm({
             />
           ) : field.type === "select" && field.options ? (
             <Select
-              id={field.name}
-              value={values[field.name] || ""}
-              onChange={(e) => handleChange(field.name, e.target.value)}
-              required={field.required}
+              value={values[field.name] || undefined}
+              onValueChange={(v) => handleChange(field.name, v)}
               disabled={disabled}
             >
-              <option value="">Выберите...</option>
-              {field.options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
+              <SelectTrigger id={field.name}>
+                <SelectValue placeholder="Выберите..." />
+              </SelectTrigger>
+              <SelectContent>
+                {field.options.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           ) : (
             <Input

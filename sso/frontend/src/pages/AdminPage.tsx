@@ -1,9 +1,10 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Plus, Trash2, Users } from "lucide-react";
+import { Plus, Trash2, Users, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -30,6 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import api from "@/api/client";
@@ -67,13 +69,15 @@ const APP_BADGE_CLASS: Record<string, string> = {
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { isLoggedIn, fullName, logout } = useAuth();
+  const { isLoggedIn } = useAuth();
 
   const [users, setUsers] = useState<SSOUser[] | null>(null);
   const [appFilter, setAppFilter] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SSOUser | null>(null);
   const [creating, setCreating] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [selectedApp, setSelectedApp] = useState("services");
 
   const loadUsers = () => {
     const params = appFilter !== "all" ? `?app_filter=${appFilter}` : "";
@@ -91,11 +95,6 @@ export default function AdminPage() {
     loadUsers();
   }, [isLoggedIn, appFilter, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
-
   const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -105,7 +104,7 @@ export default function AdminPage() {
         username: form.get("username"),
         password: form.get("password"),
         full_name: form.get("full_name"),
-        app: form.get("app"),
+        app: selectedApp,
         role: "admin",
       });
       toast.success("Администратор создан");
@@ -135,24 +134,8 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="space-y-6">
       <Toaster position="top-right" richColors />
-
-      {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="font-semibold">Политехник.SSO</p>
-            <p className="text-xs text-muted-foreground">{fullName}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-1" />
-            Выйти
-          </Button>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(["all", "services", "traffic"] as const).map((app) => {
@@ -248,11 +231,10 @@ export default function AdminPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Create admin dialog */}
       <AlertDialog open={createOpen} onOpenChange={setCreateOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[calc(100%-2rem)] rounded-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Новый администратор приложения</AlertDialogTitle>
             <AlertDialogDescription>
@@ -264,15 +246,15 @@ export default function AdminPage() {
           <form id="create-form" onSubmit={handleCreate} className="space-y-3 mt-1">
             <div className="space-y-1.5">
               <Label htmlFor="cf-app">Приложение</Label>
-              <select
-                id="cf-app"
-                name="app"
-                required
-                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="services">Политехник.Услуги</option>
-                <option value="traffic">Политехник.Посещаемость</option>
-              </select>
+              <Select value={selectedApp} onValueChange={setSelectedApp}>
+                <SelectTrigger id="cf-app">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="services">Политехник.Услуги</SelectItem>
+                  <SelectItem value="traffic">Политехник.Посещаемость</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cf-username">Логин</Label>
@@ -280,13 +262,20 @@ export default function AdminPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cf-password">Пароль</Label>
-              <Input
-                id="cf-password"
-                name="password"
-                type="password"
-                required
-                autoComplete="new-password"
-              />
+              <InputGroup>
+                <InputGroupInput
+                  id="cf-password"
+                  name="password"
+                  type={showPw ? "text" : "password"}
+                  required
+                  autoComplete="new-password"
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton size="icon-sm" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Скрыть пароль" : "Показать пароль"}>
+                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cf-full-name">Полное имя</Label>
@@ -315,7 +304,7 @@ export default function AdminPage() {
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[calc(100%-2rem)] rounded-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить пользователя?</AlertDialogTitle>
             <AlertDialogDescription>

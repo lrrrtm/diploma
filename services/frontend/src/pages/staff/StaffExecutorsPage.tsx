@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Users, Trash2, Plus, User } from "lucide-react";
+import { Users, Trash2, Plus, User, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import {
   Dialog,
   DialogContent,
@@ -13,16 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import api from "@/api/client";
 import type { Executor } from "@/types";
@@ -38,6 +30,7 @@ export default function StaffExecutorsPage() {
   const [password, setPassword] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
 
   const fetchExecutors = () => {
     api.get<Executor[]>("/executors/").then((res) => {
@@ -175,16 +168,23 @@ export default function StaffExecutorsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="exec-password">Пароль</Label>
-              <Input
-                id="exec-password"
-                type="password"
-                placeholder="Минимум 4 символа"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={4}
-                autoComplete="new-password"
-              />
+              <InputGroup>
+                <InputGroupInput
+                  id="exec-password"
+                  type={showPw ? "text" : "password"}
+                  placeholder="Минимум 4 символа"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={4}
+                  autoComplete="new-password"
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton size="icon-sm" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Скрыть пароль" : "Показать пароль"}>
+                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <DialogFooter>
@@ -199,21 +199,13 @@ export default function StaffExecutorsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm delete */}
-      <AlertDialog open={!!deleteTargetId} onOpenChange={(o) => !o && setDeleteTargetId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Удалить исполнителя?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Исполнитель будет удалён. Назначенные ему заявки станут без исполнителя.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Удалить</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTargetId}
+        onOpenChange={(o) => !o && setDeleteTargetId(null)}
+        title="Удалить исполнителя?"
+        description="Исполнитель будет удалён. Назначенные ему заявки станут без исполнителя."
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { AlertCircle, ClipboardList, LogOut, Users, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { AlertCircle, Users, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -37,9 +37,8 @@ interface RuzLesson {
 }
 
 export default function TeacherSessionPage() {
-  const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { teacherName, logout, isLoggedIn } = useAuth();
+  const { teacherName, isLoggedIn } = useAuth();
 
   const deviceId = params.get("device") ?? "";
 
@@ -55,7 +54,7 @@ export default function TeacherSessionPage() {
     if (!isLoggedIn) {
       goToSSOLogin();
     }
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn]);
 
   // Load current session for this device
   useEffect(() => {
@@ -170,11 +169,6 @@ export default function TeacherSessionPage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    goToSSOLogin();
-  };
-
   if (session === null) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 px-4">
@@ -186,24 +180,7 @@ export default function TeacherSessionPage() {
   }
 
   return (
-    <div className="h-full bg-background flex flex-col">
-      {/* Header */}
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <p className="font-semibold text-foreground text-sm">Политехник.Посещаемость</p>
-          <p className="text-xs text-muted-foreground">{teacherName}</p>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/teacher/history"><ClipboardList className="h-4 w-4" /></Link>
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-6 max-w-lg mx-auto w-full">
+    <div className="max-w-lg mx-auto w-full">
         {session === "none" ? (
           /* ── No active session ── */
           <div className="space-y-4">
@@ -309,7 +286,6 @@ export default function TeacherSessionPage() {
             )}
           </div>
         )}
-      </div>
     </div>
   );
 }

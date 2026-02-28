@@ -225,9 +225,9 @@ export default function AdminRegisterPage() {
       : deviceId;
 
   return (
-    <div className="h-full bg-background flex flex-col">
-      {/* Header */}
-      <div className="bg-card border-b border-border px-2 py-3 flex items-center gap-1 shrink-0">
+    <div className="flex flex-col h-full">
+      {/* Step header */}
+      <div className="flex items-center gap-1 mb-3 shrink-0">
         <Button variant="ghost" size="icon" onClick={handleBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -273,7 +273,7 @@ export default function AdminRegisterPage() {
 
       {/* Confirmation dialog */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[calc(100%-2rem)] rounded-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Подтвердите назначение</AlertDialogTitle>
             <AlertDialogDescription asChild>

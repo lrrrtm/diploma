@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/api/client";
@@ -20,30 +21,33 @@ interface Teacher {
 }
 
 export default function AdminTeachersPage() {
-  const navigate = useNavigate();
   const { isLoggedIn, role } = useAuth();
   const [teachers, setTeachers] = useState<Teacher[] | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn || role !== "admin") { goToSSOLogin(); return; }
     load();
-  }, [isLoggedIn, role, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function load() {
     api.get<Teacher[]>("/teachers/").then((r) => setTeachers(r.data)).catch(() => setTeachers([]));
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Удалить преподавателя?")) return;
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
     try {
-      await api.delete(`/teachers/${id}`);
+      await api.delete(`/teachers/${pendingDeleteId}`);
       toast.success("Преподаватель удалён");
       load();
     } catch {
       toast.error("Не удалось удалить преподавателя");
+    } finally {
+      setPendingDeleteId(null);
     }
   }
 
@@ -71,19 +75,15 @@ export default function AdminTeachersPage() {
   };
 
   return (
-    <div className="h-full bg-background flex flex-col">
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-        <Link to="/admin/tablets" className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <p className="font-semibold text-sm flex-1">Преподаватели</p>
-        <Button variant="outline" size="sm" onClick={() => setShowForm((v) => !v)}>
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          Добавить
-        </Button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-5xl mx-auto w-full space-y-3">
+    <>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold">Преподаватели</h1>
+          <Button variant="outline" size="sm" onClick={() => setShowForm((v) => !v)}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Добавить
+          </Button>
+        </div>
         {/* Create form */}
         {showForm && (
           <Card>
@@ -99,7 +99,14 @@ export default function AdminTeachersPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="password">Пароль</Label>
-                  <Input id="password" name="password" type="password" required autoComplete="new-password" />
+                  <InputGroup>
+                    <InputGroupInput id="password" name="password" type={showPw ? "text" : "password"} required autoComplete="new-password" />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupButton size="icon-sm" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Скрыть пароль" : "Показать пароль"}>
+                        {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </InputGroupButton>
+                    </InputGroupAddon>
+                  </InputGroup>
                 </div>
                 {error && (
                   <Alert variant="destructive">
@@ -142,7 +149,7 @@ export default function AdminTeachersPage() {
                     variant="ghost"
                     size="icon"
                     className="text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => handleDelete(t.id)}
+                    onClick={() => setPendingDeleteId(t.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -152,6 +159,13 @@ export default function AdminTeachersPage() {
           </div>
         )}
       </div>
-    </div>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+        title="Удалить преподавателя?"
+        onConfirm={confirmDelete}
+      />
+    </>
   );
 }

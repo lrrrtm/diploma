@@ -9,6 +9,8 @@ import StudentScanPage from "@/pages/StudentScanPage";
 import AdminTabletsPage from "@/pages/admin/AdminTabletsPage";
 import AdminRegisterPage from "@/pages/admin/AdminRegisterPage";
 import AdminTeachersPage from "@/pages/admin/AdminTeachersPage";
+import { AdminLayout } from "@/components/shared/AdminLayout";
+import { TeacherLayout } from "@/components/shared/TeacherLayout";
 import { useAuth } from "@/context/AuthContext";
 import { goToSSOLogin } from "@/lib/sso";
 
@@ -43,15 +45,15 @@ export default function App() {
 
       {/* Teacher */}
       <Route path="/teacher" element={<Navigate to="/teacher/session" replace />} />
-      <Route path="/teacher/session" element={<TeacherSessionPage />} />
-      <Route path="/teacher/history" element={<TeacherHistoryPage />} />
-      <Route path="/teacher/history/:sessionId" element={<TeacherSessionDetailPage />} />
+      <Route path="/teacher/session" element={<TeacherLayout><TeacherSessionPage /></TeacherLayout>} />
+      <Route path="/teacher/history" element={<TeacherLayout><TeacherHistoryPage /></TeacherLayout>} />
+      <Route path="/teacher/history/:sessionId" element={<TeacherLayout><TeacherSessionDetailPage /></TeacherLayout>} />
 
       {/* Admin */}
       <Route path="/admin" element={<Navigate to="/admin/tablets" replace />} />
-      <Route path="/admin/tablets" element={<AdminTabletsPage />} />
-      <Route path="/admin/tablets/register/:deviceId" element={<AdminRegisterPage />} />
-      <Route path="/admin/teachers" element={<AdminTeachersPage />} />
+      <Route path="/admin/tablets" element={<AdminLayout><AdminTabletsPage /></AdminLayout>} />
+      <Route path="/admin/tablets/register/:deviceId" element={<AdminLayout><AdminRegisterPage /></AdminLayout>} />
+      <Route path="/admin/teachers" element={<AdminLayout><AdminTeachersPage /></AdminLayout>} />
 
       {/* Unknown paths → root */}
       <Route path="*" element={<Navigate to="/" replace />} />

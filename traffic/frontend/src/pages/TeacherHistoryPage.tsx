@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronRight, Users } from "lucide-react";
 import { goToSSOLogin } from "@/lib/sso";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
@@ -20,14 +19,13 @@ interface SessionBrief {
 }
 
 export default function TeacherHistoryPage() {
-  const navigate = useNavigate();
-  const { isLoggedIn, teacherName } = useAuth();
+  const { isLoggedIn } = useAuth();
   const [sessions, setSessions] = useState<SessionBrief[] | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn) { goToSSOLogin(); return; }
     api.get<SessionBrief[]>("/sessions/").then((r) => setSessions(r.data)).catch(() => setSessions([]));
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn]);
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString("ru-RU", {
@@ -40,18 +38,7 @@ export default function TeacherHistoryPage() {
   }
 
   return (
-    <div className="h-full bg-background flex flex-col">
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <p className="font-semibold text-sm">История занятий</p>
-          <p className="text-xs text-muted-foreground">{teacherName}</p>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-lg mx-auto w-full">
+    <div className="max-w-lg mx-auto w-full">
         {sessions === null ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -86,7 +73,6 @@ export default function TeacherHistoryPage() {
             ))}
           </div>
         )}
-      </div>
     </div>
   );
 }
