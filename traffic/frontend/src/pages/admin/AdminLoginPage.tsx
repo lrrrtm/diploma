@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertCircle, ScanLine } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertCircle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,11 +9,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 
-export default function TeacherLoginPage() {
+export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [params] = useSearchParams();
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -22,18 +21,11 @@ export default function TeacherLoginPage() {
     const form = new FormData(e.currentTarget);
     const username = (form.get("username") as string).trim();
     const password = form.get("password") as string;
-    if (!username) { setError("Введите логин"); return; }
-
     setLoading(true);
     try {
-      const res = await api.post<{
-        access_token: string;
-        teacher_id: string;
-        teacher_name: string;
-      }>("/auth/teacher/login", { username, password });
-      login(res.data.access_token, "teacher", res.data.teacher_id, res.data.teacher_name);
-      const redirect = params.get("redirect") ?? "/teacher/session";
-      navigate(redirect);
+      const res = await api.post<{ access_token: string }>("/auth/admin/login", { username, password });
+      login(res.data.access_token, "admin");
+      navigate("/admin/tablets");
     } catch {
       setError("Неверный логин или пароль");
     } finally {
@@ -45,23 +37,23 @@ export default function TeacherLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
-              <ScanLine className="h-6 w-6 text-primary-foreground" />
+          <div className="flex items-center justify-center mb-4">
+            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center">
+              <ShieldCheck className="h-6 w-6 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Политехник.Посещаемость</CardTitle>
-          <CardDescription>Кабинет преподавателя</CardDescription>
+          <CardTitle className="text-2xl">Администратор</CardTitle>
+          <CardDescription>Управление аудиториями и преподавателями</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="username">Логин</Label>
-              <Input id="username" name="username" type="text" required autoComplete="username" placeholder="Введите логин" />
+              <Input id="username" name="username" type="text" required autoComplete="username" defaultValue="admin" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Пароль</Label>
-              <Input id="password" name="password" type="password" autoComplete="current-password" placeholder="Введите пароль" />
+              <Input id="password" name="password" type="password" required autoComplete="current-password" />
             </div>
             {error && (
               <Alert variant="destructive">
