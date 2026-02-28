@@ -1,73 +1,37 @@
 import hashlib
 import hmac
+import secrets
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel
+from sqlalchemy.orm import Session as DBSession
 
 from app.config import settings
+from app.database import get_db
+from app.dependencies import require_teacher
+from app.models.attendance import Attendance
+from app.models.session import Session
+from app.models.tablet import Tablet
+from app.models.teacher import Teacher
 
 router = APIRouter()
-bearer = HTTPBearer(auto_error=False)
-
-# ---------------------------------------------------------------------------
-# In-memory session store
-# ---------------------------------------------------------------------------
-_sessions: dict[str, dict] = {}
-
-
-def _get_active_session() -> Optional[dict]:
-    """Return the active session, auto-closing it if it has expired."""
-    max_age = settings.SESSION_MAX_MINUTES * 60
-    for s in _sessions.values():
-        if not s["is_active"]:
-            continue
-        age = time.time() - s["started_at"]
-        if age > max_age:
-            s["is_active"] = False
-            continue
-        return s
-    return None
-
-
-def _require_teacher(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
-) -> str:
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(
-            credentials.credentials, settings.TEACHER_SECRET, algorithms=[settings.ALGORITHM]
-        )
-        if payload.get("role") != "teacher":
-            raise HTTPException(status_code=403, detail="Forbidden")
-        return payload["sub"]
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 # ---------------------------------------------------------------------------
-# Rotating QR token helpers (HMAC-SHA256, changes every QR_ROTATE_SECONDS)
+# QR token helpers — HMAC-SHA256, per-session secret, rotates every N seconds
+# The same logic runs on the frontend (Web Crypto API) so no backend polling
+# is needed for QR updates.
 # ---------------------------------------------------------------------------
 
-def _rotating_token(session_id: str) -> str:
-    window = int(time.time()) // settings.QR_ROTATE_SECONDS
-    key = settings.TEACHER_SECRET.encode()
-    msg = f"{session_id}|{window}".encode()
-    return hmac.new(key, msg, hashlib.sha256).hexdigest()[:16]
-
-
-def _verify_rotating_token(session_id: str, token: str) -> bool:
-    """Accept current and previous window to tolerate clock drift / slow scans."""
-    window = int(time.time()) // settings.QR_ROTATE_SECONDS
+def _verify_qr_token(session: Session, token: str) -> bool:
+    """Accept current and previous time window to handle slow scans."""
+    window = int(time.time()) // session.rotate_seconds
     for w in [window, window - 1]:
-        key = settings.TEACHER_SECRET.encode()
-        msg = f"{session_id}|{w}".encode()
+        msg = f"{session.id}|{w}".encode()
+        key = session.qr_secret.encode()
         expected = hmac.new(key, msg, hashlib.sha256).hexdigest()[:16]
         if hmac.compare_digest(expected, token):
             return True
@@ -79,7 +43,9 @@ def _verify_rotating_token(session_id: str, token: str) -> bool:
 # ---------------------------------------------------------------------------
 
 class CreateSessionRequest(BaseModel):
+    tablet_id: str
     discipline: str
+    schedule_snapshot: str | None = None  # JSON string
 
 
 class AttendRequest(BaseModel):
@@ -96,97 +62,181 @@ class AttendRequest(BaseModel):
 @router.post("/")
 def create_session(
     data: CreateSessionRequest,
-    teacher: str = Depends(_require_teacher),
+    teacher: Teacher = Depends(require_teacher),
+    db: DBSession = Depends(get_db),
 ):
-    """Start a new attendance session (closes any existing active session)."""
-    for s in _sessions.values():
-        s["is_active"] = False
+    tablet = db.get(Tablet, data.tablet_id)
+    if not tablet or not tablet.is_registered:
+        raise HTTPException(status_code=404, detail="Планшет не найден или не зарегистрирован")
 
-    session_id = str(uuid.uuid4())
-    _sessions[session_id] = {
-        "id": session_id,
-        "discipline": data.discipline,
-        "teacher": teacher,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "started_at": time.time(),
-        "is_active": True,
-        "attendees": [],
-    }
-    return _sessions[session_id]
+    # Close any existing active session for this tablet
+    db.query(Session).filter(
+        Session.tablet_id == data.tablet_id,
+        Session.is_active == True,  # noqa: E712
+    ).update({"is_active": False, "ended_at": datetime.now(timezone.utc)})
 
-
-@router.post("/close-current")
-def close_current_session():
-    """Emergency: close whatever session is currently active. No auth required
-    (this endpoint is called from the public display screen)."""
-    session = _get_active_session()
-    if not session:
-        return {"status": "no_active_session"}
-    session["is_active"] = False
-    return {"status": "closed"}
+    session = Session(
+        id=str(uuid.uuid4()),
+        tablet_id=data.tablet_id,
+        teacher_id=teacher.id,
+        teacher_name=teacher.full_name,
+        discipline=data.discipline,
+        qr_secret=secrets.token_hex(32),
+        rotate_seconds=settings.QR_ROTATE_SECONDS,
+        schedule_snapshot=data.schedule_snapshot,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return _serialize_session(session)
 
 
 @router.get("/current")
-def get_current_session():
-    """Public: returns the active session with a fresh rotating QR token."""
-    session = _get_active_session()
+def get_current_session(device_id: str, db: DBSession = Depends(get_db)):
+    """Public — called by display page to get current session state."""
+    session = (
+        db.query(Session)
+        .filter(Session.tablet_id == device_id, Session.is_active == True)  # noqa: E712
+        .first()
+    )
     if not session:
         return {"active": False}
-    now = time.time()
-    window_start = int(now) // settings.QR_ROTATE_SECONDS * settings.QR_ROTATE_SECONDS
-    next_rotation_at = int((window_start + settings.QR_ROTATE_SECONDS) * 1000)  # ms
+
+    # Auto-expire sessions older than SESSION_MAX_MINUTES
+    age_seconds = (datetime.now(timezone.utc) - session.started_at.replace(tzinfo=timezone.utc)).total_seconds()
+    if age_seconds > settings.SESSION_MAX_MINUTES * 60:
+        session.is_active = False
+        session.ended_at = datetime.now(timezone.utc)
+        db.commit()
+        return {"active": False}
+
+    attendance_count = db.query(Attendance).filter(Attendance.session_id == session.id).count()
+
     return {
         "active": True,
-        "session_id": session["id"],
-        "discipline": session["discipline"],
-        "qr_token": _rotating_token(session["id"]),
-        "rotate_seconds": settings.QR_ROTATE_SECONDS,
-        "next_rotation_at": next_rotation_at,
+        "session_id": session.id,
+        "discipline": session.discipline,
+        "teacher_name": session.teacher_name,
+        "qr_secret": session.qr_secret,
+        "rotate_seconds": session.rotate_seconds,
+        "attendance_count": attendance_count,
     }
 
 
+@router.get("/")
+def list_sessions(
+    tablet_id: str | None = None,
+    teacher: Teacher = Depends(require_teacher),
+    db: DBSession = Depends(get_db),
+):
+    """Returns all sessions for this teacher, optionally filtered by tablet."""
+    q = db.query(Session).filter(Session.teacher_id == teacher.id)
+    if tablet_id:
+        q = q.filter(Session.tablet_id == tablet_id)
+    sessions = q.order_by(Session.started_at.desc()).all()
+    return [_serialize_session(s) for s in sessions]
+
+
+@router.get("/{session_id}")
+def get_session(
+    session_id: str,
+    teacher: Teacher = Depends(require_teacher),
+    db: DBSession = Depends(get_db),
+):
+    session = db.get(Session, session_id)
+    if not session or session.teacher_id != teacher.id:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    return _serialize_session(session)
+
+
 @router.get("/{session_id}/attendees")
-def get_attendees(session_id: str, teacher: str = Depends(_require_teacher)):
-    """Returns the attendee list; teacher auth required."""
-    session = _sessions.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session["attendees"]
+def get_attendees(
+    session_id: str,
+    teacher: Teacher = Depends(require_teacher),
+    db: DBSession = Depends(get_db),
+):
+    session = db.get(Session, session_id)
+    if not session or session.teacher_id != teacher.id:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    rows = (
+        db.query(Attendance)
+        .filter(Attendance.session_id == session_id)
+        .order_by(Attendance.marked_at)
+        .all()
+    )
+    return [_serialize_attendance(a) for a in rows]
 
 
 @router.post("/{session_id}/attend")
-def mark_attendance(session_id: str, data: AttendRequest):
-    """Student marks their attendance using the current rotating QR token."""
-    session = _sessions.get(session_id)
-    if not session or not session["is_active"]:
+def mark_attendance(session_id: str, data: AttendRequest, db: DBSession = Depends(get_db)):
+    session = db.get(Session, session_id)
+    if not session or not session.is_active:
         raise HTTPException(status_code=404, detail="Занятие не найдено или уже завершено")
 
-    if not _verify_rotating_token(session_id, data.qr_token):
+    if not _verify_qr_token(session, data.qr_token):
         raise HTTPException(status_code=400, detail="QR-код устарел — попробуй ещё раз")
 
-    already = any(
-        a["student_external_id"] == data.student_external_id
-        for a in session["attendees"]
+    existing = (
+        db.query(Attendance)
+        .filter(
+            Attendance.session_id == session_id,
+            Attendance.student_external_id == data.student_external_id,
+        )
+        .first()
     )
-    if already:
+    if existing:
         return {"status": "already_marked", "message": "Ты уже отмечен на этом занятии"}
 
-    session["attendees"].append(
-        {
-            "student_external_id": data.student_external_id,
-            "student_name": data.student_name,
-            "student_email": data.student_email,
-            "marked_at": datetime.now(timezone.utc).isoformat(),
-        }
+    record = Attendance(
+        id=str(uuid.uuid4()),
+        session_id=session_id,
+        student_external_id=data.student_external_id,
+        student_name=data.student_name,
+        student_email=data.student_email,
     )
+    db.add(record)
+    db.commit()
     return {"status": "ok", "message": "Посещаемость отмечена"}
 
 
 @router.delete("/{session_id}")
-def close_session(session_id: str, teacher: str = Depends(_require_teacher)):
-    """End the session."""
-    session = _sessions.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    session["is_active"] = False
+def close_session(
+    session_id: str,
+    teacher: Teacher = Depends(require_teacher),
+    db: DBSession = Depends(get_db),
+):
+    session = db.get(Session, session_id)
+    if not session or session.teacher_id != teacher.id:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    session.is_active = False
+    session.ended_at = datetime.now(timezone.utc)
+    db.commit()
     return {"status": "closed"}
+
+
+# ---------------------------------------------------------------------------
+# Serializers
+# ---------------------------------------------------------------------------
+
+def _serialize_session(s: Session) -> dict:
+    return {
+        "id": s.id,
+        "tablet_id": s.tablet_id,
+        "teacher_id": s.teacher_id,
+        "teacher_name": s.teacher_name,
+        "discipline": s.discipline,
+        "rotate_seconds": s.rotate_seconds,
+        "started_at": s.started_at.isoformat() if s.started_at else None,
+        "ended_at": s.ended_at.isoformat() if s.ended_at else None,
+        "is_active": s.is_active,
+    }
+
+
+def _serialize_attendance(a: Attendance) -> dict:
+    return {
+        "id": a.id,
+        "student_external_id": a.student_external_id,
+        "student_name": a.student_name,
+        "student_email": a.student_email,
+        "marked_at": a.marked_at.isoformat() if a.marked_at else None,
+    }

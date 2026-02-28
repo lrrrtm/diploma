@@ -1,0 +1,89 @@
+import { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, ChevronRight, Users } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import api from "@/api/client";
+import { useAuth } from "@/context/AuthContext";
+
+interface SessionBrief {
+  id: string;
+  discipline: string;
+  teacher_name: string;
+  is_active: boolean;
+  started_at: string;
+  ended_at: string | null;
+  tablet_id: string;
+}
+
+export default function TeacherHistoryPage() {
+  const navigate = useNavigate();
+  const { isLoggedIn, teacherName } = useAuth();
+  const [sessions, setSessions] = useState<SessionBrief[] | null>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn) { navigate("/teacher/login"); return; }
+    api.get<SessionBrief[]>("/sessions/").then((r) => setSessions(r.data)).catch(() => setSessions([]));
+  }, [isLoggedIn, navigate]);
+
+  function formatDate(iso: string) {
+    return new Date(iso).toLocaleDateString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+  }
+
+  function formatTime(iso: string) {
+    return new Date(iso).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  return (
+    <div className="h-full bg-background flex flex-col">
+      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
+        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <div>
+          <p className="font-semibold text-sm">История занятий</p>
+          <p className="text-xs text-muted-foreground">{teacherName}</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-lg mx-auto w-full">
+        {sessions === null ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : sessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <Users className="h-10 w-10 text-muted-foreground" />
+            <p className="text-muted-foreground text-sm">Нет прошедших занятий</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map((s) => (
+              <Link key={s.id} to={`/teacher/history/${s.id}`}>
+                <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardContent className="px-4 py-3 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{s.discipline}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(s.started_at)} · {formatTime(s.started_at)}
+                        {s.ended_at ? `–${formatTime(s.ended_at)}` : ""}
+                        {s.is_active && (
+                          <span className="ml-1 text-green-500 font-medium">• идёт</span>
+                        )}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
