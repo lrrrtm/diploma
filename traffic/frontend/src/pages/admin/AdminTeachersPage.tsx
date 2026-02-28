@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 interface Teacher {
   id: string;
@@ -36,8 +37,13 @@ export default function AdminTeachersPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Удалить преподавателя?")) return;
-    await api.delete(`/teachers/${id}`);
-    load();
+    try {
+      await api.delete(`/teachers/${id}`);
+      toast.success("Преподаватель удалён");
+      load();
+    } catch {
+      toast.error("Не удалось удалить преподавателя");
+    }
   }
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -53,6 +59,7 @@ export default function AdminTeachersPage() {
       });
       setShowForm(false);
       load();
+      toast.success("Преподаватель создан");
       (e.target as HTMLFormElement).reset();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -75,7 +82,7 @@ export default function AdminTeachersPage() {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-lg mx-auto w-full space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-5xl mx-auto w-full space-y-3">
         {/* Create form */}
         {showForm && (
           <Card>
@@ -114,28 +121,34 @@ export default function AdminTeachersPage() {
 
         {/* List */}
         {teachers === null ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            ))}
+          </div>
         ) : teachers.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-10">Нет преподавателей</p>
         ) : (
-          teachers.map((t) => (
-            <Card key={t.id}>
-              <CardContent className="px-4 py-3 flex items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium text-sm">{t.full_name}</p>
-                  <p className="text-xs text-muted-foreground">@{t.username}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive shrink-0"
-                  onClick={() => handleDelete(t.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {teachers.map((t) => (
+              <Card key={t.id}>
+                <CardContent className="px-4 py-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-sm">{t.full_name}</p>
+                    <p className="text-xs text-muted-foreground">@{t.username}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => handleDelete(t.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     </div>

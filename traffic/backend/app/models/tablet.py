@@ -20,7 +20,7 @@ class Tablet(Base):
     room_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     assigned_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="tablet")
+    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="tablet", cascade="all, delete-orphan")
 
     @property
     def is_registered(self) -> bool:

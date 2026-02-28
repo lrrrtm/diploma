@@ -285,7 +285,7 @@ export default function DisplayPage() {
               )}
               {todayLessons.map((lesson, i) => (
                 <div key={i} className="flex gap-5 text-gray-300">
-                  <span className="text-gray-400 text-xl whitespace-nowrap shrink-0">
+                  <span className="text-gray-400 text-xl whitespace-nowrap shrink-0 w-44">
                     {lesson.time_start}–{lesson.time_end}
                   </span>
                   <div>
@@ -293,7 +293,7 @@ export default function DisplayPage() {
                     <p className="text-gray-500 text-base">
                       {lesson.typeObj?.name ?? lesson.typeObj?.abbr}
                       {lesson.teachers?.[0] && (
-                        <span className="ml-2">{lesson.teachers[0].full_name}</span>
+                        <span className="ml-2">·&nbsp;{lesson.teachers[0].full_name}</span>
                       )}
                     </p>
                   </div>

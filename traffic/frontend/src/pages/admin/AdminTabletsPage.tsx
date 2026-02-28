@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { LogOut, Monitor, Plus, Trash2, Users } from "lucide-react";
+import { LogOut, Monitor, Trash2, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 interface Tablet {
   id: string;
@@ -32,11 +33,18 @@ export default function AdminTabletsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Удалить этот планшет?")) return;
-    await api.delete(`/tablets/${id}`);
-    load();
+    try {
+      await api.delete(`/tablets/${id}`);
+      toast.success("Планшет удалён");
+      load();
+    } catch {
+      toast.error("Не удалось удалить планшет");
+    }
   }
 
   const handleLogout = () => { logout(); navigate("/admin/login"); };
+
+  const registered = tablets?.filter((t) => t.is_registered) ?? null;
 
   return (
     <div className="h-full bg-background flex flex-col">
@@ -52,53 +60,40 @@ export default function AdminTabletsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-lg mx-auto w-full space-y-3">
-        {tablets === null ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
-        ) : tablets.length === 0 ? (
+      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-5xl mx-auto w-full">
+        {registered === null ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : registered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <Monitor className="h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground text-sm">Нет зарегистрированных планшетов</p>
-            <p className="text-xs text-muted-foreground">Откройте /display на планшете, чтобы он появился здесь</p>
+            <p className="text-xs text-muted-foreground">Откройте /display на планшете и отсканируйте QR</p>
           </div>
         ) : (
-          tablets.map((t) => (
-            <Card key={t.id}>
-              <CardContent className="px-4 py-3 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  {t.is_registered ? (
-                    <>
-                      <p className="font-medium text-sm">{t.building_name}, ауд. {t.room_name}</p>
-                      <p className="text-xs text-muted-foreground font-mono break-all">{t.id}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-medium text-sm text-amber-500">Не назначена аудитория</p>
-                      <p className="text-xs text-muted-foreground font-mono break-all">{t.id}</p>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {!t.is_registered && (
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/admin/tablets/register/${t.id}`}>
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        Назначить
-                      </Link>
-                    </Button>
-                  )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {registered.map((t) => (
+              <Card key={t.id}>
+                <CardContent className="px-4 py-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm">{t.building_name}, ауд. {t.room_name}</p>
+                    <p className="text-xs text-muted-foreground font-mono break-all">{t.id}</p>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive shrink-0"
                     onClick={() => handleDelete(t.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     </div>

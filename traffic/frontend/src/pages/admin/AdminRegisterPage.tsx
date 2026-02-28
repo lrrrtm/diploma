@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +19,13 @@ interface Building {
 interface Room {
   id: number;
   name: string;
+}
+
+interface TabletInfo {
+  id: string;
+  is_registered: boolean;
+  building_id: number | null;
+  room_id: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,13 +64,12 @@ function SearchableList<T>({
     <div className="space-y-1.5">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <input
+        <Input
           ref={inputRef}
-          type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="w-full h-10 rounded-md border border-input bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="pl-9"
         />
       </div>
 
@@ -79,16 +86,17 @@ function SearchableList<T>({
           filtered.map((item) => {
             const isSelected = selected !== null && getKey(selected) === getKey(item);
             return (
-              <button
+              <Button
                 key={getKey(item)}
                 type="button"
+                variant="ghost"
                 onClick={() => onSelect(item)}
-                className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-accent ${
+                className={`w-full justify-start rounded-none font-normal ${
                   isSelected ? "bg-primary/10 font-medium" : ""
                 }`}
               >
                 {getLabel(item)}
-              </button>
+              </Button>
             );
           })
         )}
@@ -114,12 +122,29 @@ export default function AdminRegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // building_id → Set of occupied room_ids
+  const [occupiedByBuilding, setOccupiedByBuilding] = useState<Map<number, Set<number>>>(new Map());
+
   useEffect(() => {
     if (!isLoggedIn || role !== "admin") { navigate("/admin/login"); return; }
-    api
-      .get<{ buildings: Building[] }>("/schedule/buildings")
-      .then((r) => setBuildings(r.data.buildings ?? []))
-      .catch(() => setBuildings([]));
+
+    Promise.all([
+      api.get<{ buildings: Building[] }>("/schedule/buildings"),
+      api.get<TabletInfo[]>("/tablets/"),
+    ]).then(([bRes, tRes]) => {
+      setBuildings(bRes.data.buildings ?? []);
+
+      const occupied = new Map<number, Set<number>>();
+      for (const t of tRes.data) {
+        if (t.is_registered && t.building_id !== null && t.room_id !== null) {
+          if (!occupied.has(t.building_id)) occupied.set(t.building_id, new Set());
+          occupied.get(t.building_id)!.add(t.room_id);
+        }
+      }
+      setOccupiedByBuilding(occupied);
+    }).catch(() => {
+      setBuildings([]);
+    });
   }, [isLoggedIn, role, navigate]);
 
   useEffect(() => {
@@ -131,6 +156,10 @@ export default function AdminRegisterPage() {
       .then((r) => setRooms(r.data.rooms ?? []))
       .catch(() => setRooms([]));
   }, [selectedBuilding]);
+
+  const availableRooms = rooms
+    ? rooms.filter((r) => !occupiedByBuilding.get(selectedBuilding?.id ?? -1)?.has(r.id))
+    : null;
 
   const handleSave = async () => {
     if (!selectedBuilding || !selectedRoom || !deviceId) return;
@@ -155,9 +184,9 @@ export default function AdminRegisterPage() {
   return (
     <div className="h-full bg-background flex flex-col">
       <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-5 w-5" />
-        </button>
+        </Button>
         <div className="min-w-0">
           <p className="font-semibold text-sm">Назначить аудиторию</p>
           <p className="text-xs text-muted-foreground font-mono truncate">{deviceId}</p>
@@ -190,7 +219,7 @@ export default function AdminRegisterPage() {
                 <p className="text-sm text-muted-foreground">Сначала выберите корпус</p>
               ) : (
                 <SearchableList
-                  items={rooms}
+                  items={availableRooms}
                   selected={selectedRoom}
                   onSelect={setSelectedRoom}
                   getKey={(r) => r.id}

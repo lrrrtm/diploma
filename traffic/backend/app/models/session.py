@@ -26,4 +26,4 @@ class Session(Base):
 
     tablet: Mapped["Tablet"] = relationship("Tablet", back_populates="sessions")
     teacher: Mapped["Teacher | None"] = relationship("Teacher", back_populates="sessions")
-    attendances: Mapped[list["Attendance"]] = relationship("Attendance", back_populates="session")
+    attendances: Mapped[list["Attendance"]] = relationship("Attendance", back_populates="session", cascade="all, delete-orphan")

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 interface Attendee {
   id: string;
@@ -162,9 +163,10 @@ export default function TeacherSessionPage() {
       setSession("none");
       setAttendees([]);
       setDiscipline("");
+      toast.success("Занятие завершено");
       loadScheduleSuggestions();
     } catch {
-      setError("Не удалось завершить занятие");
+      toast.error("Не удалось завершить занятие");
     }
   };
 
@@ -212,15 +214,16 @@ export default function TeacherSessionPage() {
                 <p className="text-xs text-muted-foreground font-medium">Расписание на сегодня — выберите дисциплину:</p>
                 <div className="flex flex-col gap-1">
                   {scheduleSuggestions.map((l, i) => (
-                    <button
+                    <Button
                       key={i}
+                      variant="outline"
                       onClick={() => setDiscipline(l.subject)}
-                      className="text-left px-3 py-2 rounded-md border border-border hover:bg-accent text-sm transition-colors"
+                      className="justify-start h-auto py-2 font-normal"
                     >
-                      <span className="text-muted-foreground font-mono">{l.time_start} </span>
-                      <span className="font-medium">{l.subject}</span>
-                      <span className="text-muted-foreground ml-1 text-xs">{l.typeObj?.abbr}</span>
-                    </button>
+                      <span className="text-muted-foreground font-mono shrink-0">{l.time_start}</span>
+                      <span className="font-medium mx-2 truncate">{l.subject}</span>
+                      <span className="text-muted-foreground text-xs shrink-0">{l.typeObj?.abbr}</span>
+                    </Button>
                   ))}
                 </div>
               </div>

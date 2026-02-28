@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
@@ -39,9 +41,9 @@ export default function TeacherHistoryPage() {
   return (
     <div className="h-full bg-background flex flex-col">
       <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-5 w-5" />
-        </button>
+        </Button>
         <div>
           <p className="font-semibold text-sm">История занятий</p>
           <p className="text-xs text-muted-foreground">{teacherName}</p>
@@ -66,14 +68,14 @@ export default function TeacherHistoryPage() {
               <Link key={s.id} to={`/teacher/history/${s.id}`}>
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">
                   <CardContent className="px-4 py-3 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{s.discipline}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{s.discipline}</p>
+                        {s.is_active && <Badge variant="default" className="shrink-0 bg-green-500 hover:bg-green-500 text-white text-xs">идёт</Badge>}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(s.started_at)} · {formatTime(s.started_at)}
                         {s.ended_at ? `–${formatTime(s.ended_at)}` : ""}
-                        {s.is_active && (
-                          <span className="ml-1 text-green-500 font-medium">• идёт</span>
-                        )}
                       </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

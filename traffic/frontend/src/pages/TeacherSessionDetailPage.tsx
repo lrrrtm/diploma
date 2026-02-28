@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Users } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -43,18 +52,22 @@ export default function TeacherSessionDetailPage() {
   return (
     <div className="h-full bg-background flex flex-col">
       <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-        <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div className="min-w-0">
-          <p className="font-semibold text-sm truncate">{session?.discipline ?? "..."}</p>
+        </Button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-sm truncate">{session?.discipline ?? "..."}</p>
+            {session?.is_active && (
+              <Badge className="shrink-0 bg-green-500 hover:bg-green-500 text-white text-xs">идёт</Badge>
+            )}
+          </div>
           {session && (
             <p className="text-xs text-muted-foreground">
               {new Date(session.started_at).toLocaleDateString("ru-RU", {
                 day: "numeric", month: "long",
               })} · {fmt(session.started_at)}
               {session.ended_at ? `–${fmt(session.ended_at)}` : ""}
-              {session.is_active && <span className="ml-1 text-green-500">• идёт</span>}
             </p>
           )}
         </div>
@@ -75,17 +88,29 @@ export default function TeacherSessionDetailPage() {
             <p className="text-xs text-muted-foreground font-medium">
               Отмечено: {attendees.length}
             </p>
-            {attendees.map((a) => (
-              <Card key={a.id}>
-                <CardContent className="px-4 py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{a.student_name}</p>
-                    <p className="text-xs text-muted-foreground">{a.student_email}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{fmt(a.marked_at)}</p>
-                </CardContent>
-              </Card>
-            ))}
+            <div className="rounded-md border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Студент</TableHead>
+                    <TableHead className="text-right w-20">Время</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attendees.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell>
+                        <p className="text-sm font-medium">{a.student_name}</p>
+                        <p className="text-xs text-muted-foreground">{a.student_email}</p>
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {fmt(a.marked_at)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </div>
