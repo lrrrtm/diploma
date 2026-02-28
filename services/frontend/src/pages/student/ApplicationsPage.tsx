@@ -187,8 +187,15 @@ export default function ApplicationsPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Мои заявки</h1>
+      {/*
+        Sticky header occupying the same row as the main-app close button.
+        The close button sits at right-4 top-3 (w-8 h-8) inside the iframe,
+        so we leave pr-[52px] (4px gap + 32px btn + 16px margin) on the right
+        and use h-14 so both elements share the same 56px vertical band.
+        -mx-4 extends the bar to the full width of the padded layout container.
+      */}
+      <div className="-mx-4 sticky top-0 z-10 bg-background border-b h-14 flex items-center justify-between px-4 pr-[52px]">
+        <h1 className="text-lg font-semibold">Услуги</h1>
         <Button size="sm" className="gap-1.5" onClick={openNewApp}>
           <Plus className="h-4 w-4" />
           Новая заявка
@@ -196,7 +203,7 @@ export default function ApplicationsPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-3 pt-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardContent className="p-4">
@@ -213,7 +220,7 @@ export default function ApplicationsPage() {
       ) : applications.length === 0 ? (
         <DuckScreen animationData={duckAnimation} text="Заявок пока нет" />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 pt-4">
           {applications.map((app) => (
             <AppCard key={app.id} app={app} onClick={() => openDetail(app)} />
           ))}

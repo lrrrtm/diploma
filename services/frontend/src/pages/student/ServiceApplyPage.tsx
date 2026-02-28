@@ -74,7 +74,7 @@ export default function ServiceApplyPage() {
 
   if (loading || !service) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pt-6">
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-8 rounded-md" />
           <Skeleton className="h-6 w-48" />
@@ -101,7 +101,7 @@ export default function ServiceApplyPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-6">
       <div className="flex items-center gap-3">
         <Button
           type="button"
