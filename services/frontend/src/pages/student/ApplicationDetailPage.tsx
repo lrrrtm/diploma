@@ -50,7 +50,7 @@ export default function ApplicationDetailPage() {
 
   if (loading || !application) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6 pt-6">
         <Skeleton className="h-8 w-48" />
         <Card>
           <CardHeader>
@@ -69,7 +69,7 @@ export default function ApplicationDetailPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto pt-6">
       <PageHeader
         title={`Заявка #${application.id}`}
         backTo="/applications"

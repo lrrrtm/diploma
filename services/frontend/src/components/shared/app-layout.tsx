@@ -38,7 +38,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   if (!isStaffOrAdmin) {
     return (
       <div className="min-h-screen bg-background">
-        <main key={location.pathname} className="max-w-2xl mx-auto px-4 py-6 page-enter">
+        <main key={location.pathname} className="max-w-2xl mx-auto px-4 pb-6 page-enter">
           {children}
         </main>
       </div>
