@@ -40,7 +40,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="UniComm SSO", lifespan=lifespan)
+app = FastAPI(title="Polytechnik SSO", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

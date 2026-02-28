@@ -47,9 +47,9 @@ interface SSOUser {
 }
 
 const APP_LABELS: Record<string, string> = {
-  sso: "SSO",
-  services: "Заявки",
-  traffic: "Посещаемость",
+  sso: "Политехник.SSO",
+  services: "Политехник.Услуги",
+  traffic: "Политехник.Посещаемость",
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -142,7 +142,7 @@ export default function AdminPage() {
       <div className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
-            <p className="font-semibold">UniComm SSO</p>
+            <p className="font-semibold">Политехник.SSO</p>
             <p className="text-xs text-muted-foreground">{fullName}</p>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout}>
@@ -270,8 +270,8 @@ export default function AdminPage() {
                 required
                 className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="services">Заявки на услуги</option>
-                <option value="traffic">Посещаемость</option>
+                <option value="services">Политехник.Услуги</option>
+                <option value="traffic">Политехник.Посещаемость</option>
               </select>
             </div>
             <div className="space-y-1.5">

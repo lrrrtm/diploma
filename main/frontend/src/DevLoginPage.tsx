@@ -46,15 +46,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="flex items-center justify-center bg-background px-4 py-6" style={{ minHeight: "100dvh" }}>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
+            <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
+            <span className="text-muted-foreground text-xl font-light select-none">×</span>
             <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
               <GraduationCap className="h-6 w-6 text-primary-foreground" />
             </div>
-            <span className="text-muted-foreground text-xl font-light select-none">×</span>
-            <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
           </div>
           <CardTitle className="text-2xl">Политехник.Студент</CardTitle>
           <CardDescription>Войди через учётную запись СПбПУ</CardDescription>

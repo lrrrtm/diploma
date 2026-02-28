@@ -1,6 +1,6 @@
 import { useState, FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, FileText, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,10 +14,10 @@ import {
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 
-const APP_LABELS: Record<string, string> = {
-  services: "Заявки на услуги",
-  traffic: "Посещаемость",
-  sso: "Панель управления SSO",
+const APP_ICONS: Record<string, React.ElementType> = {
+  services: FileText,
+  traffic: ClipboardList,
+  sso: ShieldCheck,
 };
 
 export default function LoginPage() {
@@ -29,7 +29,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const appLabel = APP_LABELS[app] ?? app;
+  const appLabel = params.get("app_name") ?? (app === "sso" ? "Политехник.SSO" : app);
+  const AppIcon = APP_ICONS[app] ?? ShieldCheck;
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -74,18 +75,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="flex items-center justify-center bg-background px-4 py-6" style={{ minHeight: "100dvh" }}>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center">
-              <ShieldCheck className="h-6 w-6 text-primary-foreground" />
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <img src="/polytech_logo.svg" alt="СПбПУ" className="h-11 w-11" />
+            <span className="text-muted-foreground text-xl font-light select-none">×</span>
+            <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center shrink-0">
+              <AppIcon className="h-6 w-6 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Политехник</CardTitle>
-          <CardDescription>
-            Вход в <span className="font-medium text-foreground">{appLabel}</span>
-          </CardDescription>
+          <CardTitle className="text-2xl">{appLabel}</CardTitle>
+          <CardDescription>Единый вход в систему</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

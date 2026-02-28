@@ -190,7 +190,7 @@ export default function TeacherSessionPage() {
       {/* Header */}
       <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shrink-0">
         <div>
-          <p className="font-semibold text-foreground text-sm">Посещаемость</p>
+          <p className="font-semibold text-foreground text-sm">Политехник.Посещаемость</p>
           <p className="text-xs text-muted-foreground">{teacherName}</p>
         </div>
         <div className="flex items-center gap-1">

@@ -6,8 +6,32 @@ on:
       - master
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      main: ${{ steps.filter.outputs.main }}
+      services: ${{ steps.filter.outputs.services }}
+      traffic: ${{ steps.filter.outputs.traffic }}
+      sso: ${{ steps.filter.outputs.sso }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            main:
+              - 'main/frontend/**'
+            services:
+              - 'services/frontend/**'
+            traffic:
+              - 'traffic/frontend/**'
+            sso:
+              - 'sso/frontend/**'
+
   typecheck:
     name: Type Check
+    needs: changes
     runs-on: ubuntu-latest
 
     steps:
@@ -21,17 +45,26 @@ jobs:
             main/frontend/package-lock.json
             services/frontend/package-lock.json
             traffic/frontend/package-lock.json
+            sso/frontend/package-lock.json
 
       - name: Install & typecheck main
+        if: needs.changes.outputs.main == 'true'
         working-directory: main/frontend
         run: npm ci && npx tsc --noEmit
 
       - name: Install & typecheck services
+        if: needs.changes.outputs.services == 'true'
         working-directory: services/frontend
         run: npm ci && npx tsc --noEmit
 
       - name: Install & typecheck traffic
+        if: needs.changes.outputs.traffic == 'true'
         working-directory: traffic/frontend
+        run: npm ci && npx tsc --noEmit
+
+      - name: Install & typecheck sso
+        if: needs.changes.outputs.sso == 'true'
+        working-directory: sso/frontend
         run: npm ci && npx tsc --noEmit
 
   deploy:
@@ -50,6 +83,43 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
+
+            OLD_HEAD=$(git rev-parse HEAD)
             git pull origin master
-            docker compose up --build -d
-            docker image prune -f
+            CHANGED=$(git diff --name-only "$OLD_HEAD" HEAD)
+
+            echo "Changed files:"
+            echo "$CHANGED"
+
+            # If global config changed — rebuild everything
+            if echo "$CHANGED" | grep -qE '^(docker-compose|\.env)'; then
+              echo "Global config changed — rebuilding all services"
+              docker compose up --build -d
+              docker image prune -f
+              exit 0
+            fi
+
+            # Collect services to rebuild
+            SERVICES=""
+            if echo "$CHANGED" | grep -qE '^main/'; then
+              SERVICES="$SERVICES main-backend main-frontend"
+            fi
+            if echo "$CHANGED" | grep -qE '^services/'; then
+              SERVICES="$SERVICES services-backend services-frontend"
+            fi
+            if echo "$CHANGED" | grep -qE '^traffic/'; then
+              SERVICES="$SERVICES traffic-backend traffic-frontend"
+            fi
+            if echo "$CHANGED" | grep -qE '^sso/'; then
+              SERVICES="$SERVICES sso-backend sso-frontend"
+            fi
+
+            SERVICES=$(echo $SERVICES | xargs)
+
+            if [ -z "$SERVICES" ]; then
+              echo "No service changes — skipping rebuild"
+            else
+              echo "Rebuilding: $SERVICES"
+              docker compose up --build -d $SERVICES
+              docker image prune -f
+            fi
