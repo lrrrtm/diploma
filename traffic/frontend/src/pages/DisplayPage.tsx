@@ -44,18 +44,24 @@ interface RuzLesson {
 // ---------------------------------------------------------------------------
 
 function getStoredDeviceId(): string | null {
-  const id = localStorage.getItem("traffic_device_id");
-  const secret = localStorage.getItem("traffic_init_secret");
-  // Old format without init_secret — force re-init to get secret
-  if (id && !secret) {
-    localStorage.removeItem("traffic_device_id");
-    return null;
-  }
-  return id;
+  return localStorage.getItem("traffic_device_id");
 }
 
-function getStoredInitSecret(): string | null {
-  return localStorage.getItem("traffic_init_secret");
+function getStoredDisplayPin(): string | null {
+  return localStorage.getItem("traffic_display_pin");
+}
+
+/** Renders a 6-digit PIN as two groups of 3 for readability */
+function PinDisplay({ pin }: { pin: string }) {
+  const a = pin.slice(0, 3);
+  const b = pin.slice(3, 6);
+  return (
+    <div className="flex items-center gap-4">
+      <span className="text-8xl font-mono font-bold tracking-[0.2em]">{a}</span>
+      <span className="text-5xl font-mono text-gray-600">·</span>
+      <span className="text-8xl font-mono font-bold tracking-[0.2em]">{b}</span>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -68,9 +74,10 @@ export default function DisplayPage() {
   const [session, setSession] = useState<CurrentSession | null>(null);
   const [qrToken, setQrToken] = useState<string>("");
   const [todayLessons, setTodayLessons] = useState<RuzLesson[]>([]);
+  const [regPin, setRegPin] = useState<string>("");
 
   const deviceIdRef = useRef<string | null>(getStoredDeviceId());
-  const initSecretRef = useRef<string | null>(getStoredInitSecret());
+  const displayPinRef = useRef<string | null>(getStoredDisplayPin());
   const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,7 +90,6 @@ export default function DisplayPage() {
     const token = await computeQrToken(secret, sessionId, win);
     setQrToken(token);
 
-    // Schedule next rotation
     if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
     qrTimerRef.current = setTimeout(
       () => generateQr(secret, sessionId, rotateSeconds),
@@ -98,11 +104,12 @@ export default function DisplayPage() {
   async function initDevice() {
     if (deviceIdRef.current) return;
     try {
-      const res = await api.post<{ device_id: string; init_secret: string }>("/tablets/init");
+      const res = await api.post<{ device_id: string; reg_pin: string; display_pin: string }>("/tablets/init");
       deviceIdRef.current = res.data.device_id;
-      initSecretRef.current = res.data.init_secret;
+      displayPinRef.current = res.data.display_pin;
       localStorage.setItem("traffic_device_id", res.data.device_id);
-      localStorage.setItem("traffic_init_secret", res.data.init_secret);
+      localStorage.setItem("traffic_display_pin", res.data.display_pin);
+      setRegPin(res.data.reg_pin);
     } catch {
       // retry on next poll
     }
@@ -116,7 +123,7 @@ export default function DisplayPage() {
       return;
     }
     try {
-      const res = await api.get<TabletInfo>(`/tablets/${deviceId}`);
+      const res = await api.get<TabletInfo & { reg_pin?: string }>(`/tablets/${deviceId}`);
       setTablet(res.data);
       if (!res.data.is_registered) {
         setDisplayState("unregistered");
@@ -127,13 +134,13 @@ export default function DisplayPage() {
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       if (status === 404) {
-        // Киоск удалён из админки — сбрасываем и регистрируемся заново
         localStorage.removeItem("traffic_device_id");
-        localStorage.removeItem("traffic_init_secret");
+        localStorage.removeItem("traffic_display_pin");
         deviceIdRef.current = null;
-        initSecretRef.current = null;
+        displayPinRef.current = null;
         setTablet(null);
         setSession(null);
+        setRegPin("");
         setDisplayState("unregistered");
         if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
       }
@@ -146,13 +153,12 @@ export default function DisplayPage() {
     if (!deviceId) return;
     try {
       const res = await api.get<CurrentSession>(
-        `/sessions/current?device_id=${deviceId}&tablet_secret=${initSecretRef.current ?? ""}`,
+        `/sessions/current?device_id=${deviceId}&tablet_secret=${displayPinRef.current ?? ""}`,
       );
       if (res.data.active) {
         setSession(res.data);
         setDisplayState("active");
         if (res.data.qr_secret && res.data.session_id && res.data.rotate_seconds) {
-          // Only (re)start QR generation if secret changed (new session)
           generateQr(res.data.qr_secret, res.data.session_id, res.data.rotate_seconds);
         }
       } else {
@@ -181,7 +187,7 @@ export default function DisplayPage() {
     api
       .get(`/schedule/buildings/${tablet.building_id}/rooms/${tablet.room_id}/scheduler?date=${today}`)
       .then((res) => {
-        const todayWeekday = new Date().getDay() || 7; // 1-7
+        const todayWeekday = new Date().getDay() || 7;
         const day = res.data.days?.find((d: { weekday: number }) => d.weekday === todayWeekday);
         setTodayLessons(day?.lessons ?? []);
       })
@@ -204,13 +210,6 @@ export default function DisplayPage() {
   // Derived values
   // ---------------------------------------------------------------------------
 
-  const deviceId = deviceIdRef.current;
-  const registrationQr = deviceId
-    ? `${window.location.origin}/admin/tablets/register/${deviceId}`
-    : "";
-  const teacherQr = deviceId
-    ? `${window.location.origin}/teacher/session?device=${deviceId}`
-    : "";
   const studentQrValue =
     session?.active && qrToken
       ? JSON.stringify({ s: session.session_id, t: qrToken })
@@ -221,19 +220,8 @@ export default function DisplayPage() {
       ? `${tablet.building_name}, ауд. ${tablet.room_name}`
       : null;
 
-  // ---------------------------------------------------------------------------
-  // Render helpers
-  // ---------------------------------------------------------------------------
-
-  function QrPanel({ value }: { value: string }) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-3xl shadow-2xl">
-          <QRCodeSVG value={value} size={520} level="M" />
-        </div>
-      </div>
-    );
-  }
+  // The display_pin used for teacher session start (stored in localStorage)
+  const displayPin = displayPinRef.current ?? "";
 
   // ---------------------------------------------------------------------------
   // States
@@ -242,19 +230,19 @@ export default function DisplayPage() {
   if (displayState === "unregistered") {
     return (
       <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex">
-        {deviceId ? (
-          <QrPanel value={registrationQr} />
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center">
+          {regPin ? (
+            <PinDisplay pin={regPin} />
+          ) : (
             <Spinner className="h-16 w-16 text-gray-600" />
-          </div>
-        )}
+          )}
+        </div>
         <div className="flex-1 flex flex-col justify-center px-16 gap-6">
           <h1 className="text-5xl font-bold leading-tight">
             Регистрация аудитории
           </h1>
           <p className="text-2xl text-gray-400 leading-relaxed">
-            Отсканируйте QR-код, чтобы привязать киоск к аудитории
+            Введите этот код в интерфейсе администратора, чтобы привязать киоск к аудитории
           </p>
         </div>
       </div>
@@ -264,13 +252,19 @@ export default function DisplayPage() {
   if (displayState === "waiting") {
     return (
       <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex">
-        <QrPanel value={teacherQr || "no-device"} />
+        <div className="flex-1 flex items-center justify-center">
+          {displayPin ? (
+            <PinDisplay pin={displayPin} />
+          ) : (
+            <Spinner className="h-16 w-16 text-gray-600" />
+          )}
+        </div>
         <div className="flex-1 flex flex-col justify-center px-16 gap-6 overflow-hidden">
           <h1 className="text-5xl font-bold leading-tight">
             Ожидание занятия
           </h1>
           <p className="text-2xl text-gray-400 leading-relaxed">
-            Отсканируйте QR-код для того, чтобы запустить проверку посещаемости занятия
+            Введите этот код в интерфейсе преподавателя, чтобы запустить проверку посещаемости
           </p>
 
           {(roomLabel || todayLessons.length > 0) && (
@@ -306,7 +300,11 @@ export default function DisplayPage() {
   // active
   return (
     <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex">
-      <QrPanel value={studentQrValue ?? "loading"} />
+      <div className="flex-1 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-3xl shadow-2xl">
+          <QRCodeSVG value={studentQrValue ?? "loading"} size={520} level="M" />
+        </div>
+      </div>
       <div className="flex-1 flex flex-col justify-center px-16 gap-6">
         {roomLabel && (
           <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
@@ -335,8 +333,6 @@ export default function DisplayPage() {
           variant="ghost"
           onClick={async () => {
             if (session?.session_id) {
-              // Teacher ends via their cabinet; this is an emergency close
-              // (no auth — just stop polling)
               setSession(null);
               setDisplayState("waiting");
             }

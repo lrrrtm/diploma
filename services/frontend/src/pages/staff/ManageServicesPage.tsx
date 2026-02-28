@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -296,12 +297,10 @@ export default function ManageServicesPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="svc-attachment"
                   checked={requiresAttachment}
-                  onChange={(e) => setRequiresAttachment(e.target.checked)}
-                  className="rounded"
+                  onCheckedChange={(checked) => setRequiresAttachment(checked === true)}
                 />
                 <Label htmlFor="svc-attachment">
                   Требуется прикрепление документов
@@ -382,13 +381,12 @@ export default function ManageServicesPage() {
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        id={`field-required-${idx}`}
                         checked={field.required}
-                        onChange={(e) => updateField(idx, "required", e.target.checked)}
-                        className="rounded"
+                        onCheckedChange={(checked) => updateField(idx, "required", checked === true)}
                       />
-                      <Label className="text-xs">Обязательное</Label>
+                      <Label htmlFor={`field-required-${idx}`} className="text-xs">Обязательное</Label>
                     </div>
                   </CardContent>
                 </Card>

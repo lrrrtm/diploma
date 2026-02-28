@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Trash2, Users, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,30 @@ const APP_BADGE_CLASS: Record<string, string> = {
   traffic: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
 };
 
+// ---------------------------------------------------------------------------
+// Login auto-generation from Russian full name
+// ---------------------------------------------------------------------------
+
+const TRANS: Record<string, string> = {
+  а:"a",б:"b",в:"v",г:"g",д:"d",е:"e",ё:"e",ж:"zh",з:"z",и:"i",
+  й:"y",к:"k",л:"l",м:"m",н:"n",о:"o",п:"p",р:"r",с:"s",т:"t",
+  у:"u",ф:"f",х:"kh",ц:"ts",ч:"ch",ш:"sh",щ:"shch",ъ:"",ы:"y",ь:"",
+  э:"e",ю:"yu",я:"ya",
+};
+
+function translit(s: string): string {
+  return s.toLowerCase().split("").map((c) => TRANS[c] ?? c).join("");
+}
+
+function generateLogin(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  const [last, ...rest] = parts;
+  const lastName = translit(last).replace(/[^a-z0-9]/g, "");
+  const initials = rest.map((p) => translit(p[0] ?? "").replace(/[^a-z]/g, "")).join("");
+  return initials ? `${lastName}.${initials}` : lastName;
+}
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
@@ -78,6 +102,11 @@ export default function AdminPage() {
   const [creating, setCreating] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [selectedApp, setSelectedApp] = useState("services");
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [usernameManual, setUsernameManual] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "taken">("idle");
+  const checkAbortRef = useRef<AbortController | null>(null);
 
   const loadUsers = () => {
     const params = appFilter !== "all" ? `?app_filter=${appFilter}` : "";
@@ -95,20 +124,65 @@ export default function AdminPage() {
     loadUsers();
   }, [isLoggedIn, appFilter, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-generate and check username whenever fullName changes (unless manually overridden)
+  useEffect(() => {
+    if (usernameManual) return;
+    const base = generateLogin(fullName);
+    if (!base) { setUsername(""); setUsernameStatus("idle"); return; }
+
+    setUsernameStatus("checking");
+    if (checkAbortRef.current) checkAbortRef.current.abort();
+    const ctrl = new AbortController();
+    checkAbortRef.current = ctrl;
+
+    (async () => {
+      let candidate = base;
+      let suffix = 2;
+      try {
+        while (true) {
+          const res = await api.get<{ available: boolean }>(
+            `/users/check-username?username=${encodeURIComponent(candidate)}`,
+            { signal: ctrl.signal },
+          );
+          if (res.data.available) {
+            setUsername(candidate);
+            setUsernameStatus("idle");
+            return;
+          }
+          if (suffix > 20) break;
+          candidate = `${base}${suffix++}`;
+        }
+        setUsername(base);
+        setUsernameStatus("taken");
+      } catch {
+        // aborted or network error — ignore
+      }
+    })();
+  }, [fullName, usernameManual]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const resetCreateForm = () => {
+    setFullName("");
+    setUsername("");
+    setUsernameManual(false);
+    setUsernameStatus("idle");
+    if (checkAbortRef.current) checkAbortRef.current.abort();
+  };
+
   const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     setCreating(true);
     try {
       await api.post("/users/", {
-        username: form.get("username"),
+        username,
         password: form.get("password"),
-        full_name: form.get("full_name"),
+        full_name: fullName,
         app: selectedApp,
         role: "admin",
       });
       toast.success("Администратор создан");
       setCreateOpen(false);
+      resetCreateForm();
       setUsers(null);
       loadUsers();
     } catch (err: unknown) {
@@ -233,7 +307,7 @@ export default function AdminPage() {
         </Card>
 
       {/* Create admin dialog */}
-      <AlertDialog open={createOpen} onOpenChange={setCreateOpen}>
+      <AlertDialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetCreateForm(); }}>
         <AlertDialogContent className="w-[calc(100%-2rem)] rounded-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Новый администратор приложения</AlertDialogTitle>
@@ -257,8 +331,33 @@ export default function AdminPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cf-username">Логин</Label>
-              <Input id="cf-username" name="username" required autoComplete="off" />
+              <Label htmlFor="cf-full-name">Полное имя</Label>
+              <Input
+                id="cf-full-name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cf-username">Логин</Label>
+                {usernameStatus === "checking" && (
+                  <span className="text-xs text-muted-foreground">проверка...</span>
+                )}
+                {usernameStatus === "taken" && (
+                  <span className="text-xs text-destructive">логин занят</span>
+                )}
+              </div>
+              <Input
+                id="cf-username"
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setUsernameManual(true); setUsernameStatus("idle"); }}
+                required
+                autoComplete="off"
+                placeholder="авто из имени"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="cf-password">Пароль</Label>
@@ -276,10 +375,6 @@ export default function AdminPage() {
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cf-full-name">Полное имя</Label>
-              <Input id="cf-full-name" name="full_name" required />
             </div>
           </form>
           <AlertDialogFooter>

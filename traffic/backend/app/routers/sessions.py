@@ -123,7 +123,7 @@ def get_current_session(
     # Only authenticated display pages receive qr_secret
     authenticated = (
         tablet_secret is not None
-        and hmac.compare_digest(tablet_secret, tablet.init_secret)
+        and hmac.compare_digest(tablet_secret, tablet.display_pin)
     )
 
     result: dict = {

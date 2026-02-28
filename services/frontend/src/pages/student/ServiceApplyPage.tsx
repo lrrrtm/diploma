@@ -103,13 +103,15 @@ export default function ServiceApplyPage() {
   return (
     <div>
       <div className="-mx-4 sticky top-0 z-10 bg-background border-b h-14 flex items-center gap-2 px-2 pr-[52px]">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={() => navigate(-1)}
-          className="h-8 w-8 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0"
+          className="h-8 w-8 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 shrink-0"
         >
           <ArrowLeft className="h-4 w-4" />
-        </button>
+        </Button>
         <h1 className="text-base font-semibold leading-tight truncate">{service.name}</h1>
       </div>
 

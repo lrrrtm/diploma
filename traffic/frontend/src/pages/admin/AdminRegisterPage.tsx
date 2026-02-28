@@ -104,15 +104,16 @@ function StepList<T>({
           filtered.map((item) => {
             const sub = getSubLabel?.(item);
             return (
-              <button
+              <Button
                 key={getKey(item)}
                 type="button"
+                variant="ghost"
                 onClick={() => onSelect(item)}
-                className="w-full text-left px-4 py-3.5 hover:bg-accent transition-colors flex flex-col gap-0.5"
+                className="w-full justify-start text-left px-4 py-3.5 h-auto flex-col items-start gap-0.5 rounded-none"
               >
                 <span className="text-sm font-medium">{getLabel(item)}</span>
                 {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
-              </button>
+              </Button>
             );
           })
         )}

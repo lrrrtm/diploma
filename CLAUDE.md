@@ -104,9 +104,18 @@ React SPA (Vite + TypeScript + shadcn)
 |---|---|
 | `sso/backend/app/main.py` | FastAPI app, CORS, routers |
 | `sso/backend/app/routers/auth.py` | `POST /auth/login` — validates credentials, issues JWT |
+| `sso/backend/app/routers/users.py` | User CRUD + `GET /users/check-username?username=` for collision check |
 | `sso/frontend/src/pages/LoginPage.tsx` | Login form; reads `?app`, `?app_name`, `?redirect_to`; shows per-app icon |
-| `sso/frontend/src/pages/AdminPage.tsx` | SSO admin panel — user/department management |
+| `sso/frontend/src/pages/AdminPage.tsx` | SSO admin panel — user management with auto-login generation from full name |
+| `sso/frontend/src/components/shared/AdminLayout.tsx` | Sidebar layout wrapping `/admin` route |
 | `sso/frontend/src/context/AuthContext.tsx` | SSO admin auth state |
+
+### SSO Auto-Login Generation
+
+When creating a new admin user, `full_name` drives the `username` field automatically:
+- Algorithm: `Ларионенко Артём Александрович` → `larionenko.aa`, `Иванов Иван` → `ivanov.i`
+- Collision check via `GET /users/check-username?username=` — appends `2`, `3`... until free
+- User can override the auto-generated login at any time (sets `usernameManual=true`, stops auto-update)
 
 ---
 
@@ -198,6 +207,8 @@ On 401, `api/client.ts` calls `goToSSOLogin()` (via `window.location.replace`).
 
 ### Services Key Patterns
 
+**Sidebar layout**: staff/admin/executor use `AppLayout` from `app-layout.tsx` — `SidebarProvider` + `Sidebar collapsible="icon"` with role-based nav, theme switcher, logout. Student pages have a separate flat layout inside `AppLayout`.
+
 **Dynamic forms**: `components/shared/dynamic-form.tsx` renders fields from JSON schema at runtime.
 
 **Multipart submissions**: applications + responses use `multipart/form-data`.
@@ -253,11 +264,15 @@ React SPA (Vite + TS + React Router v6 + @zxing + qrcode.react + shadcn)
 
 ### Traffic Key Concepts
 
-**Kiosk** (`/kiosk`): auto-registers via `POST /api/tablets/init` (gets `device_id` + `init_secret` stored in `localStorage`). Admin registers it by assigning building+room. `init_secret` authenticates `GET /api/sessions/current` and receives `qr_secret`.
+**Kiosk** (`/kiosk`): auto-registers via `POST /api/tablets/init` (gets `device_id` + `reg_pin` + `display_pin` stored in `localStorage`). Admin enters `reg_pin` via InputOTP to identify the kiosk, then assigns building+room. `display_pin` authenticates `GET /api/sessions/current` and receives `qr_secret`.
 
-**Sessions**: teacher creates session for a kiosk → generates per-session HMAC `qr_secret`. Auto-expire after `SESSION_MAX_MINUTES` (default 90).
+**PIN codes**: two 6-digit PINs per tablet:
+- `reg_pin` — shown on unregistered kiosk screen; admin enters via `InputOTP` to navigate to registration (`GET /tablets/by-reg-pin?pin=`)
+- `display_pin` — shown on registered/waiting kiosk screen; teacher enters via `InputOTP` in a Sheet to start a session (`GET /tablets/by-display-pin?pin=`); also authenticates kiosk display for `qr_secret`
 
-**Rotating QR**: kiosk generates HMAC-SHA256 tokens client-side (`lib/hmac.ts`, Web Crypto API). Rotates every `QR_ROTATE_SECONDS`. Backend accepts current + previous window.
+**Sessions**: teacher picks kiosk by `display_pin` → creates session → generates per-session HMAC `qr_secret`. Auto-expire after `SESSION_MAX_MINUTES` (default 90).
+
+**Rotating QR** (student attendance only): kiosk generates HMAC-SHA256 tokens client-side (`lib/hmac.ts`, Web Crypto API). Rotates every `QR_ROTATE_SECONDS`. Backend accepts current + previous window.
 
 **Student attendance**: `/scan?launch_token=<jwt>` iframe. Student scans QR → `POST /api/sessions/:id/attend` with `qr_token` + `launch_token`.
 
@@ -284,7 +299,7 @@ React SPA (Vite + TS + React Router v6 + @zxing + qrcode.react + shadcn)
 |---|---|
 | **Teacher/Admin** | SSO → `AuthCallbackPage` → navigate by role |
 | **Student** | `launch_token` via `/scan?launch_token=` → `POST /api/auth/verify-launch` |
-| **Kiosk display** | `init_secret` in localStorage → query param to `GET /api/sessions/current` |
+| **Kiosk display** | `display_pin` in `localStorage("traffic_display_pin")` → query param `tablet_secret` to `GET /api/sessions/current` |
 
 On 401, `api/client.ts` calls `goToSSOLogin()`.
 
@@ -293,12 +308,17 @@ On 401, `api/client.ts` calls `goToSSOLogin()`.
 | File | Purpose |
 |---|---|
 | `traffic/backend/app/config.py` | `QR_ROTATE_SECONDS`, `SESSION_MAX_MINUTES`, secrets |
-| `traffic/backend/app/models/tablet.py` | `Tablet` with cascade to sessions |
+| `traffic/backend/app/models/tablet.py` | `Tablet` with `reg_pin`, `display_pin`, cascade to sessions |
 | `traffic/backend/app/models/session.py` | `Session` with `qr_secret`, `is_active` |
 | `traffic/backend/app/routers/sessions.py` | Session CRUD + `POST /:id/attend` |
-| `traffic/backend/app/routers/tablets.py` | Kiosk CRUD, init, register |
-| `traffic/frontend/src/App.tsx` | Routes + `RootRedirect` component |
+| `traffic/backend/app/routers/tablets.py` | Kiosk CRUD, init (returns PINs), `GET /by-reg-pin`, `GET /by-display-pin` |
+| `traffic/backend/migrate_tablet_pins.sql` | DB migration: adds `reg_pin`/`display_pin`, drops `init_secret` |
+| `traffic/frontend/src/App.tsx` | Routes + `RootRedirect` + `AdminLayout`/`TeacherLayout` wrappers |
+| `traffic/frontend/src/components/shared/AdminLayout.tsx` | Sidebar layout for admin pages |
+| `traffic/frontend/src/components/shared/TeacherLayout.tsx` | Sidebar layout for teacher pages |
 | `traffic/frontend/src/lib/hmac.ts` | Client-side HMAC token generation |
 | `traffic/frontend/src/lib/sso.ts` | `goToSSOLogin()` |
-| `traffic/frontend/src/pages/DisplayPage.tsx` | Kiosk display logic |
-| `traffic/frontend/src/pages/admin/AdminRegisterPage.tsx` | Slide animations + AlertDialog |
+| `traffic/frontend/src/pages/DisplayPage.tsx` | Kiosk display: `PinDisplay` for registration/waiting; QR only for active session |
+| `traffic/frontend/src/pages/admin/AdminTabletsPage.tsx` | Tablet list + InputOTP dialog for kiosk registration by `reg_pin` |
+| `traffic/frontend/src/pages/admin/AdminRegisterPage.tsx` | Two-step building→room assignment with slide animations |
+| `traffic/frontend/src/pages/TeacherSessionPage.tsx` | Session management + InputOTP Sheet for kiosk lookup by `display_pin` |

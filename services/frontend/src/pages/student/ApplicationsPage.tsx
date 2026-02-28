@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, ChevronRight, ArrowLeft, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -195,13 +196,15 @@ export default function ApplicationsPage() {
       */}
       <div className="-mx-4 sticky top-0 z-10 bg-background border-b h-14 flex items-center justify-between px-4 pr-[52px]">
         <h1 className="text-lg font-semibold">Услуги</h1>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={openNewApp}
-          className="h-8 px-3 flex items-center gap-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+          className="h-8 px-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 gap-1.5"
         >
           <Plus className="h-4 w-4" />
           Создать
-        </button>
+        </Button>
       </div>
 
       {loading ? (
@@ -329,12 +332,14 @@ export default function ApplicationsPage() {
           <SheetHeader>
             <div className="flex items-center gap-2">
               {step === "services" && (
-                <button
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                   onClick={goBackToDepts}
                 >
                   <ArrowLeft className="h-5 w-5" />
-                </button>
+                </Button>
               )}
               <SheetTitle>
                 {step === "departments"
@@ -358,14 +363,15 @@ export default function ApplicationsPage() {
                 </p>
               ) : (
                 departments.map((dept) => (
-                  <button
+                  <Button
                     key={dept.id}
-                    className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
+                    variant="ghost"
+                    className="w-full justify-between px-3 py-3 h-auto rounded-lg text-left font-normal"
                     onClick={() => selectDepartment(dept)}
                   >
                     <span className="text-sm font-medium">{dept.name}</span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </button>
+                  </Button>
                 ))
               ))}
 
@@ -376,14 +382,15 @@ export default function ApplicationsPage() {
                 </p>
               ) : (
                 services.map((service) => (
-                  <button
+                  <Button
                     key={service.id}
-                    className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-accent transition-colors text-left"
+                    variant="ghost"
+                    className="w-full justify-between px-3 py-3 h-auto rounded-lg text-left font-normal"
                     onClick={() => selectService(service.id)}
                   >
                     <span className="text-sm font-medium">{service.name}</span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </button>
+                  </Button>
                 ))
               ))}
           </div>

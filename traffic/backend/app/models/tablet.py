@@ -10,10 +10,14 @@ class Tablet(Base):
     __tablename__ = "tablets"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    init_secret: Mapped[str] = mapped_column(String(64), nullable=False)
+    # 6-digit PIN shown on unregistered kiosk screen — admin enters to identify tablet
+    reg_pin: Mapped[str] = mapped_column(String(6), nullable=False, unique=True, index=True)
+    # 6-digit PIN shown on registered/waiting kiosk screen — teacher enters to start session
+    # Also used by kiosk display to authenticate when fetching qr_secret
+    display_pin: Mapped[str] = mapped_column(String(6), nullable=False, unique=True, index=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    # Set by admin after scanning registration QR
+    # Set by admin after entering registration PIN
     building_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     building_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     room_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
