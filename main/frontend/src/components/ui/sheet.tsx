@@ -60,6 +60,7 @@ const SheetContent = React.forwardRef<
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      onOpenAutoFocus={(e) => e.preventDefault()}
       {...props}
     >
       <SheetPrimitive.Close className="absolute right-4 top-3 z-20 w-8 h-8 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors outline-none focus:outline-none focus-visible:outline-none focus:ring-0 disabled:pointer-events-none">
