@@ -101,21 +101,19 @@ export default function ServiceApplyPage() {
   }
 
   return (
-    <div className="space-y-6 pt-6">
-      <div className="flex items-center gap-3">
-        <Button
+    <div>
+      <div className="-mx-4 sticky top-0 z-10 bg-background border-b h-14 flex items-center gap-2 px-2 pr-[52px]">
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
           onClick={() => navigate(-1)}
+          className="h-8 w-8 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0"
         >
           <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-lg font-semibold leading-tight">{service.name}</h1>
+        </button>
+        <h1 className="text-base font-semibold leading-tight truncate">{service.name}</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6 pt-4">
         {service.required_fields.length > 0 && (
           <DynamicForm
             fields={service.required_fields}

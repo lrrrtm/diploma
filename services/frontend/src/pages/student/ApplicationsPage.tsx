@@ -4,7 +4,6 @@ import { Plus, ChevronRight, ArrowLeft, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ResponsesList } from "@/components/shared/responses-list";
@@ -196,10 +195,13 @@ export default function ApplicationsPage() {
       */}
       <div className="-mx-4 sticky top-0 z-10 bg-background border-b h-14 flex items-center justify-between px-4 pr-[52px]">
         <h1 className="text-lg font-semibold">Услуги</h1>
-        <Button size="sm" className="gap-1.5" onClick={openNewApp}>
+        <button
+          onClick={openNewApp}
+          className="h-8 px-3 flex items-center gap-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+        >
           <Plus className="h-4 w-4" />
-          Новая заявка
-        </Button>
+          Создать
+        </button>
       </div>
 
       {loading ? (
