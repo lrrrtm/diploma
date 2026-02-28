@@ -325,7 +325,7 @@ React SPA (Vite + TypeScript + React Router v6 + @zxing + qrcode.react + shadcn)
 
 ### Key Concepts
 
-**Tablets**: Each classroom display runs `/display` which auto-registers itself via `POST /api/tablets/init` (creates unregistered tablet with `init_secret`). Admin scans the registration QR and assigns a building+room via `/admin/tablets/register/:id`. The `init_secret` is stored in `localStorage` on the display and passed to `GET /api/sessions/current` to authenticate the display page and receive `qr_secret`.
+**Tablets**: Each classroom display runs `/kiosk` which auto-registers itself via `POST /api/tablets/init` (creates unregistered tablet with `init_secret`). Admin scans the registration QR and assigns a building+room via `/admin/tablets/register/:id`. The `init_secret` is stored in `localStorage` on the display and passed to `GET /api/sessions/current` to authenticate the display page and receive `qr_secret`.
 
 **Sessions**: A teacher opens `/teacher/session?device=<tablet_id>`, creates an attendance session specifying a discipline. The session generates a per-session HMAC secret (`qr_secret`). Sessions auto-expire after `SESSION_MAX_MINUTES` (default 90).
 
@@ -339,7 +339,7 @@ React SPA (Vite + TypeScript + React Router v6 + @zxing + qrcode.react + shadcn)
 
 | Route | Page | Description |
 |---|---|---|
-| `/display` | `DisplayPage` | Classroom tablet — self-registers, shows QR, polls session state |
+| `/kiosk` | `DisplayPage` | Classroom tablet — self-registers, shows QR, polls session state |
 | `/scan` | `StudentScanPage` | Student camera QR scanner (opened in iframe from main app) |
 | `/teacher/login` | `TeacherLoginPage` | Teacher login form |
 | `/teacher/session` | `TeacherSessionPage` | Create/manage active session; shows live attendee list |
