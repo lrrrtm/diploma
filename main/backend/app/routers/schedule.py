@@ -32,7 +32,7 @@ async def _ruz_get(path: str, params: dict | None = None) -> dict | list:
         resp = await client.get(
             url,
             params=params,
-            headers={"Accept": "application/json", "User-Agent": "UniComm/1.0"},
+            headers={"Accept": "application/json", "User-Agent": "Polytech/1.0"},
         )
     if resp.status_code != 200:
         raise HTTPException(

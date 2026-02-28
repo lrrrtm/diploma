@@ -62,7 +62,7 @@ async def get_gradebook(student: dict = Depends(_get_student)):
     async with httpx.AsyncClient(
         follow_redirects=False,
         timeout=_TIMEOUT,
-        headers={"User-Agent": "UniComm/1.0"},
+        headers={"User-Agent": "Polytech/1.0"},
     ) as client:
         # Step 1: GET login page to obtain csrftoken cookie
         login_page = await client.get(f"{MY_SPBSTU}/accounts/basic-login/")

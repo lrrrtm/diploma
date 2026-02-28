@@ -6,7 +6,7 @@ from app.config import settings
 router = APIRouter()
 
 RUZ = settings.RUZ_BASE_URL
-HEADERS = {"User-Agent": "UniComm-Traffic/1.0"}
+HEADERS = {"User-Agent": "Polytech-Traffic/1.0"}
 
 
 @router.get("/buildings")

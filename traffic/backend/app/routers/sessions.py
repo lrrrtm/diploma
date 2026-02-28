@@ -66,7 +66,7 @@ def create_session(
 ):
     tablet = db.get(Tablet, data.tablet_id)
     if not tablet or not tablet.is_registered:
-        raise HTTPException(status_code=404, detail="Планшет не найден или не зарегистрирован")
+        raise HTTPException(status_code=404, detail="Киоск не найден или не зарегистрирован")
 
     # Close any existing active session for this tablet
     db.query(Session).filter(

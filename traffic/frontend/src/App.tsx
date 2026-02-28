@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import DisplayPage from "@/pages/DisplayPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
@@ -8,11 +9,30 @@ import StudentScanPage from "@/pages/StudentScanPage";
 import AdminTabletsPage from "@/pages/admin/AdminTabletsPage";
 import AdminRegisterPage from "@/pages/admin/AdminRegisterPage";
 import AdminTeachersPage from "@/pages/admin/AdminTeachersPage";
+import { useAuth } from "@/context/AuthContext";
+import { goToSSOLogin } from "@/lib/sso";
+
+function RootRedirect() {
+  const { isLoggedIn, role } = useAuth();
+  useEffect(() => {
+    if (isLoggedIn && role === "admin") window.location.replace("/admin/tablets");
+    else if (isLoggedIn && role === "teacher") window.location.replace("/teacher/session");
+    else goToSSOLogin();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="flex items-center justify-center bg-background" style={{ minHeight: "100dvh" }}>
+      <p className="text-muted-foreground text-sm">Перенаправление...</p>
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <Routes>
-      {/* Classroom screen — public, shown on tablet */}
+      {/* Root — redirects to SSO or cabinet if already logged in */}
+      <Route path="/" element={<RootRedirect />} />
+
+      {/* Classroom screen — public, shown on kiosk */}
       <Route path="/display" element={<DisplayPage />} />
 
       {/* Student scanner — opened in iframe from main app */}
@@ -33,8 +53,8 @@ export default function App() {
       <Route path="/admin/tablets/register/:deviceId" element={<AdminRegisterPage />} />
       <Route path="/admin/teachers" element={<AdminTeachersPage />} />
 
-      {/* Default */}
-      <Route path="*" element={<Navigate to="/display" replace />} />
+      {/* Unknown paths → root */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

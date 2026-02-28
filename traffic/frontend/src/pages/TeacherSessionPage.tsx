@@ -138,7 +138,7 @@ export default function TeacherSessionPage() {
 
   const handleStart = async () => {
     if (!discipline.trim()) { setError("Введите название дисциплины"); return; }
-    if (!deviceId) { setError("Не указан планшет (device= в URL)"); return; }
+    if (!deviceId) { setError("Не указан киоск (device= в URL)"); return; }
     setError(null);
     setStarting(true);
     try {

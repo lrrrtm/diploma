@@ -12,7 +12,7 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysql", "-u", "unicomm", "-punicomm", "unicomm", "-e", "SELECT 1"]
+      test: ["CMD", "mysql", "-u", "services", "-pservices", "services", "-e", "SELECT 1"]
       interval: 5s
       timeout: 5s
       retries: 10

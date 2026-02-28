@@ -33,13 +33,13 @@ export default function AdminTabletsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Удалить этот планшет?")) return;
+    if (!confirm("Удалить этот киоск?")) return;
     try {
       await api.delete(`/tablets/${id}`);
-      toast.success("Планшет удалён");
+      toast.success("Киоск удалён");
       load();
     } catch {
-      toast.error("Не удалось удалить планшет");
+      toast.error("Не удалось удалить киоск");
     }
   }
 
@@ -50,7 +50,7 @@ export default function AdminTabletsPage() {
   return (
     <div className="h-full bg-background flex flex-col">
       <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shrink-0">
-        <p className="font-semibold text-sm">Планшеты</p>
+        <p className="font-semibold text-sm">Киоски</p>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" asChild>
             <Link to="/admin/teachers"><Users className="h-4 w-4 mr-1.5" />Преподаватели</Link>
@@ -71,8 +71,8 @@ export default function AdminTabletsPage() {
         ) : registered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <Monitor className="h-10 w-10 text-muted-foreground" />
-            <p className="text-muted-foreground text-sm">Нет зарегистрированных планшетов</p>
-            <p className="text-xs text-muted-foreground">Откройте /display на планшете и отсканируйте QR</p>
+            <p className="text-muted-foreground text-sm">Нет зарегистрированных киосков</p>
+            <p className="text-xs text-muted-foreground">Откройте /display на киоске и отсканируйте QR</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

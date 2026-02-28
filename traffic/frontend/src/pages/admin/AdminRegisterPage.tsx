@@ -241,7 +241,7 @@ export default function AdminRegisterPage() {
       {success ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 step-enter-forward">
           <p className="text-green-500 font-semibold text-lg">Аудитория назначена!</p>
-          <p className="text-muted-foreground text-sm">Планшет зарегистрирован и готов к работе</p>
+          <p className="text-muted-foreground text-sm">Киоск зарегистрирован и готов к работе</p>
         </div>
       ) : (
         <div

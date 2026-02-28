@@ -127,7 +127,7 @@ export default function DisplayPage() {
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       if (status === 404) {
-        // Планшет удалён из админки — сбрасываем и регистрируемся заново
+        // Киоск удалён из админки — сбрасываем и регистрируемся заново
         localStorage.removeItem("traffic_device_id");
         localStorage.removeItem("traffic_init_secret");
         deviceIdRef.current = null;
@@ -254,7 +254,7 @@ export default function DisplayPage() {
             Регистрация аудитории
           </h1>
           <p className="text-2xl text-gray-400 leading-relaxed">
-            Отсканируйте QR-код, чтобы привязать планшет к аудитории
+            Отсканируйте QR-код, чтобы привязать киоск к аудитории
           </p>
         </div>
       </div>

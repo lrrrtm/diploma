@@ -49,20 +49,20 @@ export default function LoginPage() {
       if (data.app === "sso" && data.role === "admin") {
         login(data.access_token, data.full_name);
         if (redirectTo) {
-          window.location.href = `${redirectTo}?token=${encodeURIComponent(data.access_token)}`;
+          window.location.replace(`${redirectTo}?token=${encodeURIComponent(data.access_token)}`);
         } else {
-          window.location.href = "/admin";
+          window.location.replace("/admin");
         }
         return;
       }
 
       // For app users — redirect back to their app with the token
       if (redirectTo) {
-        window.location.href = `${redirectTo}?token=${encodeURIComponent(data.access_token)}`;
+        window.location.replace(`${redirectTo}?token=${encodeURIComponent(data.access_token)}`);
       } else {
         // No redirect — just show success (shouldn't normally happen)
         login(data.access_token, data.full_name);
-        window.location.href = "/";
+        window.location.replace("/");
       }
     } catch (err: unknown) {
       const msg =

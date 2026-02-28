@@ -149,14 +149,16 @@ def list_applications(
         query = query.filter(Application.student_external_id == student_external_id)
     elif auth and auth.get("role") == "staff":
         from app.models.department import Department
-        if not db.get(Department, auth["department_id"]):
+        entity_id = auth.get("entity_id")
+        if not db.get(Department, entity_id):
             raise HTTPException(status_code=401, detail="Структура удалена", headers={"WWW-Authenticate": "Bearer"})
-        query = query.join(Service).filter(Service.department_id == auth["department_id"])
+        query = query.join(Service).filter(Service.department_id == entity_id)
     elif auth and auth.get("role") == "executor":
         from app.models.executor import Executor
-        if not db.get(Executor, auth["executor_id"]):
+        entity_id = auth.get("entity_id")
+        if not db.get(Executor, entity_id):
             raise HTTPException(status_code=401, detail="Исполнитель удалён", headers={"WWW-Authenticate": "Bearer"})
-        query = query.filter(Application.executor_id == auth["executor_id"])
+        query = query.filter(Application.executor_id == entity_id)
     elif auth and auth.get("role") == "admin":
         pass
     else:
@@ -194,15 +196,17 @@ def get_application(
             raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
     elif auth and auth.get("role") == "staff":
         from app.models.department import Department
-        if not db.get(Department, auth["department_id"]):
+        entity_id = auth.get("entity_id")
+        if not db.get(Department, entity_id):
             raise HTTPException(status_code=401, detail="Структура удалена", headers={"WWW-Authenticate": "Bearer"})
-        if application.service.department_id != auth["department_id"]:
+        if application.service.department_id != entity_id:
             raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
     elif auth and auth.get("role") == "executor":
         from app.models.executor import Executor
-        if not db.get(Executor, auth["executor_id"]):
-            raise HTTPException(status_code=401, detail="Испонитель удалён", headers={"WWW-Authenticate": "Bearer"})
-        if application.executor_id != auth["executor_id"]:
+        entity_id = auth.get("entity_id")
+        if not db.get(Executor, entity_id):
+            raise HTTPException(status_code=401, detail="Исполнитель удалён", headers={"WWW-Authenticate": "Bearer"})
+        if application.executor_id != entity_id:
             raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
     elif auth and auth.get("role") == "admin":
         pass
