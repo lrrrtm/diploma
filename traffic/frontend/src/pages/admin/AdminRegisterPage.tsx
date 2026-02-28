@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +19,87 @@ interface Room {
   id: number;
   name: string;
 }
+
+// ---------------------------------------------------------------------------
+// SearchableList
+// ---------------------------------------------------------------------------
+
+interface SearchableListProps<T> {
+  items: T[] | null;
+  selected: T | null;
+  onSelect: (item: T) => void;
+  getKey: (item: T) => number;
+  getLabel: (item: T) => string;
+  placeholder: string;
+}
+
+function SearchableList<T>({
+  items,
+  selected,
+  onSelect,
+  getKey,
+  getLabel,
+  placeholder,
+}: SearchableListProps<T>) {
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = items
+    ? items
+        .filter((item) => getLabel(item).toLowerCase().includes(query.toLowerCase()))
+        .sort((a, b) => getLabel(a).localeCompare(getLabel(b), "ru", { numeric: true }))
+    : [];
+
+  if (items === null) return <Skeleton className="h-10 w-full rounded-md" />;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={placeholder}
+          className="w-full h-10 rounded-md border border-input bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
+      {selected && (
+        <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-medium">
+          {getLabel(selected)}
+        </div>
+      )}
+
+      <div className="border border-input rounded-md overflow-y-auto max-h-56 divide-y divide-border">
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground px-3 py-2">Ничего не найдено</p>
+        ) : (
+          filtered.map((item) => {
+            const isSelected = selected !== null && getKey(selected) === getKey(item);
+            return (
+              <button
+                key={getKey(item)}
+                type="button"
+                onClick={() => onSelect(item)}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-accent ${
+                  isSelected ? "bg-primary/10 font-medium" : ""
+                }`}
+              >
+                {getLabel(item)}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function AdminRegisterPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
@@ -77,9 +158,9 @@ export default function AdminRegisterPage() {
         <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div>
+        <div className="min-w-0">
           <p className="font-semibold text-sm">Назначить аудиторию</p>
-          <p className="text-xs text-muted-foreground">{deviceId?.slice(0, 8)}…</p>
+          <p className="text-xs text-muted-foreground font-mono truncate">{deviceId}</p>
         </div>
       </div>
 
@@ -91,49 +172,31 @@ export default function AdminRegisterPage() {
           </div>
         ) : (
           <>
-            {/* Building select */}
             <div className="space-y-1.5">
               <Label>Корпус</Label>
-              {buildings === null ? (
-                <Skeleton className="h-10 w-full rounded-md" />
-              ) : (
-                <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  value={selectedBuilding?.id ?? ""}
-                  onChange={(e) => {
-                    const b = buildings.find((b) => b.id === Number(e.target.value)) ?? null;
-                    setSelectedBuilding(b);
-                  }}
-                >
-                  <option value="">Выберите корпус</option>
-                  {buildings.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}{b.address ? ` — ${b.address}` : ""}</option>
-                  ))}
-                </select>
-              )}
+              <SearchableList
+                items={buildings}
+                selected={selectedBuilding}
+                onSelect={setSelectedBuilding}
+                getKey={(b) => b.id}
+                getLabel={(b) => b.address ? `${b.name} — ${b.address}` : b.name}
+                placeholder="Поиск корпуса..."
+              />
             </div>
 
-            {/* Room select */}
             <div className="space-y-1.5">
               <Label>Аудитория</Label>
               {!selectedBuilding ? (
                 <p className="text-sm text-muted-foreground">Сначала выберите корпус</p>
-              ) : rooms === null ? (
-                <Skeleton className="h-10 w-full rounded-md" />
               ) : (
-                <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  value={selectedRoom?.id ?? ""}
-                  onChange={(e) => {
-                    const r = rooms.find((r) => r.id === Number(e.target.value)) ?? null;
-                    setSelectedRoom(r);
-                  }}
-                >
-                  <option value="">Выберите аудиторию</option>
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id}>ауд. {r.name}</option>
-                  ))}
-                </select>
+                <SearchableList
+                  items={rooms}
+                  selected={selectedRoom}
+                  onSelect={setSelectedRoom}
+                  getKey={(r) => r.id}
+                  getLabel={(r) => `ауд. ${r.name}`}
+                  placeholder="Поиск аудитории..."
+                />
               )}
             </div>
 

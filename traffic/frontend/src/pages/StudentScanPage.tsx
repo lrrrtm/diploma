@@ -47,13 +47,12 @@ export default function StudentScanPage() {
             setScanState("scanning");
             try {
               const payload = JSON.parse(result.getText()) as { s: string; t: string };
+              const launchToken = sessionStorage.getItem("traffic_launch_token") ?? "";
               const res = await api.post<{ status: string; message: string }>(
                 `/sessions/${payload.s}/attend`,
                 {
                   qr_token: payload.t,
-                  student_external_id: student.student_external_id,
-                  student_name: student.student_name,
-                  student_email: student.student_email,
+                  launch_token: launchToken,
                 }
               );
               if (res.data.status === "already_marked") {

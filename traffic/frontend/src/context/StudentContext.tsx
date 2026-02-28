@@ -44,10 +44,12 @@ export function StudentProvider({ children }: { children: ReactNode }) {
       .post<StudentInfo>("/auth/verify-launch", { token: launchToken })
       .then((res) => {
         sessionStorage.setItem("traffic_student", JSON.stringify(res.data));
+        sessionStorage.setItem("traffic_launch_token", launchToken);
         setStudent(res.data);
       })
       .catch(() => {
         sessionStorage.removeItem("traffic_student");
+        sessionStorage.removeItem("traffic_launch_token");
         setStudent(null);
       })
       .finally(() => setIsLoading(false));

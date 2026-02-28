@@ -34,7 +34,7 @@ interface RuzLesson {
   time_start: string;
   time_end: string;
   subject: string;
-  typeObj: { abbr: string };
+  typeObj: { abbr: string; name?: string };
   teachers: { full_name: string }[];
 }
 
@@ -42,8 +42,19 @@ interface RuzLesson {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getOrCreateDeviceId(): string | null {
-  return localStorage.getItem("traffic_device_id");
+function getStoredDeviceId(): string | null {
+  const id = localStorage.getItem("traffic_device_id");
+  const secret = localStorage.getItem("traffic_init_secret");
+  // Old format without init_secret — force re-init to get secret
+  if (id && !secret) {
+    localStorage.removeItem("traffic_device_id");
+    return null;
+  }
+  return id;
+}
+
+function getStoredInitSecret(): string | null {
+  return localStorage.getItem("traffic_init_secret");
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +68,8 @@ export default function DisplayPage() {
   const [qrToken, setQrToken] = useState<string>("");
   const [todayLessons, setTodayLessons] = useState<RuzLesson[]>([]);
 
-  const deviceIdRef = useRef<string | null>(getOrCreateDeviceId());
+  const deviceIdRef = useRef<string | null>(getStoredDeviceId());
+  const initSecretRef = useRef<string | null>(getStoredInitSecret());
   const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -85,9 +97,11 @@ export default function DisplayPage() {
   async function initDevice() {
     if (deviceIdRef.current) return;
     try {
-      const res = await api.post<{ device_id: string }>("/tablets/init");
+      const res = await api.post<{ device_id: string; init_secret: string }>("/tablets/init");
       deviceIdRef.current = res.data.device_id;
+      initSecretRef.current = res.data.init_secret;
       localStorage.setItem("traffic_device_id", res.data.device_id);
+      localStorage.setItem("traffic_init_secret", res.data.init_secret);
     } catch {
       // retry on next poll
     }
@@ -109,7 +123,19 @@ export default function DisplayPage() {
       } else {
         pollSession();
       }
-    } catch {
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        // Планшет удалён из админки — сбрасываем и регистрируемся заново
+        localStorage.removeItem("traffic_device_id");
+        localStorage.removeItem("traffic_init_secret");
+        deviceIdRef.current = null;
+        initSecretRef.current = null;
+        setTablet(null);
+        setSession(null);
+        setDisplayState("unregistered");
+        if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+      }
       schedulePoll(5000);
     }
   }
@@ -118,7 +144,9 @@ export default function DisplayPage() {
     const deviceId = deviceIdRef.current;
     if (!deviceId) return;
     try {
-      const res = await api.get<CurrentSession>(`/sessions/current?device_id=${deviceId}`);
+      const res = await api.get<CurrentSession>(
+        `/sessions/current?device_id=${deviceId}&tablet_secret=${initSecretRef.current ?? ""}`,
+      );
       if (res.data.active) {
         setSession(res.data);
         setDisplayState("active");
@@ -234,34 +262,33 @@ export default function DisplayPage() {
       <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex">
         <QrPanel value={teacherQr || "no-device"} />
         <div className="flex-1 flex flex-col justify-center px-16 gap-6 overflow-hidden">
-          {roomLabel && (
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
-              {roomLabel}
-            </p>
-          )}
           <h1 className="text-5xl font-bold leading-tight">
             Ожидание занятия
           </h1>
           <p className="text-2xl text-gray-400 leading-relaxed">
-            Преподаватель сканирует QR-код для запуска проверки посещаемости
+            Отсканируйте QR-код для того, чтобы запустить проверку посещаемости занятия
           </p>
 
-          {todayLessons.length > 0 && (
-            <div className="mt-4 flex flex-col gap-3 overflow-y-auto max-h-72">
-              <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold">
-                Расписание на сегодня
-              </p>
+          {(roomLabel || todayLessons.length > 0) && (
+            <div className="mt-2 flex flex-col gap-4 overflow-y-auto max-h-80">
+              {roomLabel && (
+                <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold">
+                  {roomLabel}
+                </p>
+              )}
               {todayLessons.map((lesson, i) => (
-                <div key={i} className="flex gap-4 text-gray-300">
-                  <span className="text-gray-500 font-mono text-lg whitespace-nowrap">
+                <div key={i} className="flex gap-5 text-gray-300">
+                  <span className="text-gray-400 text-xl whitespace-nowrap shrink-0">
                     {lesson.time_start}–{lesson.time_end}
                   </span>
                   <div>
-                    <span className="font-medium">{lesson.subject}</span>
-                    <span className="text-gray-500 ml-2 text-sm">{lesson.typeObj?.abbr}</span>
-                    {lesson.teachers?.[0] && (
-                      <p className="text-gray-500 text-sm">{lesson.teachers[0].full_name}</p>
-                    )}
+                    <p className="font-medium text-xl leading-snug">{lesson.subject}</p>
+                    <p className="text-gray-500 text-base">
+                      {lesson.typeObj?.name ?? lesson.typeObj?.abbr}
+                      {lesson.teachers?.[0] && (
+                        <span className="ml-2">{lesson.teachers[0].full_name}</span>
+                      )}
+                    </p>
                   </div>
                 </div>
               ))}

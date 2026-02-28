@@ -37,7 +37,7 @@ def init_tablet(db: DBSession = Depends(get_db)):
     )
     db.add(tablet)
     db.commit()
-    return {"device_id": tablet.id}
+    return {"device_id": tablet.id, "init_secret": tablet.init_secret}
 
 
 @router.get("/")

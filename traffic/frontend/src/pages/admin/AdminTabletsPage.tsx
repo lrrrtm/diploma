@@ -69,12 +69,12 @@ export default function AdminTabletsPage() {
                   {t.is_registered ? (
                     <>
                       <p className="font-medium text-sm">{t.building_name}, ауд. {t.room_name}</p>
-                      <p className="text-xs text-muted-foreground">{t.id.slice(0, 8)}…</p>
+                      <p className="text-xs text-muted-foreground font-mono break-all">{t.id}</p>
                     </>
                   ) : (
                     <>
                       <p className="font-medium text-sm text-amber-500">Не назначена аудитория</p>
-                      <p className="text-xs text-muted-foreground">{t.id.slice(0, 8)}…</p>
+                      <p className="text-xs text-muted-foreground font-mono break-all">{t.id}</p>
                     </>
                   )}
                 </div>

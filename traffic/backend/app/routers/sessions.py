@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
@@ -50,9 +51,7 @@ class CreateSessionRequest(BaseModel):
 
 class AttendRequest(BaseModel):
     qr_token: str
-    student_external_id: str
-    student_name: str
-    student_email: str = ""
+    launch_token: str
 
 
 # ---------------------------------------------------------------------------
@@ -92,8 +91,17 @@ def create_session(
 
 
 @router.get("/current")
-def get_current_session(device_id: str, db: DBSession = Depends(get_db)):
-    """Public — called by display page to get current session state."""
+def get_current_session(
+    device_id: str,
+    tablet_secret: str | None = None,
+    db: DBSession = Depends(get_db),
+):
+    """Called by display page to get current session state.
+    qr_secret is only returned when tablet_secret matches the tablet's init_secret."""
+    tablet = db.get(Tablet, device_id)
+    if not tablet:
+        return {"active": False}
+
     session = (
         db.query(Session)
         .filter(Session.tablet_id == device_id, Session.is_active == True)  # noqa: E712
@@ -112,15 +120,23 @@ def get_current_session(device_id: str, db: DBSession = Depends(get_db)):
 
     attendance_count = db.query(Attendance).filter(Attendance.session_id == session.id).count()
 
-    return {
+    # Only authenticated display pages receive qr_secret
+    authenticated = (
+        tablet_secret is not None
+        and hmac.compare_digest(tablet_secret, tablet.init_secret)
+    )
+
+    result: dict = {
         "active": True,
         "session_id": session.id,
         "discipline": session.discipline,
         "teacher_name": session.teacher_name,
-        "qr_secret": session.qr_secret,
         "rotate_seconds": session.rotate_seconds,
         "attendance_count": attendance_count,
     }
+    if authenticated:
+        result["qr_secret"] = session.qr_secret
+    return result
 
 
 @router.get("/")
@@ -176,11 +192,23 @@ def mark_attendance(session_id: str, data: AttendRequest, db: DBSession = Depend
     if not _verify_qr_token(session, data.qr_token):
         raise HTTPException(status_code=400, detail="QR-код устарел — попробуй ещё раз")
 
+    # Verify student identity via launch token from main app
+    try:
+        payload = jwt.decode(
+            data.launch_token, settings.LAUNCH_TOKEN_SECRET, algorithms=[settings.ALGORITHM]
+        )
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Не удалось подтвердить личность студента — открой приложение заново")
+
+    student_external_id = str(payload["student_id"])
+    student_name = payload.get("student_name", "")
+    student_email = payload.get("student_email", "")
+
     existing = (
         db.query(Attendance)
         .filter(
             Attendance.session_id == session_id,
-            Attendance.student_external_id == data.student_external_id,
+            Attendance.student_external_id == student_external_id,
         )
         .first()
     )
@@ -190,9 +218,9 @@ def mark_attendance(session_id: str, data: AttendRequest, db: DBSession = Depend
     record = Attendance(
         id=str(uuid.uuid4()),
         session_id=session_id,
-        student_external_id=data.student_external_id,
-        student_name=data.student_name,
-        student_email=data.student_email,
+        student_external_id=student_external_id,
+        student_name=student_name,
+        student_email=student_email,
     )
     db.add(record)
     db.commit()
