@@ -33,7 +33,7 @@ export default function App() {
       <Route path="/" element={<RootRedirect />} />
 
       {/* Classroom screen — public, shown on kiosk */}
-      <Route path="/display" element={<DisplayPage />} />
+      <Route path="/kiosk" element={<DisplayPage />} />
 
       {/* Student scanner — opened in iframe from main app */}
       <Route path="/scan" element={<StudentScanPage />} />

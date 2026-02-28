@@ -72,7 +72,7 @@ export default function AdminTabletsPage() {
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <Monitor className="h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground text-sm">Нет зарегистрированных киосков</p>
-            <p className="text-xs text-muted-foreground">Откройте /display на киоске и отсканируйте QR</p>
+            <p className="text-xs text-muted-foreground">Откройте /kiosk на киоске и отсканируйте QR</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

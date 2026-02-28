@@ -15,7 +15,7 @@ export default function AuthCallbackPage() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     if (!token) {
-      navigate("/display", { replace: true });
+      navigate("/kiosk", { replace: true });
       return;
     }
 
@@ -29,7 +29,7 @@ export default function AuthCallbackPage() {
     } else if (role === "teacher") {
       navigate("/teacher/session", { replace: true });
     } else {
-      navigate("/display", { replace: true });
+      navigate("/kiosk", { replace: true });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
