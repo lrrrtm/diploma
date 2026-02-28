@@ -62,7 +62,7 @@ function AppCard({ app, onClick }: { app: ApplicationBrief; onClick: () => void 
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2">
           <Badge variant="outline">
             {new Date(app.created_at).toLocaleDateString("ru-RU")}
           </Badge>
