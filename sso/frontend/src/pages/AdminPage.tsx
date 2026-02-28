@@ -1,0 +1,339 @@
+import { useEffect, useState, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { LogOut, Plus, Trash2, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import api from "@/api/client";
+import { useAuth } from "@/context/AuthContext";
+
+interface SSOUser {
+  id: string;
+  username: string;
+  full_name: string;
+  app: string;
+  role: string;
+  entity_id: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+const APP_LABELS: Record<string, string> = {
+  sso: "SSO",
+  services: "Заявки",
+  traffic: "Посещаемость",
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Администратор",
+  staff: "Сотрудник",
+  executor: "Исполнитель",
+  teacher: "Преподаватель",
+};
+
+const APP_BADGE_CLASS: Record<string, string> = {
+  sso: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  services: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  traffic: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+};
+
+export default function AdminPage() {
+  const navigate = useNavigate();
+  const { isLoggedIn, fullName, logout } = useAuth();
+
+  const [users, setUsers] = useState<SSOUser[] | null>(null);
+  const [appFilter, setAppFilter] = useState<string>("all");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SSOUser | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const loadUsers = () => {
+    const params = appFilter !== "all" ? `?app_filter=${appFilter}` : "";
+    api
+      .get<SSOUser[]>(`/users/${params}`)
+      .then((r) => setUsers(r.data))
+      .catch(() => {
+        toast.error("Не удалось загрузить пользователей");
+        setUsers([]);
+      });
+  };
+
+  useEffect(() => {
+    if (!isLoggedIn) { navigate("/"); return; }
+    loadUsers();
+  }, [isLoggedIn, appFilter, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
+  const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    setCreating(true);
+    try {
+      await api.post("/users/", {
+        username: form.get("username"),
+        password: form.get("password"),
+        full_name: form.get("full_name"),
+        app: form.get("app"),
+        role: "admin",
+      });
+      toast.success("Администратор создан");
+      setCreateOpen(false);
+      setUsers(null);
+      loadUsers();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        "Не удалось создать пользователя";
+      toast.error(msg);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api.delete(`/users/${deleteTarget.id}`);
+      toast.success("Пользователь удалён");
+      setDeleteTarget(null);
+      setUsers((prev) => prev?.filter((u) => u.id !== deleteTarget.id) ?? null);
+    } catch {
+      toast.error("Не удалось удалить пользователя");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Toaster position="top-right" richColors />
+
+      {/* Header */}
+      <div className="border-b border-border bg-card">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">UniComm SSO</p>
+            <p className="text-xs text-muted-foreground">{fullName}</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-1" />
+            Выйти
+          </Button>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {(["all", "services", "traffic"] as const).map((app) => {
+            const count =
+              app === "all"
+                ? (users?.length ?? "—")
+                : (users?.filter((u) => u.app === app).length ?? "—");
+            const label =
+              app === "all" ? "Всего пользователей" : APP_LABELS[app];
+            return (
+              <Card
+                key={app}
+                className={`cursor-pointer transition-colors ${appFilter === app ? "border-primary" : ""}`}
+                onClick={() => setAppFilter(app)}
+              >
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-2xl font-bold">{count}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Users table */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Пользователи
+              {appFilter !== "all" && (
+                <Badge variant="secondary">{APP_LABELS[appFilter]}</Badge>
+              )}
+            </CardTitle>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Добавить администратора
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {users === null ? (
+              <div className="p-4 space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : users.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">Нет пользователей</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Пользователь</TableHead>
+                    <TableHead>Приложение</TableHead>
+                    <TableHead>Роль</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id} className={!u.is_active ? "opacity-50" : ""}>
+                      <TableCell>
+                        <p className="text-sm font-medium">{u.full_name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{u.username}</p>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${APP_BADGE_CLASS[u.app] ?? ""}`}
+                        >
+                          {APP_LABELS[u.app] ?? u.app}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {ROLE_LABELS[u.role] ?? u.role}
+                      </TableCell>
+                      <TableCell>
+                        {/* Can't delete sso admin itself */}
+                        {!(u.app === "sso" && u.role === "admin") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(u)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Create admin dialog */}
+      <AlertDialog open={createOpen} onOpenChange={setCreateOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Новый администратор приложения</AlertDialogTitle>
+            <AlertDialogDescription>
+              Создайте учётную запись для администратора одного из приложений.
+              Остальных пользователей (сотрудников, исполнителей, преподавателей) создают
+              сами администраторы через интерфейс приложения.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <form id="create-form" onSubmit={handleCreate} className="space-y-3 mt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="cf-app">Приложение</Label>
+              <select
+                id="cf-app"
+                name="app"
+                required
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="services">Заявки на услуги</option>
+                <option value="traffic">Посещаемость</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cf-username">Логин</Label>
+              <Input id="cf-username" name="username" required autoComplete="off" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cf-password">Пароль</Label>
+              <Input
+                id="cf-password"
+                name="password"
+                type="password"
+                required
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cf-full-name">Полное имя</Label>
+              <Input id="cf-full-name" name="full_name" required />
+            </div>
+          </form>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creating}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              type="submit"
+              form="create-form"
+              disabled={creating}
+              onClick={(e) => {
+                // Let the form submit handle it — don't close dialog yet
+                e.preventDefault();
+                document.getElementById("create-form")?.dispatchEvent(
+                  new Event("submit", { bubbles: true, cancelable: true })
+                );
+              }}
+            >
+              {creating ? "Создание..." : "Создать"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить пользователя?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Пользователь <span className="font-medium">{deleteTarget?.full_name}</span>{" "}
+              ({deleteTarget?.username}) будет удалён. Это действие необратимо.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

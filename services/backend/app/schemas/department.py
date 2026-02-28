@@ -5,22 +5,19 @@ from datetime import datetime
 class DepartmentCreate(BaseModel):
     name: str
     description: str | None = None
-    login: str | None = None
+    username: str | None = None
     password: str | None = None
 
 
 class DepartmentUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    login: str | None = None
-    password: str | None = None
 
 
 class DepartmentResponse(BaseModel):
     id: str
     name: str
     description: str | None = None
-    login: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { goToSSOLogin } from "@/lib/sso";
 import { toast } from "sonner";
 
 interface Tablet {
@@ -23,7 +24,7 @@ export default function AdminTabletsPage() {
   const [tablets, setTablets] = useState<Tablet[] | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn || role !== "admin") { navigate("/admin/login"); return; }
+    if (!isLoggedIn || role !== "admin") { goToSSOLogin(); return; }
     load();
   }, [isLoggedIn, role, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -42,7 +43,7 @@ export default function AdminTabletsPage() {
     }
   }
 
-  const handleLogout = () => { logout(); navigate("/admin/login"); };
+  const handleLogout = () => { logout(); goToSSOLogin(); };
 
   const registered = tablets?.filter((t) => t.is_registered) ?? null;
 

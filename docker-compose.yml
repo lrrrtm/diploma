@@ -27,6 +27,56 @@ services:
     networks:
       - main
 
+  # ---- SSO service (sso.poly.hex8d.space) ----
+
+  sso-db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${SSO_MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${SSO_MYSQL_DATABASE}
+      MYSQL_USER: ${SSO_MYSQL_USER}
+      MYSQL_PASSWORD: ${SSO_MYSQL_PASSWORD}
+    volumes:
+      - sso_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      sso:
+        aliases:
+          - sso-db
+
+  sso-backend:
+    build: ./sso/backend
+    restart: unless-stopped
+    depends_on:
+      sso-db:
+        condition: service_healthy
+    environment:
+      SSO_JWT_SECRET: ${SSO_JWT_SECRET}
+      SSO_SERVICE_SECRET: ${SSO_SERVICE_SECRET}
+      SSO_ADMIN_USERNAME: ${SSO_ADMIN_USERNAME}
+      SSO_ADMIN_PASSWORD: ${SSO_ADMIN_PASSWORD}
+      DATABASE_URL: mysql+pymysql://${SSO_MYSQL_USER}:${SSO_MYSQL_PASSWORD}@sso-db:3306/${SSO_MYSQL_DATABASE}
+    networks:
+      sso:
+        aliases:
+          - sso-backend
+
+  sso-frontend:
+    build: ./sso/frontend
+    restart: unless-stopped
+    ports:
+      - "3013:80"
+    depends_on:
+      - sso-backend
+    networks:
+      - sso
+
   # ---- Services mini-app (services.poly.hex8d.space) ----
 
   services-db:
@@ -56,14 +106,17 @@ services:
     depends_on:
       services-db:
         condition: service_healthy
+      sso-backend:
+        condition: service_started
     environment:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_HOST: db
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      SECRET_KEY: ${SERVICES_SECRET_KEY}
+      SSO_JWT_SECRET: ${SSO_JWT_SECRET}
+      SSO_SERVICE_SECRET: ${SSO_SERVICE_SECRET}
+      SSO_API_URL: http://sso-backend:8000
       UPLOAD_DIR: /app/uploads
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       LAUNCH_TOKEN_SECRET: ${LAUNCH_TOKEN_SECRET}
     volumes:
       - services_uploads:/app/uploads
@@ -71,6 +124,7 @@ services:
       services:
         aliases:
           - backend
+      sso: {}
 
   services-frontend:
     build: ./services/frontend
@@ -111,16 +165,19 @@ services:
     depends_on:
       traffic-db:
         condition: service_healthy
+      sso-backend:
+        condition: service_started
     environment:
       LAUNCH_TOKEN_SECRET: ${LAUNCH_TOKEN_SECRET}
-      TEACHER_SECRET: ${TRAFFIC_TEACHER_SECRET}
-      ADMIN_SECRET: ${TRAFFIC_ADMIN_SECRET}
-      ADMIN_PASSWORD: ${TRAFFIC_ADMIN_PASSWORD}
+      SSO_JWT_SECRET: ${SSO_JWT_SECRET}
+      SSO_SERVICE_SECRET: ${SSO_SERVICE_SECRET}
+      SSO_API_URL: http://sso-backend:8000
       DATABASE_URL: mysql+pymysql://${TRAFFIC_MYSQL_USER}:${TRAFFIC_MYSQL_PASSWORD}@db:3306/${TRAFFIC_MYSQL_DATABASE}
     networks:
       traffic:
         aliases:
           - backend
+      sso: {}
 
   traffic-frontend:
     build: ./traffic/frontend
@@ -133,11 +190,13 @@ services:
       - traffic
 
 volumes:
+  sso_db_data:
   services_db_data:
   services_uploads:
   traffic_db_data:
 
 networks:
   main:
+  sso:
   services:
   traffic:

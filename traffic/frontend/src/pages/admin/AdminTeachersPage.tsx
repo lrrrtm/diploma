@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { goToSSOLogin } from "@/lib/sso";
 import { toast } from "sonner";
 
 interface Teacher {
@@ -27,7 +28,7 @@ export default function AdminTeachersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn || role !== "admin") { navigate("/admin/login"); return; }
+    if (!isLoggedIn || role !== "admin") { goToSSOLogin(); return; }
     load();
   }, [isLoggedIn, role, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 

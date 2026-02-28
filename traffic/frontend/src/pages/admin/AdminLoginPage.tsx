@@ -42,8 +42,8 @@ export default function AdminLoginPage() {
               <ShieldCheck className="h-6 w-6 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Администратор</CardTitle>
-          <CardDescription>Управление аудиториями и преподавателями</CardDescription>
+          <CardTitle className="text-2xl">Политехник.Посещаемость</CardTitle>
+          <CardDescription>Панель управления планшетами и преподавателями</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

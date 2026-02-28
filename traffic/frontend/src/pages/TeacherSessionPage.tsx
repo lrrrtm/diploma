@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { goToSSOLogin } from "@/lib/sso";
 import { toast } from "sonner";
 
 interface Attendee {
@@ -52,8 +53,7 @@ export default function TeacherSessionPage() {
 
   useEffect(() => {
     if (!isLoggedIn) {
-      const redirect = encodeURIComponent(window.location.pathname + window.location.search);
-      navigate(`/teacher/login?redirect=${redirect}`);
+      goToSSOLogin();
     }
   }, [isLoggedIn, navigate]);
 
@@ -172,7 +172,7 @@ export default function TeacherSessionPage() {
 
   const handleLogout = () => {
     logout();
-    navigate("/teacher/login");
+    goToSSOLogin();
   };
 
   if (session === null) {

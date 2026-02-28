@@ -1,7 +1,8 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
-from passlib.context import CryptContext
 
+from app.config import settings
 from app.database import get_db
 from app.models import Department
 from app.schemas.department import (
@@ -13,8 +14,47 @@ from app.schemas.department import (
 from app.dependencies import require_admin
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
+# ---------------------------------------------------------------------------
+# SSO helpers
+# ---------------------------------------------------------------------------
+
+def _sso_headers() -> dict:
+    return {"X-Service-Secret": settings.SSO_SERVICE_SECRET}
+
+
+def _sso_create_staff(dept_id: str, username: str, password: str, dept_name: str) -> None:
+    resp = httpx.post(
+        f"{settings.SSO_API_URL}/api/users/",
+        json={
+            "username": username,
+            "password": password,
+            "full_name": dept_name,
+            "app": "services",
+            "role": "staff",
+            "entity_id": dept_id,
+        },
+        headers=_sso_headers(),
+        timeout=10,
+    )
+    if resp.status_code not in (200, 201):
+        detail = resp.json().get("detail", "Ошибка создания пользователя в SSO")
+        raise HTTPException(status_code=400, detail=detail)
+
+
+def _sso_delete_by_entity(entity_id: str) -> None:
+    httpx.delete(
+        f"{settings.SSO_API_URL}/api/users/by-entity/{entity_id}",
+        params={"app": "services"},
+        headers=_sso_headers(),
+        timeout=10,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 
 @router.get("/", response_model=list[DepartmentResponse])
 def list_departments(db: Session = Depends(get_db)):
@@ -44,10 +84,13 @@ def create_department(
     department = Department(
         name=data.name,
         description=data.description,
-        login=data.login,
-        password_hash=pwd_context.hash(data.password) if data.password else None,
     )
     db.add(department)
+    db.flush()  # get department.id
+
+    if data.username and data.password:
+        _sso_create_staff(department.id, data.username, data.password, data.name)
+
     db.commit()
     db.refresh(department)
     return DepartmentResponse.model_validate(department)
@@ -68,10 +111,6 @@ def update_department(
         department.name = data.name
     if data.description is not None:
         department.description = data.description
-    if data.login is not None:
-        department.login = data.login
-    if data.password is not None:
-        department.password_hash = pwd_context.hash(data.password)
 
     db.commit()
     db.refresh(department)
@@ -89,3 +128,4 @@ def delete_department(
         raise HTTPException(status_code=404, detail="Структура не найдена")
     db.delete(department)
     db.commit()
+    _sso_delete_by_entity(department_id)

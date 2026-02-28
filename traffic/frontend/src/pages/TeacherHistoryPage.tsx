@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Users } from "lucide-react";
+import { goToSSOLogin } from "@/lib/sso";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ export default function TeacherHistoryPage() {
   const [sessions, setSessions] = useState<SessionBrief[] | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn) { navigate("/teacher/login"); return; }
+    if (!isLoggedIn) { goToSSOLogin(); return; }
     api.get<SessionBrief[]>("/sessions/").then((r) => setSessions(r.data)).catch(() => setSessions([]));
   }, [isLoggedIn, navigate]);
 

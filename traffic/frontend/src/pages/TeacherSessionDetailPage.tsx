@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { goToSSOLogin } from "@/lib/sso";
 import { ArrowLeft, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export default function TeacherSessionDetailPage() {
   const [attendees, setAttendees] = useState<Attendee[] | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn) { navigate("/teacher/login"); return; }
+    if (!isLoggedIn) { goToSSOLogin(); return; }
     if (!sessionId) return;
     api.get<SessionData>(`/sessions/${sessionId}`).then((r) => setSession(r.data)).catch(() => navigate(-1));
     api.get<Attendee[]>(`/sessions/${sessionId}/attendees`).then((r) => setAttendees(r.data)).catch(() => setAttendees([]));

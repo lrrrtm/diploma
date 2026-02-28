@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useStudent, useStudentLoading, useWasLaunchAttempted } from "@/context/StudentContext";
@@ -5,8 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AppLayout } from "@/components/shared/app-layout";
 import DuckScreen from "@/components/DuckScreen";
 import duckAnimation from "@/assets/DUCK_PAPER_PLANE.json";
+import { goToSSOLogin } from "@/lib/sso";
 
-import LoginPage from "@/pages/auth/LoginPage";
+import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import ServiceApplyPage from "@/pages/student/ServiceApplyPage";
 import ApplicationsPage from "@/pages/student/ApplicationsPage";
 import ApplicationDetailPage from "@/pages/student/ApplicationDetailPage";
@@ -18,19 +20,22 @@ import AdminDepartmentsPage from "@/pages/admin/AdminDepartmentsPage";
 import ExecutorDashboardPage from "@/pages/executor/ExecutorDashboardPage";
 import ExecutorApplicationDetailPage from "@/pages/executor/ExecutorApplicationDetailPage";
 
+function SSORedirect() {
+  useEffect(() => { goToSSOLogin(); }, []);
+  return (
+    <div className="flex items-center justify-center h-screen bg-background">
+      <p className="text-muted-foreground text-sm">Перенаправление...</p>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { isAuthenticated, auth } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <SSORedirect />;
   if (allowedRoles && auth && !allowedRoles.includes(auth.role)) {
     return <Navigate to="/" replace />;
   }
   return <AppLayout>{children}</AppLayout>;
-}
-
-function GuestRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) return <Navigate to="/" replace />;
-  return <>{children}</>;
 }
 
 function HomePage() {
@@ -51,21 +56,14 @@ function HomePage() {
   if (isAuthenticated && auth?.role === "executor") return <Navigate to="/executor" replace />;
   if (student) return <Navigate to="/applications" replace />;
   if (wasLaunchAttempted) return <DuckScreen animationData={duckAnimation} text="Эта страница открывается только через Политехник" />;
-  return <Navigate to="/login" replace />;
+  return <SSORedirect />;
 }
 
 export default function App() {
   return (
     <Routes>
-      {/* Guest route — login for staff/admin */}
-      <Route
-        path="/login"
-        element={
-          <GuestRoute>
-            <LoginPage />
-          </GuestRoute>
-        }
-      />
+      {/* SSO callback */}
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       {/* Home redirect */}
       <Route path="/" element={<HomePage />} />

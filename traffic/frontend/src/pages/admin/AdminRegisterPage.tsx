@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { goToSSOLogin } from "@/lib/sso";
 import { toast } from "sonner";
 
 type RegStep = "building" | "room";
@@ -144,7 +145,7 @@ export default function AdminRegisterPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (!isLoggedIn || role !== "admin") { navigate("/admin/login"); return; }
+    if (!isLoggedIn || role !== "admin") { goToSSOLogin(); return; }
 
     Promise.all([
       api.get<{ buildings: Building[] }>("/schedule/buildings"),

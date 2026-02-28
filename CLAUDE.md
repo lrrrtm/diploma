@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to AI assistants working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Repository Strategy — Monolith
 
@@ -18,8 +18,8 @@ diploma/                        ← this repo
     nginx/                      ← dev nginx config
     docker-compose.yml          ← standalone dev compose
   traffic/                      ← attendance mini-app
-    frontend/                   ← React SPA, Vite, TypeScript, React Router, @zxing, qrcode.react
-    backend/                    ← FastAPI (lightweight, no DB)
+    frontend/                   ← React SPA, Vite, TypeScript, React Router, @zxing, qrcode.react, shadcn
+    backend/                    ← FastAPI, SQLAlchemy, MySQL
   docker-compose.yml            ← unified production compose (main + services + traffic)
   .env.dist                     ← env template for unified compose
 ```
@@ -38,16 +38,37 @@ Unified compose exposes:
 
 Server nginx (on the host) reverse-proxies each subdomain to the corresponding port. SSL via Certbot.
 
+### Nginx DNS caching fix
+
+All nginx configs use the Docker embedded resolver to prevent stale IPs when backend containers restart:
+```nginx
+resolver 127.0.0.11 valid=5s;
+location /api/ {
+    set $backend http://backend:8000;
+    proxy_pass $backend$request_uri;
+}
+```
+Without `resolver` + `set $var`, nginx resolves the upstream hostname once at startup and breaks after container restarts.
+
 ### Main app ↔ Mini-app contract
 
-The main app generates a **launch token** (short-lived JWT signed with `LAUNCH_TOKEN_SECRET`) and opens mini-apps in an iframe:
+The main app generates a **launch token** (short-lived JWT, 5-minute expiry, signed with `LAUNCH_TOKEN_SECRET`) and opens mini-apps in an iframe:
 ```
 https://services.poly.hex8d.space/?launch_token=<jwt>
 https://traffic.poly.hex8d.space/scan?launch_token=<jwt>
 ```
-The mini-app frontend reads `launch_token` from URL, sends `POST /api/auth/verify-launch` to its own backend, which decodes the token using the shared `LAUNCH_TOKEN_SECRET` and returns student identity (`student_id`, `student_name`, `student_email`). The mini-app stores this in `StudentContext` (sessionStorage).
+The mini-app frontend reads `launch_token` from URL, sends `POST /api/auth/verify-launch` to its own backend, which decodes the token using the shared `LAUNCH_TOKEN_SECRET` and returns student identity (`student_id`, `student_name`, `student_email`). The mini-app stores this in `StudentContext` (sessionStorage) and also stores the raw token for later use (e.g., attendance verification).
 
 Mini-app URLs are configured via `SERVICES_URL` and `TRAFFIC_URL` env vars in the main backend.
+
+### shadcn/ui convention
+
+All frontends use shadcn/ui. **Always install components via CLI** — never create them manually:
+```bash
+cd <app>/frontend
+npx shadcn@latest add <component>
+```
+The `components.json` and `tsconfig.json` (with `paths`) must exist for the CLI to work. Path alias `@` → `./src` is configured in `tsconfig.app.json` and `vite.config.ts`.
 
 ---
 
@@ -224,6 +245,8 @@ This app is a mini-app inside the main app. There is **no generic User model**.
 
 **Tabs + auto-refresh**: Application list pages (student `ApplicationsPage`, staff `StaffDashboardPage`, executor `ExecutorDashboardPage`) use `@radix-ui/react-tabs` to split by status (Ожидает / В обработке / Завершённые) and poll every 5 seconds via `setInterval`.
 
+**Step animations**: Multi-step flows (e.g., new application: departments → services) use `step-enter-forward` / `step-enter-back` CSS classes defined in `index.css`. `key={step}` on the content div forces remount to trigger animation; `stepDir` state controls direction.
+
 **Shared detail components**:
 - `components/shared/responses-list.tsx` — renders the sorted (newest-first) list of response cards; used on all three detail pages
 - `components/shared/respond-form.tsx` — message + status change + file upload form; used on staff and executor detail pages
@@ -255,6 +278,7 @@ This app is a mini-app inside the main app. There is **no generic User model**.
 | `services/frontend/src/components/shared/dynamic-form.tsx` | Runtime form renderer from JSON schema |
 | `services/frontend/src/components/shared/responses-list.tsx` | Shared response history list |
 | `services/frontend/src/components/shared/respond-form.tsx` | Shared respond form (staff + executor) |
+| `services/frontend/src/pages/student/ApplicationsPage.tsx` | Tabs + new app sheet with step animations + 5s refresh |
 | `services/frontend/src/pages/staff/StaffDashboardPage.tsx` | Tabs + search + service filter + 5s refresh |
 | `services/frontend/src/pages/staff/StaffExecutorsPage.tsx` | Create/delete executors |
 | `services/frontend/src/pages/staff/ManageServicesPage.tsx` | Service CRUD for staff |
@@ -266,7 +290,7 @@ This app is a mini-app inside the main app. There is **no generic User model**.
 
 ## Traffic Mini-App
 
-**UniComm Traffic** — QR-based attendance system. Students scan QR codes displayed in classrooms to mark their presence; teachers create and manage attendance sessions.
+**UniComm Traffic** — QR-based attendance system. Students scan QR codes displayed on classroom tablets to mark their presence; teachers create and manage attendance sessions via their cabinet; admins manage tablets and teacher accounts.
 
 ### Traffic Dev Commands
 
@@ -284,49 +308,82 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+Requires `traffic/.env` (for unified compose) with: `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `DATABASE_URL`, `LAUNCH_TOKEN_SECRET`, `TEACHER_SECRET`, `ADMIN_SECRET`, `ADMIN_PASSWORD`, `QR_ROTATE_SECONDS`, `SESSION_MAX_MINUTES`.
+
 ### Traffic Architecture
 
 ```
-React SPA (Vite + TypeScript + React Router v6 + @zxing + qrcode.react)
+React SPA (Vite + TypeScript + React Router v6 + @zxing + qrcode.react + shadcn)
   └── Axios → /api/* (proxied by nginx)
-        └── FastAPI (Python 3.12, uvicorn, no database)
-              ├── In-memory session store (dict)
+        └── FastAPI (Python 3.12, uvicorn)
+              ├── SQLAlchemy 2.0 ORM (sync) + MySQL 8.0 (PyMySQL)
               ├── Launch token verification (shared LAUNCH_TOKEN_SECRET)
-              ├── Teacher JWT auth (TEACHER_SECRET)
-              └── HMAC-based rotating QR tokens (5s rotation)
+              ├── Teacher JWT auth (TEACHER_SECRET, 8h expiry)
+              ├── Admin JWT auth (ADMIN_SECRET)
+              └── HMAC-SHA256 rotating QR tokens (default 5s rotation)
 ```
 
 ### Key Concepts
 
-**Sessions**: A teacher creates an attendance session. The session generates a QR code displayed on a classroom screen. Students scan the QR code to mark attendance. Sessions auto-expire after 90 minutes.
+**Tablets**: Each classroom display runs `/display` which auto-registers itself via `POST /api/tablets/init` (creates unregistered tablet with `init_secret`). Admin scans the registration QR and assigns a building+room via `/admin/tablets/register/:id`. The `init_secret` is stored in `localStorage` on the display and passed to `GET /api/sessions/current` to authenticate the display page and receive `qr_secret`.
 
-**Rotating QR tokens**: QR codes contain HMAC-SHA256 tokens that change every `QR_ROTATE_SECONDS` (default 5). The backend accepts the current window's token plus the previous window's token to handle scanning lag.
+**Sessions**: A teacher opens `/teacher/session?device=<tablet_id>`, creates an attendance session specifying a discipline. The session generates a per-session HMAC secret (`qr_secret`). Sessions auto-expire after `SESSION_MAX_MINUTES` (default 90).
 
-**In-memory storage**: All session data lives in Python memory (no database). Sessions are lost on backend restart.
+**Rotating QR tokens**: The display page generates HMAC-SHA256 tokens client-side using Web Crypto API (no backend polling). Tokens rotate every `QR_ROTATE_SECONDS`. Backend accepts current and previous window to handle slow scans.
 
-**Teacher auth**: Stub login — any credentials are accepted. Teacher JWTs are signed with `TEACHER_SECRET` (8-hour expiry).
+**Student attendance**: Students open `/scan?launch_token=<jwt>` in an iframe. They scan the QR, the frontend calls `POST /api/sessions/:id/attend` with `qr_token` + `launch_token`. Backend verifies both the HMAC token and the student's JWT identity.
+
+**Cascade deletes**: `Tablet → Session → Attendance` relationships use `cascade="all, delete-orphan"` in SQLAlchemy so deleting a tablet removes all its sessions and attendance records.
 
 ### Traffic Routes
 
 | Route | Page | Description |
 |---|---|---|
-| `/display` | `DisplayPage` | Classroom screen — shows QR code (public, for tablet/board) |
-| `/teacher/login` | `TeacherLoginPage` | Teacher login form |
-| `/teacher/session` | `TeacherSessionPage` | Create/manage attendance sessions |
+| `/display` | `DisplayPage` | Classroom tablet — self-registers, shows QR, polls session state |
 | `/scan` | `StudentScanPage` | Student camera QR scanner (opened in iframe from main app) |
+| `/teacher/login` | `TeacherLoginPage` | Teacher login form |
+| `/teacher/session` | `TeacherSessionPage` | Create/manage active session; shows live attendee list |
+| `/teacher/history` | `TeacherHistoryPage` | Past sessions list |
+| `/teacher/history/:id` | `TeacherSessionDetailPage` | Session details + full attendee table |
+| `/admin/login` | `AdminLoginPage` | Admin login form |
+| `/admin/tablets` | `AdminTabletsPage` | Registered tablets grid (unregistered tablets hidden) |
+| `/admin/tablets/register/:deviceId` | `AdminRegisterPage` | Two-step building→room selection with slide animations + AlertDialog confirm |
+| `/admin/teachers` | `AdminTeachersPage` | Teacher account CRUD |
+
+### Traffic Authentication Model
+
+| Actor | Auth method | JWT claims |
+|---|---|---|
+| **Student** | Main app `launch_token` via URL → `POST /api/auth/verify-launch` | stored in `sessionStorage` |
+| **Teacher** | Login with `username` + `password` → `POST /api/auth/teacher/login` | `role=teacher`, `teacher_id`, `teacher_name` |
+| **Admin** | Login with `admin` + `ADMIN_PASSWORD` → `POST /api/auth/admin/login` | `role=admin` |
+| **Display (tablet)** | `init_secret` (64-char hex) stored in `localStorage`, passed as query param to `GET /api/sessions/current?tablet_secret=` | not a JWT — HMAC comparison |
 
 ### Traffic Key Files
 
 | File | Purpose |
 |---|---|
-| `traffic/backend/app/main.py` | FastAPI app, CORS, routers: auth, sessions |
-| `traffic/backend/app/config.py` | `LAUNCH_TOKEN_SECRET`, `TEACHER_SECRET`, `QR_ROTATE_SECONDS`, `SESSION_MAX_MINUTES` |
-| `traffic/backend/app/routers/auth.py` | Teacher login (stub), `POST /verify-launch` for student launch tokens |
-| `traffic/backend/app/routers/sessions.py` | Session CRUD, rotating QR token generation, attendance recording |
+| `traffic/backend/app/main.py` | FastAPI app, CORS, routers registration |
+| `traffic/backend/app/config.py` | All settings: secrets, `QR_ROTATE_SECONDS`, `SESSION_MAX_MINUTES`, `DATABASE_URL` |
+| `traffic/backend/app/database.py` | SQLAlchemy engine + `get_db` dependency |
+| `traffic/backend/app/models/tablet.py` | `Tablet`: `id`, `init_secret`, building/room fields, `sessions` cascade relationship |
+| `traffic/backend/app/models/session.py` | `Session`: `qr_secret`, `rotate_seconds`, `is_active`, `attendances` cascade relationship |
+| `traffic/backend/app/models/attendance.py` | `Attendance`: student identity + `marked_at`; unique constraint on `(session_id, student_external_id)` |
+| `traffic/backend/app/models/teacher.py` | `Teacher`: `username`, `password_hash`, `full_name` |
+| `traffic/backend/app/routers/auth.py` | Teacher + admin login, `POST /verify-launch` for students |
+| `traffic/backend/app/routers/tablets.py` | `POST /init`, CRUD for tablets; register endpoint assigns building+room |
+| `traffic/backend/app/routers/sessions.py` | Session CRUD; `GET /current` returns `qr_secret` only to authenticated display; `POST /:id/attend` verifies HMAC token + launch_token JWT |
+| `traffic/backend/app/routers/teachers.py` | Admin CRUD for teacher accounts |
 | `traffic/frontend/src/App.tsx` | React Router v6 route tree |
-| `traffic/frontend/src/context/StudentContext.tsx` | Student identity from launch token verification |
-| `traffic/frontend/src/api/client.ts` | Axios instance |
-| `traffic/frontend/src/pages/DisplayPage.tsx` | Classroom QR display |
-| `traffic/frontend/src/pages/StudentScanPage.tsx` | Camera-based QR scanner |
-| `traffic/frontend/src/pages/TeacherLoginPage.tsx` | Teacher login form |
-| `traffic/frontend/src/pages/TeacherSessionPage.tsx` | Session management UI |
+| `traffic/frontend/src/context/AuthContext.tsx` | Teacher + admin auth state (localStorage) |
+| `traffic/frontend/src/context/StudentContext.tsx` | Student identity + raw launch_token (sessionStorage) |
+| `traffic/frontend/src/lib/hmac.ts` | Client-side HMAC-SHA256 QR token generation (Web Crypto API) |
+| `traffic/frontend/src/pages/DisplayPage.tsx` | Tablet display: self-init, polls tablet + session, generates QR client-side |
+| `traffic/frontend/src/pages/StudentScanPage.tsx` | @zxing camera scanner; sends `qr_token` + `launch_token` to attend endpoint |
+| `traffic/frontend/src/pages/TeacherSessionPage.tsx` | Create session with schedule suggestions; live attendee list with 5s polling |
+| `traffic/frontend/src/pages/TeacherHistoryPage.tsx` | Past sessions list with active Badge |
+| `traffic/frontend/src/pages/TeacherSessionDetailPage.tsx` | Session detail + attendees Table |
+| `traffic/frontend/src/pages/admin/AdminTabletsPage.tsx` | Registered tablets in responsive grid |
+| `traffic/frontend/src/pages/admin/AdminRegisterPage.tsx` | Two-step building→room selection with `step-enter-forward/back` animations + AlertDialog |
+| `traffic/frontend/src/pages/admin/AdminTeachersPage.tsx` | Teacher CRUD in responsive grid |
+| `traffic/frontend/nginx.prod.conf` | Production nginx: resolver fix + proxy_pass with `$request_uri` |

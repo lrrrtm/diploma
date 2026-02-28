@@ -2,19 +2,9 @@ export type AuthRole = "staff" | "admin" | "executor";
 
 export interface AuthInfo {
   role: AuthRole;
+  full_name: string;
   department_id: string | null;
-  department_name: string | null;
-  executor_id?: string | null;
-  executor_name?: string | null;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  role: AuthRole;
-  department_id?: string;
-  department_name?: string;
-  executor_id?: string;
-  executor_name?: string;
+  executor_id: string | null;
 }
 
 export interface StudentInfo {
@@ -27,7 +17,6 @@ export interface Department {
   id: string;
   name: string;
   description: string | null;
-  login: string | null;
   created_at: string;
 }
 
@@ -83,7 +72,6 @@ export interface Executor {
   id: string;
   department_id: string;
   name: string;
-  login: string;
   created_at: string;
 }
 

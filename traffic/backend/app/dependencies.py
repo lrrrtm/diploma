@@ -10,30 +10,37 @@ from app.models.teacher import Teacher
 bearer = HTTPBearer(auto_error=False)
 
 
-def _decode(credentials: HTTPAuthorizationCredentials | None, secret: str, required_role: str) -> dict:
+def _decode_sso(credentials: HTTPAuthorizationCredentials | None) -> dict:
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        payload = jwt.decode(credentials.credentials, secret, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            credentials.credentials, settings.SSO_JWT_SECRET, algorithms=[settings.ALGORITHM]
+        )
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    if payload.get("role") != required_role:
-        raise HTTPException(status_code=403, detail="Forbidden")
+        raise HTTPException(status_code=401, detail="Недействительный или просроченный токен")
+    if payload.get("app") != "traffic":
+        raise HTTPException(status_code=403, detail="Токен не предназначен для этого приложения")
     return payload
 
 
 def require_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
 ) -> dict:
-    return _decode(credentials, settings.ADMIN_SECRET, "admin")
+    payload = _decode_sso(credentials)
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Требуются права администратора")
+    return payload
 
 
 def require_teacher(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: DBSession = Depends(get_db),
 ) -> Teacher:
-    payload = _decode(credentials, settings.TEACHER_SECRET, "teacher")
-    teacher = db.get(Teacher, payload["sub"])
+    payload = _decode_sso(credentials)
+    if payload.get("role") != "teacher":
+        raise HTTPException(status_code=403, detail="Требуются права преподавателя")
+    teacher = db.get(Teacher, payload.get("entity_id"))
     if not teacher:
-        raise HTTPException(status_code=401, detail="Teacher account not found")
+        raise HTTPException(status_code=401, detail="Аккаунт преподавателя не найден")
     return teacher

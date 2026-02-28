@@ -11,14 +11,14 @@ class Settings(BaseSettings):
     # Shared secret for verifying launch tokens from main app
     LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
 
-    # Secret used to sign teacher JWTs
-    TEACHER_SECRET: str = "change-me-teacher-secret"
+    # Secret used to verify SSO tokens (shared with the SSO service)
+    SSO_JWT_SECRET: str = "change-me-sso-jwt-secret"
 
-    # Secret used to sign admin JWTs
-    ADMIN_SECRET: str = "change-me-admin-secret"
+    # Secret used to authenticate inter-service calls to the SSO API
+    SSO_SERVICE_SECRET: str = "change-me-sso-service-secret"
 
-    # Admin password (username is always "admin")
-    ADMIN_PASSWORD: str = "change-me-admin-password"
+    # Internal URL of the SSO backend reachable from this container
+    SSO_API_URL: str = "http://sso-backend:8000"
 
     # How often the student QR token rotates (seconds)
     QR_ROTATE_SECONDS: int = 5

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { goToSSOLogin } from "@/lib/sso";
 
 const api = axios.create({ baseURL: "/api" });
 
@@ -18,8 +19,7 @@ api.interceptors.response.use(
       if (path.startsWith("/teacher") || path.startsWith("/admin")) {
         localStorage.removeItem("traffic_token");
         localStorage.removeItem("traffic_role");
-        const isAdmin = path.startsWith("/admin");
-        window.location.href = isAdmin ? "/admin/login" : "/teacher/login";
+        goToSSOLogin();
       }
     }
     return Promise.reject(err);

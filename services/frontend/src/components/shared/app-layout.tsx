@@ -22,7 +22,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate("/");
   };
 
   const isActive = (path: string) => {
@@ -62,8 +62,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const navItems = auth.role === "admin" ? adminNav : auth.role === "executor" ? executorNav : staffNav;
 
-  const displayName =
-    auth.role === "admin" ? "Администратор" : auth.role === "executor" ? (auth.executor_name ?? "Исполнитель") : auth.department_name || "Сотрудник";
+  const displayName = auth.full_name || (auth.role === "admin" ? "Администратор" : auth.role === "executor" ? "Исполнитель" : "Сотрудник");
 
   const displayRole = auth.role === "admin" ? "Администратор" : auth.role === "executor" ? "Исполнитель" : "Сотрудник";
 

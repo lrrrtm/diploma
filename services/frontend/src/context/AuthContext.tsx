@@ -5,18 +5,22 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import api from "@/api/client";
-import type { AuthInfo, TokenResponse } from "@/types";
+import type { AuthInfo } from "@/types";
 
 interface AuthContextType {
   auth: AuthInfo | null;
   token: string | null;
-  login: (loginStr: string, password: string) => Promise<void>;
+  loginFromToken: (token: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+function parseJwtPayload(token: string): Record<string, unknown> {
+  const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  return JSON.parse(atob(b64));
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthInfo | null>(() => {
@@ -27,26 +31,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => localStorage.getItem("token")
   );
 
-  const login = useCallback(
-    async (loginStr: string, password: string) => {
-      const { data } = await api.post<TokenResponse>("/auth/login", {
-        login: loginStr,
-        password,
-      });
-      const authInfo: AuthInfo = {
-        role: data.role,
-        department_id: data.department_id ?? null,
-        department_name: data.department_name ?? null,
-        executor_id: data.executor_id ?? null,
-        executor_name: data.executor_name ?? null,
-      };
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("auth", JSON.stringify(authInfo));
-      setToken(data.access_token);
-      setAuth(authInfo);
-    },
-    []
-  );
+  const loginFromToken = useCallback((token: string) => {
+    const payload = parseJwtPayload(token);
+    const role = payload.role as AuthInfo["role"];
+    const entityId = (payload.entity_id as string | null) ?? null;
+    const authInfo: AuthInfo = {
+      role,
+      full_name: (payload.full_name as string) ?? "",
+      department_id: role === "staff" ? entityId : null,
+      executor_id: role === "executor" ? entityId : null,
+    };
+    localStorage.setItem("token", token);
+    localStorage.setItem("auth", JSON.stringify(authInfo));
+    setToken(token);
+    setAuth(authInfo);
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("token");
@@ -60,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         auth,
         token,
-        login,
+        loginFromToken,
         logout,
         isAuthenticated: !!token,
       }}

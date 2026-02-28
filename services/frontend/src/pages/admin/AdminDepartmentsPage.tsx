@@ -29,7 +29,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/shared/page-header";
 import api from "@/api/client";
@@ -42,7 +41,7 @@ export default function AdminDepartmentsPage() {
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [login, setLogin] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
@@ -61,7 +60,7 @@ export default function AdminDepartmentsPage() {
     setEditingDept(null);
     setName("");
     setDescription("");
-    setLogin("");
+    setUsername("");
     setPassword("");
     setDialogOpen(true);
   };
@@ -70,7 +69,7 @@ export default function AdminDepartmentsPage() {
     setEditingDept(dept);
     setName(dept.name);
     setDescription(dept.description || "");
-    setLogin(dept.login || "");
+    setUsername("");
     setPassword("");
     setDialogOpen(true);
   };
@@ -80,10 +79,10 @@ export default function AdminDepartmentsPage() {
     const payload: Record<string, unknown> = {
       name,
       description: description || null,
-      login: login || null,
     };
-    if (password) {
-      payload.password = password;
+    if (!editingDept) {
+      payload.username = username || null;
+      payload.password = password || null;
     }
 
     try {
@@ -135,7 +134,6 @@ export default function AdminDepartmentsPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-5 w-24 rounded-full" />
             </CardContent>
           </Card>
         ))}
@@ -188,13 +186,10 @@ export default function AdminDepartmentsPage() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent>
                 <p className="text-sm text-muted-foreground">
                   {dept.description || "Описание отсутствует"}
                 </p>
-                {dept.login && (
-                  <Badge variant="secondary">Логин: {dept.login}</Badge>
-                )}
               </CardContent>
             </Card>
           ))}
@@ -209,7 +204,9 @@ export default function AdminDepartmentsPage() {
               {editingDept ? "Редактировать структуру" : "Новая структура"}
             </DialogTitle>
             <DialogDescription>
-              Укажите данные структуры и учётные данные для входа
+              {editingDept
+                ? "Измените название или описание структуры."
+                : "Укажите данные структуры и учётные данные для сотрудника."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -233,29 +230,32 @@ export default function AdminDepartmentsPage() {
               />
             </div>
 
-            <Separator />
-
-            <div className="space-y-2">
-              <Label htmlFor="dept-login">Логин для входа</Label>
-              <Input
-                id="dept-login"
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                placeholder="stipendial"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dept-password">
-                {editingDept ? "Новый пароль (оставьте пустым, чтобы не менять)" : "Пароль"}
-              </Label>
-              <Input
-                id="dept-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={editingDept ? "Оставьте пустым" : "Пароль"}
-              />
-            </div>
+            {!editingDept && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label htmlFor="dept-username">Логин сотрудника (SSO)</Label>
+                  <Input
+                    id="dept-username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="stipendial"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dept-password">Пароль сотрудника</Label>
+                  <Input
+                    id="dept-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Пароль"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </>
+            )}
 
             <Button type="submit" className="w-full">
               {editingDept ? "Сохранить" : "Создать"}

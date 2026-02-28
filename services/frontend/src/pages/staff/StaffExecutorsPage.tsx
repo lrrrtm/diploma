@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Users, Trash2, Plus, KeyRound, User } from "lucide-react";
+import { Users, Trash2, Plus, User } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,7 +34,7 @@ export default function StaffExecutorsPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [name, setName] = useState("");
-  const [login, setLogin] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +55,11 @@ export default function StaffExecutorsPage() {
     setCreating(true);
     setError(null);
     try {
-      await api.post("/executors/", { name, login, password });
+      await api.post("/executors/", { name, username, password });
       toast.success("Исполнитель создан");
       setDialogOpen(false);
       setName("");
-      setLogin("");
+      setUsername("");
       setPassword("");
       fetchExecutors();
     } catch (err: unknown) {
@@ -92,10 +92,7 @@ export default function StaffExecutorsPage() {
           <Card key={i}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="space-y-1.5 flex-1">
-                  <Skeleton className="h-5 w-1/3" />
-                  <Skeleton className="h-4 w-1/4" />
-                </div>
+                <Skeleton className="h-5 w-1/3" />
                 <Skeleton className="h-8 w-8 rounded-md shrink-0" />
               </div>
             </CardContent>
@@ -129,15 +126,9 @@ export default function StaffExecutorsPage() {
             <Card key={ex.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-medium truncate">{ex.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <KeyRound className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{ex.login}</span>
-                    </div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-medium truncate">{ex.name}</span>
                   </div>
                   <Button
                     variant="ghost"
@@ -172,13 +163,14 @@ export default function StaffExecutorsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="exec-login">Логин</Label>
+              <Label htmlFor="exec-username">Логин (SSO)</Label>
               <Input
-                id="exec-login"
+                id="exec-username"
                 placeholder="ivanov"
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
@@ -191,6 +183,7 @@ export default function StaffExecutorsPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={4}
+                autoComplete="new-password"
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
