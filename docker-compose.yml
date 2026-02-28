@@ -66,6 +66,7 @@ services:
       sso:
         aliases:
           - sso-backend
+          - backend
 
   sso-frontend:
     build: ./sso/frontend
