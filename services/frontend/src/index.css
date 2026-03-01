@@ -29,6 +29,9 @@
   animation: step-enter-back 180ms ease-out both;
 }
 
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 @layer base {
   * {
     @apply border-border;

@@ -1,145 +1,163 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  LogOut,
-  Monitor,
-  Moon,
-  Sun,
-  Users,
-  Tv,
-} from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { User, Tv, Users, LogOut, Sun, Moon, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme, type Theme } from "@/context/ThemeContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { goToSSOLogin } from "@/lib/sso";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/admin/tablets", label: "Киоски", icon: Tv },
   { to: "/admin/teachers", label: "Преподаватели", icon: Users },
 ];
 
+const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType }[] = [
+  { value: "light", label: "Светлая", icon: Sun },
+  { value: "system", label: "Системная", icon: Monitor },
+  { value: "dark", label: "Тёмная", icon: Moon },
+];
+
 export function AdminLayout({ children }: { children: ReactNode }) {
-  const { logout } = useAuth();
+  const { fullName, logout } = useAuth();
   const location = useLocation();
   const { theme, setTheme } = useTheme();
+  const isMobile = useIsMobile();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     goToSSOLogin();
   };
 
-  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + "/");
+  const isActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(path + "/");
+
+  const displayName = fullName || "Администратор";
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+
+  const profileContent = (
+    <div className="overflow-y-auto max-h-[85dvh] px-4 pt-6 pb-8">
+      <div className="flex flex-col items-center mb-5 gap-1.5">
+        <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center">
+          <span className="text-xl font-bold text-primary-foreground select-none">
+            {initials}
+          </span>
+        </div>
+        <p className="text-base font-semibold text-foreground text-center mt-1">
+          {displayName}
+        </p>
+        <p className="text-sm text-muted-foreground text-center">
+          Администратор
+        </p>
+      </div>
+
+      <div className="mt-6">
+        <p className="text-sm font-medium text-foreground mb-2">
+          Тема оформления
+        </p>
+        <div className="flex gap-1 p-1 bg-muted rounded-lg">
+          {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setTheme(value)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                theme === value
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Button
+        variant="outline"
+        className="mt-6 w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-red-900 dark:hover:bg-red-950"
+        onClick={handleLogout}
+      >
+        <LogOut className="h-4 w-4 mr-2" />
+        Выйти
+      </Button>
+    </div>
+  );
 
   return (
-    <SidebarProvider className="h-svh">
-      <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" asChild>
-                <Link to="/admin/tablets">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <LayoutDashboard className="size-4" />
-                  </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Политехник</span>
-                    <span className="truncate text-xs text-muted-foreground">Посещаемость</span>
-                  </div>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
+    <div className="flex flex-col h-svh bg-background">
+      {/* Top bar */}
+      <header className="flex items-center gap-2 border-b border-border bg-card px-4 h-12 shrink-0">
+        <nav className="flex-1 overflow-x-auto flex gap-1 min-w-0 no-scrollbar">
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors",
+                isActive(item.to)
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              )}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
 
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {navItems.map((item) => (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton asChild isActive={isActive(item.to)} tooltip={item.label}>
-                      <Link to={item.to}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setProfileOpen(true)}
+          className="rounded-xl bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary shrink-0"
+          title="Профиль"
+        >
+          <User className="h-5 w-5" />
+        </Button>
+      </header>
 
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <div className="flex items-center gap-1 px-2 pb-1 group-data-[collapsible=icon]:hidden">
-                <Button
-                  variant={theme === "light" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setTheme("light")}
-                  title="Светлая тема"
-                >
-                  <Sun className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant={theme === "system" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setTheme("system")}
-                  title="Системная тема"
-                >
-                  <Monitor className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant={theme === "dark" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setTheme("dark")}
-                  title="Тёмная тема"
-                >
-                  <Moon className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={handleLogout} tooltip="Выйти">
-                <LogOut />
-                <span>Выйти</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-      </Sidebar>
-
-      <SidebarInset>
-        <header className="flex h-12 items-center gap-2 border-b border-border bg-card px-4 shrink-0">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="h-4" />
-        </header>
-        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-4">
-          <div className="flex-1 max-w-5xl mx-auto w-full flex flex-col">
-            {children}
-          </div>
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-4">
+        <div className="flex-1 max-w-5xl mx-auto w-full flex flex-col">
+          {children}
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+
+      {/* Profile — Sheet on mobile, Dialog on desktop */}
+      {isMobile ? (
+        <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
+          <SheetContent side="bottom" className="p-0 rounded-t-2xl">
+            <SheetTitle className="sr-only">Профиль</SheetTitle>
+            {profileContent}
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+          <DialogContent className="max-w-sm p-0">
+            <DialogTitle className="sr-only">Профиль</DialogTitle>
+            {profileContent}
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
   );
 }

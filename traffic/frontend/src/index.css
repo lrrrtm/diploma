@@ -93,6 +93,9 @@
 .step-enter-forward { animation: step-enter-forward 180ms ease-out both; }
 .step-enter-back    { animation: step-enter-back    180ms ease-out both; }
 
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 html, body, #root {
   height: 100%;
   overflow: hidden;
