@@ -2,7 +2,10 @@ import asyncio
 import logging
 import secrets
 import uuid
+from copy import deepcopy
+from datetime import datetime, timezone
 from collections.abc import Iterable
+from typing import Any
 
 import httpx
 
@@ -13,6 +16,21 @@ from poly_shared.clients.sso_client import SSOClient
 from poly_shared.errors import UpstreamRejected, UpstreamUnavailable
 
 logger = logging.getLogger(__name__)
+
+
+_SYNC_LOCK = asyncio.Lock()
+_MANUAL_TASK: asyncio.Task | None = None
+_SYNC_STATE: dict[str, Any] = {
+    "running": False,
+    "last_source": None,
+    "last_started_at": None,
+    "last_finished_at": None,
+    "last_success_at": None,
+    "last_error": None,
+    "last_stats": None,
+    "runs_total": 0,
+    "runs_failed": 0,
+}
 
 _TRANS = {
     "а": "a",
@@ -125,6 +143,7 @@ def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
     created_or_linked_sso = 0
     skipped = 0
     failed = 0
+    failed_sample: list[dict[str, Any]] = []
 
     client = SSOClient(
         base_url=settings.SSO_API_URL,
@@ -190,8 +209,16 @@ def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
                     ruz_teacher_id=ruz_teacher_id,
                 )
                 created_or_linked_sso += 1
-            except (UpstreamRejected, UpstreamUnavailable, RuntimeError):
+            except (UpstreamRejected, UpstreamUnavailable, RuntimeError) as exc:
                 failed += 1
+                if len(failed_sample) < 50:
+                    failed_sample.append(
+                        {
+                            "ruz_teacher_id": ruz_teacher_id,
+                            "full_name": full_name,
+                            "reason": str(exc),
+                        }
+                    )
                 logger.exception("Failed to provision SSO teacher for ruz_teacher_id=%s", ruz_teacher_id)
 
         return {
@@ -201,15 +228,73 @@ def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
             "created_or_linked_sso": created_or_linked_sso,
             "skipped": skipped,
             "failed": failed,
+            "failed_sample": failed_sample,
         }
     finally:
         db.close()
 
 
-async def run_teacher_sync_once() -> dict[str, int]:
-    raw = await _fetch_teachers_from_schedule()
-    normalized = _normalize(raw)
-    return await asyncio.to_thread(_sync_to_traffic_and_sso, normalized)
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def get_teacher_sync_status() -> dict[str, Any]:
+    payload = deepcopy(_SYNC_STATE)
+    payload["running"] = _SYNC_LOCK.locked()
+    payload["enabled"] = settings.TRAFFIC_TEACHER_SYNC_ENABLED
+    payload["interval_seconds"] = settings.TRAFFIC_TEACHER_SYNC_INTERVAL_SECONDS
+    payload["startup_delay_seconds"] = settings.TRAFFIC_TEACHER_SYNC_STARTUP_DELAY_SECONDS
+    return payload
+
+
+def is_teacher_sync_running() -> bool:
+    return _SYNC_LOCK.locked()
+
+
+async def run_teacher_sync_once(source: str = "scheduler") -> dict[str, Any]:
+    async with _SYNC_LOCK:
+        started_at = _iso_now()
+        _SYNC_STATE["running"] = True
+        _SYNC_STATE["last_source"] = source
+        _SYNC_STATE["last_started_at"] = started_at
+        _SYNC_STATE["last_error"] = None
+        _SYNC_STATE["runs_total"] = int(_SYNC_STATE["runs_total"]) + 1
+
+        try:
+            raw = await _fetch_teachers_from_schedule()
+            normalized = _normalize(raw)
+            stats = await asyncio.to_thread(_sync_to_traffic_and_sso, normalized)
+            _SYNC_STATE["last_stats"] = stats
+            _SYNC_STATE["last_success_at"] = _iso_now()
+            return stats
+        except Exception as exc:
+            _SYNC_STATE["last_error"] = str(exc)
+            _SYNC_STATE["runs_failed"] = int(_SYNC_STATE["runs_failed"]) + 1
+            raise
+        finally:
+            _SYNC_STATE["running"] = False
+            _SYNC_STATE["last_finished_at"] = _iso_now()
+
+
+def _manual_task_done(task: asyncio.Task) -> None:
+    global _MANUAL_TASK
+    _MANUAL_TASK = None
+    try:
+        task.result()
+    except Exception:
+        logger.exception("Manual teacher sync failed")
+
+
+def trigger_teacher_sync_now() -> bool:
+    global _MANUAL_TASK
+    if _SYNC_LOCK.locked():
+        return False
+    if _MANUAL_TASK is not None and not _MANUAL_TASK.done():
+        return False
+    loop = asyncio.get_running_loop()
+    _MANUAL_TASK = loop.create_task(run_teacher_sync_once(source="manual"), name="traffic-teacher-sync-manual")
+    _MANUAL_TASK.add_done_callback(_manual_task_done)
+    return True
 
 
 async def run_teacher_sync_forever() -> None:
@@ -221,7 +306,7 @@ async def run_teacher_sync_forever() -> None:
 
     while True:
         try:
-            stats = await run_teacher_sync_once()
+            stats = await run_teacher_sync_once(source="scheduler")
             logger.info(
                 (
                     "Traffic teacher sync completed: fetched=%s created_local=%s "

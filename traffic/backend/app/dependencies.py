@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException
+from fastapi import Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session as DBSession
 
@@ -31,6 +31,18 @@ def _decode_sso(credentials: HTTPAuthorizationCredentials | None) -> dict:
 def require_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
 ) -> dict:
+    payload = _decode_sso(credentials)
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Требуются права администратора")
+    return payload
+
+
+def require_admin_or_service(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    x_service_secret: str | None = Header(default=None),
+) -> dict:
+    if x_service_secret and x_service_secret == settings.SSO_SERVICE_SECRET:
+        return {"caller": "service"}
     payload = _decode_sso(credentials)
     if payload.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Требуются права администратора")

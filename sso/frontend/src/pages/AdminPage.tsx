@@ -51,6 +51,37 @@ interface SSOUser {
   created_at: string;
 }
 
+interface TeacherSyncFailedSampleItem {
+  ruz_teacher_id: number;
+  full_name: string;
+  reason?: string;
+}
+
+interface TeacherSyncStats {
+  fetched: number;
+  created_local: number;
+  updated_local: number;
+  created_or_linked_sso: number;
+  skipped: number;
+  failed: number;
+  failed_sample?: TeacherSyncFailedSampleItem[];
+}
+
+interface TeacherSyncStatus {
+  running: boolean;
+  enabled: boolean;
+  interval_seconds: number;
+  startup_delay_seconds: number;
+  last_source: string | null;
+  last_started_at: string | null;
+  last_finished_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  last_stats: TeacherSyncStats | null;
+  runs_total: number;
+  runs_failed: number;
+}
+
 const APP_LABELS: Record<string, string> = {
   sso: "Политехник.SSO",
   services: "Политехник.Услуги",
@@ -107,6 +138,13 @@ function buildPaginationItems(currentPage: number, totalPages: number): Array<nu
   return [1, "ellipsis-left", currentPage - 1, currentPage, currentPage + 1, "ellipsis-right", totalPages];
 }
 
+function formatDateTime(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("ru-RU");
+}
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
@@ -125,6 +163,9 @@ export default function AdminPage() {
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "taken">("idle");
   const checkAbortRef = useRef<AbortController | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [syncStatus, setSyncStatus] = useState<TeacherSyncStatus | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncStarting, setSyncStarting] = useState(false);
 
   const loadUsers = () => {
     api
@@ -136,10 +177,52 @@ export default function AdminPage() {
       });
   };
 
+  const loadSyncStatus = async (silent = false) => {
+    setSyncLoading(true);
+    try {
+      const response = await api.get<TeacherSyncStatus>("/integrations/traffic/teacher-sync/status");
+      setSyncStatus(response.data);
+    } catch {
+      if (!silent) {
+        toast.error("Не удалось загрузить статус синхронизации преподавателей");
+      }
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const handleRunSyncNow = async () => {
+    setSyncStarting(true);
+    try {
+      const response = await api.post<{ sync?: TeacherSyncStatus }>("/integrations/traffic/teacher-sync/run");
+      if (response.data.sync) {
+        setSyncStatus(response.data.sync);
+      }
+      toast.success("Ручная синхронизация запущена");
+      await loadSyncStatus(true);
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        "Не удалось запустить синхронизацию";
+      toast.error(detail);
+    } finally {
+      setSyncStarting(false);
+    }
+  };
+
   useEffect(() => {
     if (!isLoggedIn) { navigate("/"); return; }
     loadUsers();
+    void loadSyncStatus(true);
   }, [isLoggedIn, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!syncStatus?.running) return;
+    const timer = setInterval(() => {
+      void loadSyncStatus(true);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [syncStatus?.running]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageSize = isMobile ? 8 : 12;
   const filteredUsers = useMemo(() => {
@@ -255,13 +338,78 @@ export default function AdminPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Пользователи</h1>
         <div className="flex gap-1">
-          <Button size="icon" variant="ghost" onClick={loadUsers} title="Обновить">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => {
+              loadUsers();
+              void loadSyncStatus();
+            }}
+            title="Обновить"
+          >
             <RefreshCw className="h-4 w-4" />
           </Button>
           <Button size="icon" onClick={() => setCreateOpen(true)} title="Добавить администратора">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-lg border bg-card p-3 sm:p-4 space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium">Синхронизация преподавателей</p>
+            <p className="text-xs text-muted-foreground">RUZ - Traffic - SSO</p>
+          </div>
+          <div className="flex gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => void loadSyncStatus()}
+              title="Обновить статус синхронизации"
+              disabled={syncLoading || syncStarting}
+            >
+              <RefreshCw className={`h-4 w-4 ${syncLoading ? "animate-spin" : ""}`} />
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleRunSyncNow}
+              disabled={syncStarting || Boolean(syncStatus?.running)}
+            >
+              {syncStarting ? "Запуск..." : syncStatus?.running ? "Выполняется..." : "Запустить сейчас"}
+            </Button>
+          </div>
+        </div>
+
+        {syncStatus ? (
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>
+              Статус:{" "}
+              <span className={syncStatus.running ? "text-amber-600 dark:text-amber-400 font-medium" : "text-emerald-600 dark:text-emerald-400 font-medium"}>
+                {syncStatus.running ? "выполняется" : "ожидает"}
+              </span>
+            </p>
+            <p>
+              Авто-синк: {syncStatus.enabled ? "включён" : "выключен"} (interval {syncStatus.interval_seconds}s)
+            </p>
+            <p>Последний запуск: {formatDateTime(syncStatus.last_started_at)}</p>
+            <p>Последний успешный запуск: {formatDateTime(syncStatus.last_success_at)}</p>
+            {syncStatus.last_stats && (
+              <p>
+                Результат: fetched {syncStatus.last_stats.fetched}, local +{syncStatus.last_stats.created_local},
+                sso +{syncStatus.last_stats.created_or_linked_sso}, failed {syncStatus.last_stats.failed}
+              </p>
+            )}
+            {syncStatus.last_error && <p className="text-destructive">Ошибка: {syncStatus.last_error}</p>}
+            {syncStatus.last_stats?.failed_sample && syncStatus.last_stats.failed_sample.length > 0 && (
+              <p>
+                Примеры проблем: {syncStatus.last_stats.failed_sample.slice(0, 3).map((item) => item.full_name).join(", ")}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Статус синхронизации пока не получен</p>
+        )}
       </div>
 
       {users === null ? (

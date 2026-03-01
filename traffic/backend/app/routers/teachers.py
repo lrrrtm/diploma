@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session as DBSession
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import require_admin
+from app.dependencies import require_admin, require_admin_or_service
+from app.jobs.teacher_sync import (
+    get_teacher_sync_status,
+    is_teacher_sync_running,
+    trigger_teacher_sync_now,
+)
 from app.models.teacher import Teacher
 from poly_shared.clients.sso_client import SSOClient
 from poly_shared.errors import UpstreamRejected, UpstreamUnavailable
@@ -175,6 +180,25 @@ def delete_teacher(
     db.commit()
     _sso_delete_user(teacher_id)
     return {"status": "deleted"}
+
+
+@router.get("/sync/status")
+async def teacher_sync_status(_: dict = Depends(require_admin_or_service)):
+    return get_teacher_sync_status()
+
+
+@router.post("/sync/run", status_code=202)
+async def teacher_sync_run(_: dict = Depends(require_admin_or_service)):
+    if is_teacher_sync_running():
+        raise HTTPException(status_code=409, detail="Синхронизация уже выполняется")
+    started = trigger_teacher_sync_now()
+    if not started:
+        raise HTTPException(status_code=409, detail="Синхронизация уже запущена")
+    return {
+        "status": "started",
+        "detail": "Ручная синхронизация запущена",
+        "sync": get_teacher_sync_status(),
+    }
 
 
 def _serialize(t: Teacher, sso_user: dict | None = None) -> dict:

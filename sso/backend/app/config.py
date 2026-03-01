@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Token expiry
     SESSION_TOKEN_EXPIRE_HOURS: int = 24
 
+    # Internal URL of traffic backend for integrations (teacher sync control)
+    TRAFFIC_API_URL: str = "http://traffic-backend:8000"
+
     @model_validator(mode="after")
     def build_database_url(self) -> "Settings":
         if self.DATABASE_URL:

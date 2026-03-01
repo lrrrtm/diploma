@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 
 from app.database import SessionLocal
 from app.config import settings
-from app.routers import auth, users, provision
+from app.routers import auth, integrations, provision, users
 
 import app.models  # noqa: F401 — registers all models with Base metadata
 
@@ -52,6 +52,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(provision.router, prefix="/api/provision", tags=["provision"])
+app.include_router(integrations.router, prefix="/api/integrations", tags=["integrations"])
 
 
 @app.get("/api/health")
