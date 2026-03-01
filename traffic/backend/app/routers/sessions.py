@@ -61,18 +61,36 @@ def _normalize_date(value: str) -> str:
     return value.replace(".", "-")
 
 
+def _normalize_name(value: str) -> str:
+    return " ".join(value.strip().lower().replace("ё", "е").split())
+
+
 def _lesson_teacher_ids(lesson: dict) -> set[int]:
     result: set[int] = set()
     for teacher in lesson.get("teachers") or []:
         if not isinstance(teacher, dict):
             continue
-        for key in ("id", "teacher_id", "ruz_teacher_id"):
+        for key in ("id", "teacher_id", "ruz_teacher_id", "oid"):
             raw = teacher.get(key)
             if isinstance(raw, int):
                 result.add(raw)
                 continue
             if isinstance(raw, str) and raw.isdigit():
                 result.add(int(raw))
+    return result
+
+
+def _lesson_teacher_names(lesson: dict) -> set[str]:
+    result: set[str] = set()
+    for teacher in lesson.get("teachers") or []:
+        if not isinstance(teacher, dict):
+            continue
+        for key in ("full_name", "name"):
+            raw = teacher.get(key)
+            if isinstance(raw, str):
+                normalized = _normalize_name(raw)
+                if normalized:
+                    result.add(normalized)
     return result
 
 
@@ -141,6 +159,27 @@ def get_session_start_options(
     except UpstreamRejected:
         raise HTTPException(status_code=502, detail="Не удалось получить расписание аудитории")
 
+    candidate_teacher_ids: set[int] = {teacher.ruz_teacher_id}
+    teacher_full_name = _normalize_name(teacher.full_name)
+    try:
+        teachers_payload = schedule_client.get_teachers()
+        teachers_raw = teachers_payload.get("teachers", []) if isinstance(teachers_payload, dict) else []
+        if isinstance(teachers_raw, list):
+            for item in teachers_raw:
+                if not isinstance(item, dict):
+                    continue
+                schedule_id = item.get("id")
+                schedule_oid = item.get("oid")
+                if schedule_id == teacher.ruz_teacher_id or schedule_oid == teacher.ruz_teacher_id:
+                    if isinstance(schedule_id, int):
+                        candidate_teacher_ids.add(schedule_id)
+                    if isinstance(schedule_oid, int):
+                        candidate_teacher_ids.add(schedule_oid)
+                    break
+    except (UpstreamUnavailable, UpstreamRejected):
+        # Fallbacks (ID and full name) still work even if teacher dictionary is unavailable.
+        pass
+
     days = scheduler.get("days", []) if isinstance(scheduler, dict) else []
     if not isinstance(days, list):
         days = []
@@ -168,7 +207,11 @@ def get_session_start_options(
         if not isinstance(lesson, dict):
             continue
         teacher_ids = _lesson_teacher_ids(lesson)
-        if teacher.ruz_teacher_id not in teacher_ids:
+        matched = bool(candidate_teacher_ids.intersection(teacher_ids))
+        if not matched and teacher_full_name:
+            lesson_teacher_names = _lesson_teacher_names(lesson)
+            matched = teacher_full_name in lesson_teacher_names
+        if not matched:
             continue
         type_obj = lesson.get("typeObj") or {}
         eligible_lessons.append(

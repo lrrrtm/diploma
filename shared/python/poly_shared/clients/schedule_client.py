@@ -68,3 +68,13 @@ class ScheduleClient:
                 message="failed to fetch room scheduler",
             )
         return self._response_json(response, "invalid room scheduler response")
+
+    def get_teachers(self) -> Any:
+        response = self._request("GET", "/api/schedule/teachers")
+        if response.status_code != 200:
+            raise UpstreamRejected(
+                service="schedule",
+                status_code=response.status_code,
+                message="failed to fetch teachers",
+            )
+        return self._response_json(response, "invalid teachers response")
