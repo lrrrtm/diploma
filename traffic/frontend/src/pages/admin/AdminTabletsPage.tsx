@@ -1,17 +1,26 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Monitor, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import api from "@/api/client";
 import { useAdminData } from "@/context/AdminDataContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
 export default function AdminTabletsPage() {
   const navigate = useNavigate();
   const { tablets, refresh } = useAdminData();
+  const isMobile = useIsMobile();
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   async function confirmDelete() {
@@ -44,9 +53,9 @@ export default function AdminTabletsPage() {
       </div>
 
       {registered === null ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+        <div className="rounded-lg border bg-card p-3 space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full rounded-md" />
           ))}
         </div>
       ) : registered.length === 0 ? (
@@ -56,25 +65,66 @@ export default function AdminTabletsPage() {
           <p className="text-xs text-muted-foreground">Нажмите + и введите код с экрана киоска</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {registered.map((t) => (
-            <Card key={t.id}>
-              <CardContent className="px-4 py-3 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-sm">{t.building_name}, ауд. {t.room_name}</p>
-                  <p className="text-xs text-muted-foreground font-mono break-all">{t.id}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive shrink-0"
-                  onClick={() => setPendingDeleteId(t.id)}
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <Table>
+            <TableHeader className={isMobile ? "sr-only" : undefined}>
+              <TableRow>
+                <TableHead className="w-[45%]">UUID киоска</TableHead>
+                <TableHead className="w-[20%]">Корпус</TableHead>
+                <TableHead className="w-[20%]">Аудитория</TableHead>
+                <TableHead className="w-[15%] text-right">Действия</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {registered.map((t) => (
+                <TableRow
+                  key={t.id}
+                  className={isMobile ? "block px-3 py-2 border-b last:border-b-0" : undefined}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                  <TableCell
+                    className={
+                      isMobile
+                        ? "flex items-start justify-between gap-3 px-0 py-1"
+                        : "font-mono text-xs break-all"
+                    }
+                  >
+                    {isMobile && (
+                      <span className="text-xs text-muted-foreground shrink-0">UUID</span>
+                    )}
+                    <span className="font-mono text-xs break-all text-right sm:text-left">
+                      {t.id}
+                    </span>
+                  </TableCell>
+                  <TableCell
+                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : undefined}
+                  >
+                    {isMobile && <span className="text-xs text-muted-foreground">Корпус</span>}
+                    <span>{t.building_name ?? "—"}</span>
+                  </TableCell>
+                  <TableCell
+                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : undefined}
+                  >
+                    {isMobile && <span className="text-xs text-muted-foreground">Аудитория</span>}
+                    <span>{t.room_name ?? "—"}</span>
+                  </TableCell>
+                  <TableCell
+                    className={isMobile ? "flex justify-end px-0 pt-2 pb-1" : "text-right"}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setPendingDeleteId(t.id)}
+                      title="Удалить киоск"
+                      aria-label={`Удалить киоск ${t.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 

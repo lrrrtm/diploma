@@ -5,29 +5,88 @@ on:
     branches:
       - master
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
-      main: ${{ steps.filter.outputs.main }}
-      services: ${{ steps.filter.outputs.services }}
-      traffic: ${{ steps.filter.outputs.traffic }}
-      sso: ${{ steps.filter.outputs.sso }}
+      infra: ${{ steps.filter.outputs.infra }}
+      main_backend: ${{ steps.filter.outputs.main_backend }}
+      main_frontend: ${{ steps.filter.outputs.main_frontend }}
+      services_backend: ${{ steps.filter.outputs.services_backend }}
+      services_frontend: ${{ steps.filter.outputs.services_frontend }}
+      traffic_backend: ${{ steps.filter.outputs.traffic_backend }}
+      traffic_frontend: ${{ steps.filter.outputs.traffic_frontend }}
+      sso_backend: ${{ steps.filter.outputs.sso_backend }}
+      sso_frontend: ${{ steps.filter.outputs.sso_frontend }}
+      frontend_changed: ${{ steps.summary.outputs.frontend_changed }}
+      deploy_required: ${{ steps.summary.outputs.deploy_required }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            main:
+            infra:
+              - 'docker-compose.yml'
+              - 'main/docker-compose.yml'
+              - 'services/docker-compose.yml'
+            main_backend:
+              - 'main/backend/**'
+            main_frontend:
               - 'main/frontend/**'
-            services:
+            services_backend:
+              - 'services/backend/**'
+            services_frontend:
               - 'services/frontend/**'
-            traffic:
+            traffic_backend:
+              - 'traffic/backend/**'
+            traffic_frontend:
               - 'traffic/frontend/**'
-            sso:
+            sso_backend:
+              - 'sso/backend/**'
+            sso_frontend:
               - 'sso/frontend/**'
+
+      - name: Summarize deployment scope
+        id: summary
+        run: |
+          set -eu
+
+          FRONTEND_CHANGED=false
+          DEPLOY_REQUIRED=false
+
+          if [ "${{ steps.filter.outputs.main_frontend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.services_frontend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.traffic_frontend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.sso_frontend }}" = "true" ]; then
+            FRONTEND_CHANGED=true
+          fi
+
+          if [ "${{ steps.filter.outputs.infra }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.main_backend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.main_frontend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.services_backend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.services_frontend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.traffic_backend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.traffic_frontend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.sso_backend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.sso_frontend }}" = "true" ]; then
+            DEPLOY_REQUIRED=true
+          fi
+
+          echo "frontend_changed=$FRONTEND_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "deploy_required=$DEPLOY_REQUIRED" >> "$GITHUB_OUTPUT"
 
   typecheck:
     name: Type Check
@@ -36,8 +95,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.frontend_changed == 'true'
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.frontend_changed == 'true'
         with:
           node-version: 20
           cache: npm
@@ -48,29 +109,32 @@ jobs:
             sso/frontend/package-lock.json
 
       - name: Install & typecheck main
-        if: needs.changes.outputs.main == 'true'
+        if: needs.changes.outputs.main_frontend == 'true'
         working-directory: main/frontend
         run: npm ci && npx tsc --noEmit
 
       - name: Install & typecheck services
-        if: needs.changes.outputs.services == 'true'
+        if: needs.changes.outputs.services_frontend == 'true'
         working-directory: services/frontend
         run: npm ci && npx tsc --noEmit
 
       - name: Install & typecheck traffic
-        if: needs.changes.outputs.traffic == 'true'
+        if: needs.changes.outputs.traffic_frontend == 'true'
         working-directory: traffic/frontend
         run: npm ci && npx tsc --noEmit
 
       - name: Install & typecheck sso
-        if: needs.changes.outputs.sso == 'true'
+        if: needs.changes.outputs.sso_frontend == 'true'
         working-directory: sso/frontend
         run: npm ci && npx tsc --noEmit
 
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: typecheck
+    needs:
+      - changes
+      - typecheck
+    if: needs.changes.outputs.deploy_required == 'true'
 
     steps:
       - name: Deploy via SSH
@@ -81,45 +145,52 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            set -e
-            cd ${{ secrets.DEPLOY_PATH }}
+            set -eu
+            cd "${{ secrets.DEPLOY_PATH }}"
 
-            OLD_HEAD=$(git rev-parse HEAD)
-            git pull origin master
-            CHANGED=$(git diff --name-only "$OLD_HEAD" HEAD)
+            git pull --ff-only origin master
 
-            echo "Changed files:"
-            echo "$CHANGED"
-
-            # If global config changed — rebuild everything
-            if echo "$CHANGED" | grep -qE '^(docker-compose|\.env)'; then
-              echo "Global config changed — rebuilding all services"
+            # Global infra changes -> full rebuild.
+            if [ "${{ needs.changes.outputs.infra }}" = "true" ]; then
+              echo "Global infrastructure files changed. Rebuilding all services."
               docker compose up --build -d
               docker image prune -f
               exit 0
             fi
 
-            # Collect services to rebuild
+            # Collect only changed services.
             SERVICES=""
-            if echo "$CHANGED" | grep -qE '^main/'; then
-              SERVICES="$SERVICES main-backend main-frontend"
+            if [ "${{ needs.changes.outputs.main_backend }}" = "true" ]; then
+              SERVICES="$SERVICES main-backend"
             fi
-            if echo "$CHANGED" | grep -qE '^services/'; then
-              SERVICES="$SERVICES services-backend services-frontend"
+            if [ "${{ needs.changes.outputs.main_frontend }}" = "true" ]; then
+              SERVICES="$SERVICES main-frontend"
             fi
-            if echo "$CHANGED" | grep -qE '^traffic/'; then
-              SERVICES="$SERVICES traffic-backend traffic-frontend"
+            if [ "${{ needs.changes.outputs.services_backend }}" = "true" ]; then
+              SERVICES="$SERVICES services-backend"
             fi
-            if echo "$CHANGED" | grep -qE '^sso/'; then
-              SERVICES="$SERVICES sso-backend sso-frontend"
+            if [ "${{ needs.changes.outputs.services_frontend }}" = "true" ]; then
+              SERVICES="$SERVICES services-frontend"
+            fi
+            if [ "${{ needs.changes.outputs.traffic_backend }}" = "true" ]; then
+              SERVICES="$SERVICES traffic-backend"
+            fi
+            if [ "${{ needs.changes.outputs.traffic_frontend }}" = "true" ]; then
+              SERVICES="$SERVICES traffic-frontend"
+            fi
+            if [ "${{ needs.changes.outputs.sso_backend }}" = "true" ]; then
+              SERVICES="$SERVICES sso-backend"
+            fi
+            if [ "${{ needs.changes.outputs.sso_frontend }}" = "true" ]; then
+              SERVICES="$SERVICES sso-frontend"
             fi
 
-            SERVICES=$(echo $SERVICES | xargs)
+            SERVICES=$(echo "$SERVICES" | xargs)
 
             if [ -z "$SERVICES" ]; then
-              echo "No service changes — skipping rebuild"
+              echo "No deployable component changes detected. Skipping rebuild."
             else
-              echo "Rebuilding: $SERVICES"
+              echo "Rebuilding services: $SERVICES"
               docker compose up --build -d $SERVICES
               docker image prune -f
             fi
