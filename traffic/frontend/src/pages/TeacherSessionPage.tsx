@@ -65,6 +65,18 @@ function pickSuggestedLessonIndex(lessons: SessionStartLesson[]): number {
   return index >= 0 ? index : 0;
 }
 
+function isLessonActiveNow(lesson: SessionStartLesson): boolean {
+  const [sh, sm] = lesson.time_start.split(":").map(Number);
+  const [eh, em] = lesson.time_end.split(":").map(Number);
+  if (Number.isNaN(sh) || Number.isNaN(sm) || Number.isNaN(eh) || Number.isNaN(em)) {
+    return false;
+  }
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const start = sh * 60 + sm;
+  const end = eh * 60 + em;
+  return nowMinutes >= start && nowMinutes <= end;
+}
+
 export default function TeacherSessionPage() {
   const { isLoggedIn } = useAuth();
 
@@ -268,6 +280,11 @@ export default function TeacherSessionPage() {
                       <span className="font-mono text-xs shrink-0">{lesson.time_start}-{lesson.time_end}</span>
                       <span className="mx-2 truncate">{lesson.subject}</span>
                       <span className="text-xs opacity-80 shrink-0">{lesson.type_abbr}</span>
+                      {isLessonActiveNow(lesson) && (
+                        <span className="ml-auto rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 shrink-0">
+                          Идёт сейчас
+                        </span>
+                      )}
                     </Button>
                   ))}
                 </div>
