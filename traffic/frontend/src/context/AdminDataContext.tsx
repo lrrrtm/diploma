@@ -12,7 +12,7 @@ export interface Tablet {
 
 export interface Teacher {
   id: string;
-  username: string;
+  username: string | null;
   full_name: string;
   created_at: string | null;
 }

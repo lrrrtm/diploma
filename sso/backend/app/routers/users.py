@@ -76,7 +76,7 @@ class UpdateUserRequest(BaseModel):
 @router.get("/check-username")
 def check_username(
     username: str,
-    _: dict = Depends(_require_sso_admin),
+    _: str = Depends(_require_sso_admin_or_service),
     db: DBSession = Depends(get_db),
 ):
     exists = db.query(User).filter(User.username == username).first()
@@ -86,9 +86,11 @@ def check_username(
 @router.get("/")
 def list_users(
     app_filter: str | None = None,
-    _: dict = Depends(_require_sso_admin),
+    caller: str = Depends(_require_sso_admin_or_service),
     db: DBSession = Depends(get_db),
 ):
+    if caller == "service" and not app_filter:
+        raise HTTPException(status_code=400, detail="Для service-запроса требуется app_filter")
     q = db.query(User)
     if app_filter:
         q = q.filter(User.app == app_filter)

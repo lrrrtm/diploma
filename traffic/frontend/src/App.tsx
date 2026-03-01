@@ -8,7 +8,6 @@ import TeacherSessionDetailPage from "@/pages/TeacherSessionDetailPage";
 import StudentScanPage from "@/pages/StudentScanPage";
 import AdminTabletsPage from "@/pages/admin/AdminTabletsPage";
 import AdminTeachersPage from "@/pages/admin/AdminTeachersPage";
-import AdminAddTeacherPage from "@/pages/admin/AdminAddTeacherPage";
 import { AdminLayout } from "@/components/shared/AdminLayout";
 import { TeacherLayout } from "@/components/shared/TeacherLayout";
 import { useAuth } from "@/context/AuthContext";
@@ -88,7 +87,7 @@ export default function App() {
         <Route index element={<Navigate to="tablets" replace />} />
         <Route path="tablets" element={<AdminTabletsPage />} />
         <Route path="teachers" element={<AdminTeachersPage />} />
-        <Route path="teachers/add" element={<AdminAddTeacherPage />} />
+        <Route path="teachers/add" element={<Navigate to="/admin/teachers" replace />} />
       </Route>
 
       {/* Unknown paths → root */}
