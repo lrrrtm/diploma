@@ -135,7 +135,7 @@ def delete_tablet(
 
 
 def _serialize(t: Tablet) -> dict:
-    return {
+    d: dict = {
         "id": t.id,
         "is_registered": t.is_registered,
         "building_id": t.building_id,
@@ -145,3 +145,6 @@ def _serialize(t: Tablet) -> dict:
         "assigned_at": t.assigned_at.isoformat() if t.assigned_at else None,
         "created_at": t.created_at.isoformat() if t.created_at else None,
     }
+    if not t.is_registered:
+        d["reg_pin"] = t.reg_pin
+    return d

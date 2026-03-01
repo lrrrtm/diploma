@@ -226,7 +226,7 @@ export default function AdminRegisterPage() {
       : deviceId;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Step header */}
       <div className="flex items-center gap-1 mb-3 shrink-0">
         <Button variant="ghost" size="icon" onClick={handleBack}>
