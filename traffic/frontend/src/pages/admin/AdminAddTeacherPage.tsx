@@ -52,12 +52,18 @@ export default function AdminAddTeacherPage() {
     if (!base) { setUsername(""); return; }
 
     const taken = new Set((teachers ?? []).map((t) => t.username));
-    let candidate = base;
-    for (let i = 2; i <= 20; i++) {
-      if (!taken.has(candidate)) break;
-      candidate = `${base}${i}`;
+    if (!taken.has(base)) {
+      setUsername(base);
+      return;
     }
-    setUsername(candidate);
+    for (let i = 2; i <= 20; i++) {
+      const candidate = `${base}${i}`;
+      if (!taken.has(candidate)) {
+        setUsername(candidate);
+        return;
+      }
+    }
+    setUsername(base); // all suffixes taken — backend will reject with error
   }, [fullName, usernameManual, teachers]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {

@@ -141,7 +141,7 @@ export function AdminLayout() {
 
         {/* Content */}
         <div className={cn("flex-1 min-h-0 overflow-y-auto flex flex-col px-4 pt-4", isMobile ? "pb-24" : "pb-4")}>
-          <div className="flex-1 max-w-5xl mx-auto w-full flex flex-col">
+          <div className="flex-1 min-h-0 max-w-5xl mx-auto w-full flex flex-col">
             <Outlet />
           </div>
         </div>
