@@ -63,6 +63,18 @@ function getStoredDisplayPin(): string | null {
   return localStorage.getItem("traffic_display_pin");
 }
 
+function getLocalDateKey(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getWeekdayFromDateKey(dateKey: string): number {
+  const date = new Date(`${dateKey}T00:00:00`);
+  return date.getDay() || 7;
+}
+
 /** Renders a 6-digit PIN as two groups of 3 for readability */
 function PinDisplay({ pin }: { pin: string }) {
   const value = pin.slice(0, 6);
@@ -99,6 +111,8 @@ function PinDisplay({ pin }: { pin: string }) {
 
 export default function DisplayPage() {
   const STREAM_STALE_MS = 15000;
+  const SCHEDULE_REFRESH_MS = 5 * 60 * 1000;
+  const DATE_CHECK_INTERVAL_MS = 30 * 1000;
   const [displayState, setDisplayState] = useState<DisplayState>("unregistered");
   const [tablet, setTablet] = useState<TabletInfo | null>(null);
   const [session, setSession] = useState<CurrentSession | null>(null);
@@ -306,16 +320,43 @@ export default function DisplayPage() {
 
   useEffect(() => {
     if (displayState !== "waiting" || !tablet?.building_id || !tablet?.room_id) return;
-    const today = new Date().toISOString().split("T")[0];
-    api
-      .get(`/schedule/buildings/${tablet.building_id}/rooms/${tablet.room_id}/scheduler?date=${today}`)
-      .then((res) => {
-        const todayWeekday = new Date().getDay() || 7;
-        const day = res.data.days?.find((d: { weekday: number }) => d.weekday === todayWeekday);
+
+    let disposed = false;
+    let lastDateKey = getLocalDateKey();
+
+    const loadSchedule = async (dateKey: string) => {
+      try {
+        const response = await api.get(
+          `/schedule/buildings/${tablet.building_id}/rooms/${tablet.room_id}/scheduler?date=${dateKey}`,
+        );
+        if (disposed) return;
+        const weekday = getWeekdayFromDateKey(dateKey);
+        const day = response.data.days?.find((item: { weekday: number }) => item.weekday === weekday);
         setTodayLessons(day?.lessons ?? []);
-      })
-      .catch(() => {});
-  }, [displayState, tablet?.building_id, tablet?.room_id]);
+      } catch {
+        if (!disposed) setTodayLessons([]);
+      }
+    };
+
+    void loadSchedule(lastDateKey);
+
+    const refreshTimer = setInterval(() => {
+      void loadSchedule(getLocalDateKey());
+    }, SCHEDULE_REFRESH_MS);
+
+    const dateWatcherTimer = setInterval(() => {
+      const currentDateKey = getLocalDateKey();
+      if (currentDateKey === lastDateKey) return;
+      lastDateKey = currentDateKey;
+      void loadSchedule(currentDateKey);
+    }, DATE_CHECK_INTERVAL_MS);
+
+    return () => {
+      disposed = true;
+      clearInterval(refreshTimer);
+      clearInterval(dateWatcherTimer);
+    };
+  }, [DATE_CHECK_INTERVAL_MS, SCHEDULE_REFRESH_MS, displayState, tablet?.building_id, tablet?.room_id]);
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -420,38 +461,35 @@ export default function DisplayPage() {
 
   if (displayState === "waiting") {
     return (
-      <div className="relative h-screen overflow-hidden bg-background text-foreground select-none flex">
+      <div className="relative h-screen overflow-hidden bg-background text-foreground select-none flex flex-col lg:flex-row">
         {disconnectedStrip}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6 sm:px-8 lg:px-12 py-8">
           {displayPin ? (
             <PinDisplay pin={displayPin} />
           ) : (
             <Spinner className="h-16 w-16 text-muted-foreground" />
           )}
-        </div>
-        <div className="flex-1 flex flex-col justify-center px-16 gap-6 overflow-hidden">
-          <h1 className="text-5xl font-bold leading-tight">
-            Ожидание занятия
-          </h1>
-          <p className="text-2xl text-muted-foreground leading-relaxed">
+          <p className="max-w-2xl text-center text-lg sm:text-xl lg:text-2xl leading-relaxed text-white">
             Введите этот код в интерфейсе преподавателя, чтобы запустить проверку посещаемости
           </p>
+        </div>
+        <div className="flex-1 flex flex-col justify-center px-6 sm:px-8 lg:px-16 py-8 gap-4 overflow-hidden">
+          {roomLabel && (
+            <p className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-tight text-white">
+              {roomLabel}
+            </p>
+          )}
 
-          {(roomLabel || todayLessons.length > 0) && (
-            <div className="mt-2 flex flex-col gap-4 overflow-y-auto max-h-80">
-              {roomLabel && (
-                <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">
-                  {roomLabel}
-                </p>
-              )}
+          {todayLessons.length > 0 && (
+            <div className="mt-1 flex flex-col gap-3 overflow-y-auto max-h-[52vh] pr-1">
               {todayLessons.map((lesson, i) => (
-                <div key={i} className="flex gap-5 text-foreground">
-                  <span className="text-muted-foreground text-xl whitespace-nowrap shrink-0 w-44">
+                <div key={i} className="flex items-start gap-2 sm:gap-3 text-foreground">
+                  <span className="text-foreground/80 text-lg sm:text-xl whitespace-nowrap shrink-0 w-28 sm:w-32">
                     {lesson.time_start}–{lesson.time_end}
                   </span>
                   <div>
                     <p className="font-medium text-xl leading-snug">{lesson.subject}</p>
-                    <p className="text-muted-foreground text-base">
+                    <p className="text-foreground/70 text-base">
                       {lesson.typeObj?.name ?? lesson.typeObj?.abbr}
                       {lesson.teachers?.[0] && (
                         <span className="ml-2">·&nbsp;{lesson.teachers[0].full_name}</span>
