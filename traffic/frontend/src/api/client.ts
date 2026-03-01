@@ -19,6 +19,9 @@ api.interceptors.response.use(
       if (path.startsWith("/teacher") || path.startsWith("/admin")) {
         localStorage.removeItem("traffic_token");
         localStorage.removeItem("traffic_role");
+        localStorage.removeItem("traffic_full_name");
+        localStorage.removeItem("traffic_teacher_id");
+        localStorage.removeItem("traffic_teacher_name");
         goToSSOLogin();
       }
     }

@@ -109,6 +109,8 @@ def _issue_teacher_token(user: dict) -> str:
         "app": user["app"],
         "role": user["role"],
         "entity_id": user.get("entity_id"),
+        "auth_source": "telegram",
+        "telegram_id": user.get("telegram_id"),
         "exp": datetime.now(timezone.utc) + timedelta(hours=settings.SESSION_TOKEN_EXPIRE_HOURS),
     }
     return jwt.encode(payload, settings.SSO_JWT_SECRET, algorithm=settings.ALGORITHM)

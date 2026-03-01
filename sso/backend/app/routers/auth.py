@@ -50,6 +50,7 @@ def _make_token(user: User) -> str:
         "app": user.app,
         "role": user.role,
         "entity_id": user.entity_id,
+        "auth_source": "sso",
         "exp": datetime.now(timezone.utc) + timedelta(hours=settings.SESSION_TOKEN_EXPIRE_HOURS),
     }
     return jwt.encode(payload, settings.SSO_JWT_SECRET, algorithm=settings.ALGORITHM)
