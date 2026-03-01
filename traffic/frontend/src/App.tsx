@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import DisplayPage from "@/pages/DisplayPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
@@ -16,6 +16,35 @@ import { TeacherLayout } from "@/components/shared/TeacherLayout";
 import { useAuth } from "@/context/AuthContext";
 import { goToSSOLogin } from "@/lib/sso";
 
+function RedirectScreen() {
+  return (
+    <div className="flex items-center justify-center bg-background" style={{ minHeight: "100dvh" }}>
+      <p className="text-muted-foreground text-sm">Перенаправление...</p>
+    </div>
+  );
+}
+
+function RequireRole({ role: requiredRole, children }: { role: "admin" | "teacher"; children: ReactNode }) {
+  const { isLoggedIn, role } = useAuth();
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      goToSSOLogin();
+      return;
+    }
+
+    if (role !== requiredRole) {
+      if (role === "admin") window.location.replace("/admin/tablets");
+      else if (role === "teacher") window.location.replace("/teacher/session");
+      else goToSSOLogin();
+    }
+  }, [isLoggedIn, role, requiredRole]);
+
+  if (!isLoggedIn || role !== requiredRole) return <RedirectScreen />;
+
+  return <>{children}</>;
+}
+
 function RootRedirect() {
   const { isLoggedIn, role } = useAuth();
   useEffect(() => {
@@ -23,11 +52,7 @@ function RootRedirect() {
     else if (isLoggedIn && role === "teacher") window.location.replace("/teacher/session");
     else goToSSOLogin();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <div className="flex items-center justify-center bg-background" style={{ minHeight: "100dvh" }}>
-      <p className="text-muted-foreground text-sm">Перенаправление...</p>
-    </div>
-  );
+  return <RedirectScreen />;
 }
 
 export default function App() {
@@ -47,12 +72,21 @@ export default function App() {
 
       {/* Teacher */}
       <Route path="/teacher" element={<Navigate to="/teacher/session" replace />} />
-      <Route path="/teacher/session" element={<TeacherLayout><TeacherSessionPage /></TeacherLayout>} />
-      <Route path="/teacher/history" element={<TeacherLayout><TeacherHistoryPage /></TeacherLayout>} />
-      <Route path="/teacher/history/:sessionId" element={<TeacherLayout><TeacherSessionDetailPage /></TeacherLayout>} />
+      <Route
+        path="/teacher/session"
+        element={<RequireRole role="teacher"><TeacherLayout><TeacherSessionPage /></TeacherLayout></RequireRole>}
+      />
+      <Route
+        path="/teacher/history"
+        element={<RequireRole role="teacher"><TeacherLayout><TeacherHistoryPage /></TeacherLayout></RequireRole>}
+      />
+      <Route
+        path="/teacher/history/:sessionId"
+        element={<RequireRole role="teacher"><TeacherLayout><TeacherSessionDetailPage /></TeacherLayout></RequireRole>}
+      />
 
       {/* Admin — nested routes share AdminLayout + AdminDataContext */}
-      <Route path="/admin" element={<AdminLayout />}>
+      <Route path="/admin" element={<RequireRole role="admin"><AdminLayout /></RequireRole>}>
         <Route index element={<Navigate to="tablets" replace />} />
         <Route path="tablets" element={<AdminTabletsPage />} />
         <Route path="tablets/add" element={<AdminAddKioskPage />} />

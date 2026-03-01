@@ -7,6 +7,8 @@ const Sheet = DialogPrimitive.Root;
 const SheetTrigger = DialogPrimitive.Trigger;
 const SheetClose = DialogPrimitive.Close;
 const SheetPortal = DialogPrimitive.Portal;
+const isTouchDevice = () =>
+  typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
 const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
@@ -26,7 +28,7 @@ SheetOverlay.displayName = "SheetOverlay";
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onOpenAutoFocus, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <DialogPrimitive.Content
@@ -35,6 +37,10 @@ const SheetContent = React.forwardRef<
         "fixed inset-x-0 bottom-0 z-50 flex flex-col bg-background border-t rounded-t-2xl shadow-lg h-[67dvh] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom duration-300",
         className
       )}
+      onOpenAutoFocus={(event) => {
+        onOpenAutoFocus?.(event);
+        if (!event.defaultPrevented && isTouchDevice()) event.preventDefault();
+      }}
       {...props}
     >
       <div className="mx-auto mt-3 h-1.5 w-10 rounded-full bg-muted shrink-0" />
@@ -73,7 +79,7 @@ const SheetDescription = React.forwardRef<
 SheetDescription.displayName = "SheetDescription";
 
 const SheetCloseButton = () => (
-  <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+  <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none">
     <X className="h-5 w-5" />
     <span className="sr-only">Закрыть</span>
   </DialogPrimitive.Close>

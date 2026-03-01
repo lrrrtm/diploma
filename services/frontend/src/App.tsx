@@ -31,8 +31,8 @@ function SSORedirect() {
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { isAuthenticated, auth } = useAuth();
-  if (!isAuthenticated) return <SSORedirect />;
-  if (allowedRoles && auth && !allowedRoles.includes(auth.role)) {
+  if (!isAuthenticated || !auth) return <SSORedirect />;
+  if (allowedRoles && !allowedRoles.includes(auth.role)) {
     return <Navigate to="/" replace />;
   }
   return <AppLayout>{children}</AppLayout>;
