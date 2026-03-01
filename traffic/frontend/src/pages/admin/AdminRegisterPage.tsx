@@ -92,7 +92,7 @@ function StepList<T>({
       </div>
 
       {/* Scrollable list */}
-      <div className="flex-1 overflow-y-auto divide-y divide-border">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden divide-y divide-border">
         {filtered === null ? (
           <div className="p-4 space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -110,10 +110,10 @@ function StepList<T>({
                 type="button"
                 variant="ghost"
                 onClick={() => onSelect(item)}
-                className="w-full justify-start text-left px-4 py-3.5 h-auto flex-col items-start gap-0.5 rounded-none"
+                className="w-full justify-start text-left px-4 py-3.5 h-auto flex-col items-start gap-0.5 rounded-none whitespace-normal"
               >
-                <span className="text-sm font-medium">{getLabel(item)}</span>
-                {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+                <span className="text-sm font-medium break-words text-left w-full">{getLabel(item)}</span>
+                {sub && <span className="text-xs text-muted-foreground break-words text-left w-full">{sub}</span>}
               </Button>
             );
           })
@@ -230,8 +230,8 @@ export default function AdminRegisterPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Step header */}
-      <div className="flex items-center gap-1 mb-3 shrink-0">
+      {/* Step header — sticky so it doesn't scroll with the list */}
+      <div className="flex items-center gap-1 mb-3 shrink-0 sticky top-0 z-10 bg-background -mx-4 px-4 pb-2 pt-0">
         <Button variant="ghost" size="icon" onClick={handleBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>

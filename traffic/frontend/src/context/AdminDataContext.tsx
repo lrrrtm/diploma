@@ -38,6 +38,8 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [teachers, setTeachers] = useState<Teacher[] | null>(null);
 
   const refresh = useCallback(() => {
+    setTablets(null);
+    setTeachers(null);
     api.get<Tablet[]>("/tablets/").then((r) => setTablets(r.data)).catch(() => setTablets([]));
     api.get<Teacher[]>("/teachers/").then((r) => setTeachers(r.data)).catch(() => setTeachers([]));
   }, []);
