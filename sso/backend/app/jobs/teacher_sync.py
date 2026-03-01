@@ -155,6 +155,9 @@ def _sync_teachers_to_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
             for (username,) in db.query(User.username).all()
             if isinstance(username, str) and username
         }
+        # Auto-synced teachers don't use password login flow in expected scenario.
+        # Generate one strong random hash per sync run to avoid expensive per-user hashing.
+        auto_password_hash = pwd_context.hash(secrets.token_urlsafe(32))
 
         for ruz_teacher_id, full_name in teachers:
             existing_user = existing_users_by_ruz.get(ruz_teacher_id)
@@ -176,7 +179,6 @@ def _sync_teachers_to_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
                 failed += 1
                 continue
 
-            password_hash = pwd_context.hash(secrets.token_urlsafe(24))
             created_this_teacher = False
 
             for suffix in range(1, 10_000):
@@ -186,7 +188,7 @@ def _sync_teachers_to_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
 
                 user = User(
                     username=username,
-                    password_hash=password_hash,
+                    password_hash=auto_password_hash,
                     full_name=full_name,
                     app="traffic",
                     role="teacher",
@@ -230,7 +232,9 @@ def _sync_teachers_to_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
 async def run_teacher_sync_once() -> dict[str, int]:
     raw_teachers = await _fetch_ruz_teachers()
     normalized = _normalize_teachers(raw_teachers)
-    return _sync_teachers_to_sso(normalized)
+    # Run blocking SQLAlchemy + bcrypt work in a worker thread
+    # so FastAPI event loop remains responsive.
+    return await asyncio.to_thread(_sync_teachers_to_sso, normalized)
 
 
 async def run_teacher_sync_forever() -> None:

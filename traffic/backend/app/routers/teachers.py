@@ -1,4 +1,5 @@
 import uuid
+import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,7 @@ from app.dependencies import require_admin
 from app.models.teacher import Teacher
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -32,12 +34,15 @@ def _sso_headers() -> dict:
 
 
 def _sso_check_username(username: str) -> bool:
-    resp = httpx.get(
-        f"{settings.SSO_API_URL}/api/users/check-username",
-        params={"username": username},
-        headers=_sso_headers(),
-        timeout=10,
-    )
+    try:
+        resp = httpx.get(
+            f"{settings.SSO_API_URL}/api/users/check-username",
+            params={"username": username},
+            headers=_sso_headers(),
+            timeout=10,
+        )
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="SSO недоступен: не удалось проверить логин")
     if resp.status_code != 200:
         try:
             detail = resp.json().get("detail", "Ошибка проверки логина в SSO")
@@ -48,13 +53,18 @@ def _sso_check_username(username: str) -> bool:
 
 
 def _sso_fetch_teacher_users() -> dict[str, dict]:
-    resp = httpx.get(
-        f"{settings.SSO_API_URL}/api/users/",
-        params={"app_filter": "traffic"},
-        headers=_sso_headers(),
-        timeout=10,
-    )
+    try:
+        resp = httpx.get(
+            f"{settings.SSO_API_URL}/api/users/",
+            params={"app_filter": "traffic"},
+            headers=_sso_headers(),
+            timeout=10,
+        )
+    except httpx.RequestError as exc:
+        logger.warning("SSO unavailable while fetching teacher users: %s", exc)
+        return {}
     if resp.status_code != 200:
+        logger.warning("SSO returned non-200 while fetching teacher users: %s", resp.status_code)
         return {}
 
     try:
@@ -80,19 +90,22 @@ def _sso_fetch_teacher_users() -> dict[str, dict]:
 
 
 def _sso_create_user(teacher_id: str, username: str, password: str, full_name: str) -> None:
-    resp = httpx.post(
-        f"{settings.SSO_API_URL}/api/users/",
-        json={
-            "username": username,
-            "password": password,
-            "full_name": full_name,
-            "app": "traffic",
-            "role": "teacher",
-            "entity_id": teacher_id,
-        },
-        headers=_sso_headers(),
-        timeout=10,
-    )
+    try:
+        resp = httpx.post(
+            f"{settings.SSO_API_URL}/api/users/",
+            json={
+                "username": username,
+                "password": password,
+                "full_name": full_name,
+                "app": "traffic",
+                "role": "teacher",
+                "entity_id": teacher_id,
+            },
+            headers=_sso_headers(),
+            timeout=10,
+        )
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="SSO недоступен: не удалось создать пользователя")
     if resp.status_code not in (200, 201):
         try:
             detail = resp.json().get("detail", "Ошибка создания пользователя в SSO")
@@ -102,12 +115,15 @@ def _sso_create_user(teacher_id: str, username: str, password: str, full_name: s
 
 
 def _sso_delete_user(teacher_id: str) -> None:
-    httpx.delete(
-        f"{settings.SSO_API_URL}/api/users/by-entity/{teacher_id}",
-        params={"app": "traffic"},
-        headers=_sso_headers(),
-        timeout=10,
-    )
+    try:
+        httpx.delete(
+            f"{settings.SSO_API_URL}/api/users/by-entity/{teacher_id}",
+            params={"app": "traffic"},
+            headers=_sso_headers(),
+            timeout=10,
+        )
+    except httpx.RequestError as exc:
+        logger.warning("Failed to delete SSO user by entity %s: %s", teacher_id, exc)
 
 
 # ---------------------------------------------------------------------------

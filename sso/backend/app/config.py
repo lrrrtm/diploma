@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     RUZ_BASE_URL: str = "https://ruz.spbstu.ru/api/v1/ruz"
 
     # Automatic teacher sync-job settings
-    TEACHER_SYNC_ENABLED: bool = True
+    TEACHER_SYNC_ENABLED: bool = False
     TEACHER_SYNC_INTERVAL_SECONDS: int = 3600
     TEACHER_SYNC_STARTUP_DELAY_SECONDS: int = 15
 

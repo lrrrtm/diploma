@@ -70,6 +70,44 @@ async def link_telegram_to_sso_user(ctx: AppContext, user_id: str, message: Mess
     return False, "Не удалось привязать аккаунт преподавателя."
 
 
+async def is_registered_teacher(ctx: AppContext, message: Message) -> tuple[bool | None, str | None]:
+    if not message.from_user:
+        return None, "Не удалось определить Telegram-пользователя."
+
+    headers = {"X-Service-Secret": ctx.settings.SSO_SERVICE_SECRET}
+    params = {"app_filter": "traffic"}
+    telegram_id = message.from_user.id
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(
+            f"{ctx.settings.SSO_API_URL}/api/users/by-telegram/{telegram_id}",
+            headers=headers,
+            params=params,
+        )
+
+    if response.status_code == 200:
+        return True, None
+    if response.status_code == 404:
+        return False, None
+    return None, "Не удалось проверить регистрацию. Попробуйте позже."
+
+
+async def answer_start_by_registration(ctx: AppContext, message: Message) -> None:
+    registered, error_text = await is_registered_teacher(ctx, message)
+    if registered is True:
+        await message.answer(
+            "Чтобы открыть кабинет преподавателя, нажмите на кнопку под сообщением.",
+            reply_markup=teacher_webapp_markup(ctx.settings.TRAFFIC_TEACHER_URL),
+        )
+        return
+    if registered is False:
+        await message.answer(
+            "Чтобы воспользоваться ботом, необходимо отсканировать QR-код для регистрации."
+        )
+        return
+    await message.answer(error_text or "Не удалось обработать запрос.")
+
+
 def configure_handlers(dp: Dispatcher, ctx: AppContext) -> None:
     @dp.message(CommandStart(deep_link=True))
     async def start_with_payload(message: Message) -> None:
@@ -78,11 +116,7 @@ def configure_handlers(dp: Dispatcher, ctx: AppContext) -> None:
 
         match = REGISTER_RE.match(payload)
         if not match:
-            await message.answer(
-                "Бот для преподавателей посещаемости СПбПУ.\n"
-                "Используйте кнопку ниже, чтобы открыть кабинет.",
-                reply_markup=teacher_webapp_markup(ctx.settings.TRAFFIC_TEACHER_URL),
-            )
+            await answer_start_by_registration(ctx, message)
             return
 
         sso_user_id = match.group(1)
@@ -90,7 +124,7 @@ def configure_handlers(dp: Dispatcher, ctx: AppContext) -> None:
 
         if linked:
             await message.answer(
-                f"{response_text}\nТеперь можно открыть кабинет преподавателя:",
+                f"{response_text}\nЧтобы открыть кабинет преподавателя, нажмите на кнопку под сообщением.",
                 reply_markup=teacher_webapp_markup(ctx.settings.TRAFFIC_TEACHER_URL),
             )
         else:
@@ -98,11 +132,7 @@ def configure_handlers(dp: Dispatcher, ctx: AppContext) -> None:
 
     @dp.message(CommandStart())
     async def start_plain(message: Message) -> None:
-        await message.answer(
-            "Бот для преподавателей посещаемости СПбПУ.\n"
-            "Откройте кабинет преподавателя кнопкой ниже.",
-            reply_markup=teacher_webapp_markup(ctx.settings.TRAFFIC_TEACHER_URL),
-        )
+        await answer_start_by_registration(ctx, message)
 
 
 async def main() -> None:
