@@ -63,6 +63,26 @@ def _sso_delete_user(teacher_id: str) -> None:
 # Routes
 # ---------------------------------------------------------------------------
 
+@router.get("/check-username")
+def check_username(
+    username: str,
+    _: dict = Depends(require_admin),
+):
+    """Proxy username availability check to SSO."""
+    try:
+        resp = httpx.get(
+            f"{settings.SSO_API_URL}/api/users/check-username",
+            params={"username": username},
+            headers=_sso_headers(),
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        pass
+    return {"available": True}  # fallback: let backend reject on duplicate
+
+
 @router.get("/")
 def list_teachers(db: DBSession = Depends(get_db), _: dict = Depends(require_admin)):
     teachers = db.query(Teacher).order_by(Teacher.created_at).all()

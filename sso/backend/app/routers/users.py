@@ -76,7 +76,7 @@ class UpdateUserRequest(BaseModel):
 @router.get("/check-username")
 def check_username(
     username: str,
-    _: dict = Depends(_require_sso_admin),
+    _: str = Depends(_require_sso_admin_or_service),
     db: DBSession = Depends(get_db),
 ):
     exists = db.query(User).filter(User.username == username).first()
