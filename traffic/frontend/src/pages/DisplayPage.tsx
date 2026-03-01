@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { XCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
 import {
   InputOTP,
   InputOTPGroup,
@@ -17,6 +15,7 @@ import { computeQrToken, currentWindow, msUntilNextWindow } from "@/lib/hmac";
 
 type DisplayState = "unregistered" | "waiting" | "active";
 type StreamBannerState = "hidden" | "offline" | "recovered";
+type StreamBannerTone = "offline" | "recovered";
 
 interface TabletInfo {
   id: string;
@@ -75,6 +74,51 @@ function getWeekdayFromDateKey(dateKey: string): number {
   return date.getDay() || 7;
 }
 
+function normalizeText(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function parseClockToMinutes(value: string | undefined): number | null {
+  if (!value) return null;
+  const [hoursRaw, minutesRaw] = value.split(":");
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function findActiveLessonIndex(lessons: RuzLesson[], discipline: string | undefined, now: Date): number {
+  if (lessons.length === 0) return -1;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const disciplineNorm = normalizeText(discipline);
+
+  const timeMatchIndex = lessons.findIndex((lesson) => {
+    const start = parseClockToMinutes(lesson.time_start);
+    const end = parseClockToMinutes(lesson.time_end);
+    if (start === null || end === null) return false;
+    return nowMinutes >= start && nowMinutes < end;
+  });
+
+  if (!disciplineNorm) return timeMatchIndex;
+
+  if (timeMatchIndex !== -1) {
+    const subjectNorm = normalizeText(lessons[timeMatchIndex]?.subject);
+    if (subjectNorm.includes(disciplineNorm) || disciplineNorm.includes(subjectNorm)) {
+      return timeMatchIndex;
+    }
+  }
+
+  const disciplineMatchIndex = lessons.findIndex((lesson) => {
+    const subjectNorm = normalizeText(lesson.subject);
+    return subjectNorm.includes(disciplineNorm) || disciplineNorm.includes(subjectNorm);
+  });
+
+  if (disciplineMatchIndex !== -1) return disciplineMatchIndex;
+  return timeMatchIndex;
+}
+
 /** Renders a 6-digit PIN as two groups of 3 for readability */
 function PinDisplay({ pin }: { pin: string }) {
   const value = pin.slice(0, 6);
@@ -119,7 +163,9 @@ export default function DisplayPage() {
   const [qrToken, setQrToken] = useState<string>("");
   const [todayLessons, setTodayLessons] = useState<RuzLesson[]>([]);
   const [regPin, setRegPin] = useState<string>("");
+  const [now, setNow] = useState<Date>(() => new Date());
   const [streamBannerState, setStreamBannerState] = useState<StreamBannerState>("hidden");
+  const [streamBannerTone, setStreamBannerTone] = useState<StreamBannerTone>("offline");
 
   const deviceIdRef = useRef<string | null>(getStoredDeviceId());
   const displayPinRef = useRef<string | null>(getStoredDisplayPin());
@@ -166,6 +212,7 @@ export default function DisplayPage() {
   function markStreamDisconnected() {
     clearHideBannerTimer();
     disconnectedRef.current = true;
+    setStreamBannerTone("offline");
     setStreamBannerState("offline");
   }
 
@@ -173,6 +220,7 @@ export default function DisplayPage() {
     if (!disconnectedRef.current) return;
     clearHideBannerTimer();
     disconnectedRef.current = false;
+    setStreamBannerTone("recovered");
     setStreamBannerState("recovered");
     hideBannerTimerRef.current = setTimeout(() => {
       setStreamBannerState("hidden");
@@ -374,6 +422,11 @@ export default function DisplayPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     const onOffline = () => markStreamDisconnected();
     const onOnline = () => {
       // Keep strip visible until stream becomes healthy again.
@@ -414,15 +467,24 @@ export default function DisplayPage() {
       ? `${tablet.building_name}, ауд. ${tablet.room_name}`
       : null;
 
+  const isActiveMode = displayState === "active";
+  const teacherPin = displayPinRef.current ?? "";
+  const timeLabel = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const dateLabel = now.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  const activeLessonIndex = useMemo(
+    () => (isActiveMode ? findActiveLessonIndex(todayLessons, session?.discipline, now) : -1),
+    [isActiveMode, now, session?.discipline, todayLessons],
+  );
+
   // The display_pin used for teacher session start (stored in localStorage)
-  const displayPin = displayPinRef.current ?? "";
+  const displayPin = teacherPin;
   const bannerVisible = streamBannerState !== "hidden";
   const bannerText =
-    streamBannerState === "recovered"
+    streamBannerTone === "recovered"
       ? "Подключение восстановлено!"
       : "Связь с сервером пропала, восстанавливаем подключение...";
   const bannerColorClass =
-    streamBannerState === "recovered"
+    streamBannerTone === "recovered"
       ? "bg-emerald-500 text-emerald-50"
       : "bg-yellow-400 text-yellow-950";
   const disconnectedStrip = (
@@ -459,99 +521,133 @@ export default function DisplayPage() {
     );
   }
 
-  if (displayState === "waiting") {
-    return (
-      <div className="relative h-screen overflow-hidden bg-background text-foreground select-none flex flex-col lg:flex-row">
-        {disconnectedStrip}
-        <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6 sm:px-8 lg:px-12 py-8">
-          {displayPin ? (
-            <PinDisplay pin={displayPin} />
-          ) : (
-            <Spinner className="h-16 w-16 text-muted-foreground" />
-          )}
-          <p className="max-w-2xl text-center text-lg sm:text-xl lg:text-2xl leading-relaxed text-white">
-            Введите этот код в интерфейсе преподавателя, чтобы запустить проверку посещаемости
-          </p>
-        </div>
-        <div className="flex-1 flex flex-col justify-center px-6 sm:px-8 lg:px-16 py-8 gap-4 overflow-hidden">
-          {roomLabel && (
-            <p className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-tight text-white">
-              {roomLabel}
-            </p>
-          )}
+  if (displayState === "waiting" || displayState === "active") {
+    const pinSlots = (displayPin || "------").padEnd(6, "-").slice(0, 6).split("");
 
-          {todayLessons.length > 0 && (
-            <div className="mt-1 flex flex-col gap-3 overflow-y-auto max-h-[52vh] pr-1">
-              {todayLessons.map((lesson, i) => (
-                <div key={i} className="flex items-start gap-2 sm:gap-3 text-foreground">
-                  <span className="text-foreground/80 text-lg sm:text-xl whitespace-nowrap shrink-0 w-28 sm:w-32">
-                    {lesson.time_start}–{lesson.time_end}
-                  </span>
-                  <div>
-                    <p className="font-medium text-xl leading-snug">{lesson.subject}</p>
-                    <p className="text-foreground/70 text-base">
-                      {lesson.typeObj?.name ?? lesson.typeObj?.abbr}
-                      {lesson.teachers?.[0] && (
-                        <span className="ml-2">·&nbsp;{lesson.teachers[0].full_name}</span>
-                      )}
+    return (
+      <div className="relative h-screen overflow-hidden bg-background text-foreground select-none">
+        {disconnectedStrip}
+
+        <div className="h-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+          <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[minmax(280px,360px)_1fr] lg:gap-6">
+            <div className="grid min-h-0 grid-rows-[auto_1fr] gap-4 lg:gap-6">
+              <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
+                <p className="text-5xl font-semibold leading-none tracking-tight tabular-nums sm:text-6xl">
+                  {timeLabel}
+                </p>
+                <p className="mt-3 text-2xl text-white/85 sm:text-3xl">
+                  {dateLabel}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6 flex flex-col">
+                {isActiveMode ? (
+                  <>
+                    <p className="text-white/80 text-base sm:text-lg">
+                      Отсканируйте QR-код в приложении Политехник
                     </p>
-                  </div>
-                </div>
-              ))}
+                    <div className="mt-4 flex flex-1 items-center justify-center">
+                      <div className="rounded-2xl bg-white p-3 shadow-xl">
+                        <QRCodeSVG value={studentQrValue ?? "loading"} size={240} level="M" />
+                      </div>
+                    </div>
+                    {session?.attendance_count !== undefined && (
+                      <p className="mt-4 text-center text-white/90 text-lg sm:text-xl">
+                        Отмечено: <span className="font-semibold">{session.attendance_count}</span>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-white/80 text-base sm:text-lg">
+                      Код подключения для преподавателя
+                    </p>
+                    <div className="mt-5 flex items-center justify-center gap-2 sm:gap-3">
+                      {pinSlots.slice(0, 3).map((digit, index) => (
+                        <span
+                          key={`left-${index}`}
+                          className="inline-flex h-14 w-12 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-16 sm:w-14 sm:text-4xl"
+                        >
+                          {digit}
+                        </span>
+                      ))}
+                      <span className="mx-0.5 text-3xl text-white/55 sm:text-4xl">-</span>
+                      {pinSlots.slice(3).map((digit, index) => (
+                        <span
+                          key={`right-${index}`}
+                          className="inline-flex h-14 w-12 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-16 sm:w-14 sm:text-4xl"
+                        >
+                          {digit}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-5 text-center text-white/85 text-base sm:text-lg leading-relaxed">
+                      Введите этот код в интерфейсе преподавателя, чтобы запустить проверку посещаемости
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
-          )}
+
+            <div className="min-h-0 rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-7 lg:p-8 flex flex-col">
+              <div>
+                <p className="text-2xl font-semibold leading-tight sm:text-3xl lg:text-4xl">
+                  {roomLabel ?? "Аудитория не назначена"}
+                </p>
+                <p className="mt-2 text-white/75 text-base sm:text-lg">
+                  Расписание аудитории на сегодня
+                </p>
+                {isActiveMode && session?.discipline && (
+                  <p className="mt-3 inline-flex rounded-full border border-emerald-200/40 bg-emerald-500/20 px-3 py-1 text-sm font-medium text-emerald-100">
+                    Сейчас идёт: {session.discipline}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1">
+                {todayLessons.length === 0 ? (
+                  <p className="text-white/70 text-lg">На сегодня в расписании нет занятий.</p>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    {todayLessons.map((lesson, index) => {
+                      const isCurrent = isActiveMode && index === activeLessonIndex;
+                      const teacherLine = lesson.teachers?.[0]?.full_name ?? "";
+                      const typeLine = lesson.typeObj?.name ?? lesson.typeObj?.abbr ?? "";
+                      return (
+                        <div
+                          key={`${lesson.time_start}-${lesson.time_end}-${lesson.subject}-${index}`}
+                          className={`grid grid-cols-[7.5rem_1fr] items-start gap-2 rounded-2xl border px-3 py-3 sm:grid-cols-[8.5rem_1fr] sm:gap-3 ${
+                            isCurrent
+                              ? "border-emerald-200/40 bg-emerald-500/20 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]"
+                              : "border-white/10 bg-white/5"
+                          }`}
+                        >
+                          <p className="text-lg font-medium tabular-nums text-white/85 sm:text-xl">
+                            {lesson.time_start}–{lesson.time_end}
+                          </p>
+                          <div>
+                            <p className="text-xl font-semibold leading-snug sm:text-2xl">
+                              {lesson.subject}
+                            </p>
+                            <p className="mt-1 text-base text-white/70 sm:text-lg">
+                              {typeLine}
+                              {teacherLine && (
+                                <span className="ml-2">· {teacherLine}</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // active
-  return (
-    <div className="relative h-screen overflow-hidden bg-background text-foreground select-none flex">
-      {disconnectedStrip}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-3xl shadow-2xl">
-          <QRCodeSVG value={studentQrValue ?? "loading"} size={520} level="M" />
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col justify-center px-16 gap-6">
-        {roomLabel && (
-          <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">
-            {roomLabel}
-          </p>
-        )}
-        <p className="text-xs text-green-500 uppercase tracking-widest font-semibold">
-          Занятие идёт
-        </p>
-        <h1 className="text-5xl font-bold leading-tight break-words">
-          {session?.discipline}
-        </h1>
-        <p className="text-xl text-muted-foreground">{session?.teacher_name}</p>
-        <p className="text-lg text-muted-foreground leading-relaxed">
-          Открой приложение Политехник, нажми на значок QR и наведи камеру на этот экран
-        </p>
-        {session?.attendance_count !== undefined && (
-          <p className="text-3xl font-bold text-foreground">
-            {session.attendance_count}{" "}
-            <span className="text-muted-foreground text-xl font-normal">
-              {session.attendance_count === 1 ? "студент" : "студентов"} отмечено
-            </span>
-          </p>
-        )}
-        <Button
-          variant="ghost"
-          onClick={async () => {
-            if (session?.session_id) {
-              setSession(null);
-              setDisplayState("waiting");
-            }
-          }}
-          className="mt-2 w-fit text-muted-foreground hover:text-red-500 hover:bg-transparent"
-        >
-          <XCircle className="h-4 w-4 mr-2" />
-          Завершить занятие
-        </Button>
-      </div>
-    </div>
-  );
+  return null;
 }
