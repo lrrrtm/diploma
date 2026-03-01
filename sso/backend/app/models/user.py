@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,6 +26,8 @@ class User(Base):
     # Links to the app-specific entity (department_id, executor_id, teacher_id).
     # Null for app-level admins and sso admin.
     entity_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # Teacher ID from RUZ API (field "id", not "oid"), used by sync-job.
+    ruz_teacher_id: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True, index=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

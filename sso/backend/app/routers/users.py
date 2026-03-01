@@ -62,6 +62,7 @@ class CreateUserRequest(BaseModel):
     app: str          # 'services' | 'traffic' | 'sso'
     role: str         # 'admin' | 'staff' | 'executor' | 'teacher'
     entity_id: str | None = None
+    ruz_teacher_id: int | None = None
 
 
 class UpdateUserRequest(BaseModel):
@@ -128,6 +129,25 @@ def get_user_by_telegram(
     return _serialize(user)
 
 
+@router.get("/by-ruz-teacher/{ruz_teacher_id}")
+def get_user_by_ruz_teacher(
+    ruz_teacher_id: int,
+    app_filter: str | None = None,
+    caller: str = Depends(_require_sso_admin_or_service),
+    db: DBSession = Depends(get_db),
+):
+    if caller == "service" and not app_filter:
+        raise HTTPException(status_code=400, detail="Для service-запроса требуется app_filter")
+
+    query = db.query(User).filter(User.ruz_teacher_id == ruz_teacher_id)
+    if app_filter:
+        query = query.filter(User.app == app_filter)
+    user = query.first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь с таким RUZ teacher id не найден")
+    return _serialize(user)
+
+
 @router.post("/", status_code=201)
 def create_user(
     data: CreateUserRequest,
@@ -145,6 +165,10 @@ def create_user(
 
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
+    if data.ruz_teacher_id is not None:
+        exists_by_ruz_id = db.query(User).filter(User.ruz_teacher_id == data.ruz_teacher_id).first()
+        if exists_by_ruz_id:
+            raise HTTPException(status_code=400, detail="Пользователь с таким RUZ teacher id уже существует")
 
     user = User(
         id=str(uuid.uuid4()),
@@ -154,6 +178,7 @@ def create_user(
         app=data.app,
         role=data.role,
         entity_id=data.entity_id,
+        ruz_teacher_id=data.ruz_teacher_id,
     )
     db.add(user)
     db.commit()
@@ -259,6 +284,7 @@ def _serialize(u: User) -> dict:
         "app": u.app,
         "role": u.role,
         "entity_id": u.entity_id,
+        "ruz_teacher_id": u.ruz_teacher_id,
         "telegram_id": telegram_id,
         "telegram_username": telegram_username,
         "telegram_linked": telegram_id is not None,
