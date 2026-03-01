@@ -9,6 +9,8 @@ import StudentScanPage from "@/pages/StudentScanPage";
 import AdminTabletsPage from "@/pages/admin/AdminTabletsPage";
 import AdminRegisterPage from "@/pages/admin/AdminRegisterPage";
 import AdminTeachersPage from "@/pages/admin/AdminTeachersPage";
+import AdminAddKioskPage from "@/pages/admin/AdminAddKioskPage";
+import AdminAddTeacherPage from "@/pages/admin/AdminAddTeacherPage";
 import { AdminLayout } from "@/components/shared/AdminLayout";
 import { TeacherLayout } from "@/components/shared/TeacherLayout";
 import { useAuth } from "@/context/AuthContext";
@@ -49,11 +51,15 @@ export default function App() {
       <Route path="/teacher/history" element={<TeacherLayout><TeacherHistoryPage /></TeacherLayout>} />
       <Route path="/teacher/history/:sessionId" element={<TeacherLayout><TeacherSessionDetailPage /></TeacherLayout>} />
 
-      {/* Admin */}
-      <Route path="/admin" element={<Navigate to="/admin/tablets" replace />} />
-      <Route path="/admin/tablets" element={<AdminLayout><AdminTabletsPage /></AdminLayout>} />
-      <Route path="/admin/tablets/register/:deviceId" element={<AdminLayout><AdminRegisterPage /></AdminLayout>} />
-      <Route path="/admin/teachers" element={<AdminLayout><AdminTeachersPage /></AdminLayout>} />
+      {/* Admin — nested routes share AdminLayout + AdminDataContext */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="tablets" replace />} />
+        <Route path="tablets" element={<AdminTabletsPage />} />
+        <Route path="tablets/add" element={<AdminAddKioskPage />} />
+        <Route path="tablets/register/:deviceId" element={<AdminRegisterPage />} />
+        <Route path="teachers" element={<AdminTeachersPage />} />
+        <Route path="teachers/add" element={<AdminAddTeacherPage />} />
+      </Route>
 
       {/* Unknown paths → root */}
       <Route path="*" element={<Navigate to="/" replace />} />

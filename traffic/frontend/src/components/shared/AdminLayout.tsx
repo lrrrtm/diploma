@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { User, Tv, Users, LogOut, Sun, Moon, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import { useTheme, type Theme } from "@/context/ThemeContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { goToSSOLogin } from "@/lib/sso";
 import { cn } from "@/lib/utils";
+import { AdminDataProvider } from "@/context/AdminDataContext";
 
 const navItems = [
   { to: "/admin/tablets", label: "Киоски", icon: Tv },
@@ -29,7 +30,7 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType }[] 
   { value: "dark", label: "Тёмная", icon: Moon },
 ];
 
-export function AdminLayout({ children }: { children: ReactNode }) {
+export function AdminLayout() {
   const { fullName, logout } = useAuth();
   const location = useLocation();
   const { theme, setTheme } = useTheme();
@@ -103,91 +104,93 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex flex-col h-svh bg-background">
-      {/* Top bar — desktop only */}
-      {!isMobile && (
-        <header className="flex items-center gap-2 border-b border-border bg-card px-4 h-12 shrink-0">
-          <nav className="flex-1 overflow-x-auto flex gap-1 min-w-0 no-scrollbar">
-            {navItems.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors",
-                  isActive(item.to)
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                )}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+    <AdminDataProvider>
+      <div className="flex flex-col h-svh bg-background">
+        {/* Top bar — desktop only */}
+        {!isMobile && (
+          <header className="flex items-center gap-2 border-b border-border bg-card px-4 h-12 shrink-0">
+            <nav className="flex-1 overflow-x-auto flex gap-1 min-w-0 no-scrollbar">
+              {navItems.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors",
+                    isActive(item.to)
+                      ? "bg-secondary text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setProfileOpen(true)}
-            className="rounded-xl bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary shrink-0"
-            title="Профиль"
-          >
-            <User className="h-5 w-5" />
-          </Button>
-        </header>
-      )}
-
-      {/* Content */}
-      <div className={cn("flex-1 min-h-0 overflow-y-auto flex flex-col px-4 pt-4", isMobile ? "pb-24" : "pb-4")}>
-        <div className="flex-1 max-w-5xl mx-auto w-full flex flex-col">
-          {children}
-        </div>
-      </div>
-
-      {/* Bottom nav — mobile only */}
-      {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
-          <div className="flex">
-            {navItems.map(({ to, label, icon: Icon }) => (
-              <Link
-                key={to}
-                to={to}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs transition-colors",
-                  isActive(to) ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                {label}
-              </Link>
-            ))}
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setProfileOpen(true)}
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-xl bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary shrink-0"
+              title="Профиль"
             >
               <User className="h-5 w-5" />
-              Профиль
-            </button>
-          </div>
-        </nav>
-      )}
+            </Button>
+          </header>
+        )}
 
-      {/* Profile — Sheet on mobile, Dialog on desktop */}
-      {isMobile ? (
-        <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
-          <SheetContent side="bottom" className="p-0 rounded-t-2xl">
-            <SheetTitle className="sr-only">Профиль</SheetTitle>
-            {profileContent}
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-          <DialogContent className="max-w-sm p-0">
-            <DialogTitle className="sr-only">Профиль</DialogTitle>
-            {profileContent}
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+        {/* Content */}
+        <div className={cn("flex-1 min-h-0 overflow-y-auto flex flex-col px-4 pt-4", isMobile ? "pb-24" : "pb-4")}>
+          <div className="flex-1 max-w-5xl mx-auto w-full flex flex-col">
+            <Outlet />
+          </div>
+        </div>
+
+        {/* Bottom nav — mobile only */}
+        {isMobile && (
+          <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
+            <div className="flex">
+              {navItems.map(({ to, label, icon: Icon }) => (
+                <Link
+                  key={to}
+                  to={to}
+                  className={cn(
+                    "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs transition-colors",
+                    isActive(to) ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  {label}
+                </Link>
+              ))}
+              <button
+                onClick={() => setProfileOpen(true)}
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <User className="h-5 w-5" />
+                Профиль
+              </button>
+            </div>
+          </nav>
+        )}
+
+        {/* Profile — Sheet on mobile, Dialog on desktop */}
+        {isMobile ? (
+          <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
+            <SheetContent side="bottom" className="p-0 rounded-t-2xl">
+              <SheetTitle className="sr-only">Профиль</SheetTitle>
+              {profileContent}
+            </SheetContent>
+          </Sheet>
+        ) : (
+          <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+            <DialogContent className="max-w-sm p-0">
+              <DialogTitle className="sr-only">Профиль</DialogTitle>
+              {profileContent}
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+    </AdminDataProvider>
   );
 }
