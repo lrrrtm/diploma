@@ -469,6 +469,7 @@ export default function DisplayPage() {
 
   const isActiveMode = displayState === "active";
   const teacherPin = displayPinRef.current ?? "";
+  const teacherPortalQrValue = "https://traffic.poly.hex8d.space/";
   const timeLabel = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   const dateLabel = now.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
   const activeLessonIndex = useMemo(
@@ -529,8 +530,8 @@ export default function DisplayPage() {
         {disconnectedStrip}
 
         <div className="h-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-          <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[minmax(280px,360px)_1fr] lg:gap-6">
-            <div className="grid min-h-0 grid-rows-[auto_1fr] gap-4 lg:gap-6">
+          <div className="grid h-full min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] lg:gap-6">
+            <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] gap-4 lg:gap-6">
               <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
                 <p className="text-5xl font-semibold leading-none tracking-tight tabular-nums sm:text-6xl">
                   {timeLabel}
@@ -540,15 +541,12 @@ export default function DisplayPage() {
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6 flex flex-col">
+              <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6 flex min-h-0 flex-col overflow-hidden">
                 {isActiveMode ? (
                   <>
-                    <p className="text-white/80 text-base sm:text-lg">
-                      Отсканируйте QR-код в приложении Политехник
-                    </p>
-                    <div className="mt-4 flex flex-1 items-center justify-center">
+                    <div className="flex flex-1 items-center justify-center">
                       <div className="rounded-2xl bg-white p-3 shadow-xl">
-                        <QRCodeSVG value={studentQrValue ?? "loading"} size={240} level="M" />
+                        <QRCodeSVG value={studentQrValue ?? "loading"} size={220} level="M" />
                       </div>
                     </div>
                     {session?.attendance_count !== undefined && (
@@ -559,23 +557,25 @@ export default function DisplayPage() {
                   </>
                 ) : (
                   <>
-                    <p className="text-white/80 text-base sm:text-lg">
-                      Код подключения для преподавателя
-                    </p>
-                    <div className="mt-5 flex items-center justify-center gap-2 sm:gap-3">
+                    <div className="flex items-center justify-center">
+                      <div className="rounded-2xl bg-white p-3 shadow-xl">
+                        <QRCodeSVG value={teacherPortalQrValue} size={220} level="M" />
+                      </div>
+                    </div>
+                    <div className="mt-5 flex items-center justify-center gap-1.5 sm:gap-2">
                       {pinSlots.slice(0, 3).map((digit, index) => (
                         <span
                           key={`left-${index}`}
-                          className="inline-flex h-14 w-12 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-16 sm:w-14 sm:text-4xl"
+                          className="inline-flex h-12 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-14 sm:w-12 sm:text-4xl"
                         >
                           {digit}
                         </span>
                       ))}
-                      <span className="mx-0.5 text-3xl text-white/55 sm:text-4xl">-</span>
+                      <span className="mx-0.5 text-2xl text-white/55 sm:text-3xl">-</span>
                       {pinSlots.slice(3).map((digit, index) => (
                         <span
                           key={`right-${index}`}
-                          className="inline-flex h-14 w-12 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-16 sm:w-14 sm:text-4xl"
+                          className="inline-flex h-12 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-14 sm:w-12 sm:text-4xl"
                         >
                           {digit}
                         </span>
@@ -589,7 +589,7 @@ export default function DisplayPage() {
               </div>
             </div>
 
-            <div className="min-h-0 rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-7 lg:p-8 flex flex-col">
+            <div className="min-h-0 min-w-0 rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-7 lg:p-8 flex flex-col">
               <div>
                 <p className="text-2xl font-semibold leading-tight sm:text-3xl lg:text-4xl">
                   {roomLabel ?? "Аудитория не назначена"}
