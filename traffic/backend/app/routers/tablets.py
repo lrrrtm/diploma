@@ -19,6 +19,7 @@ from app.models.tablet import Tablet
 from app.realtime import hub
 
 router = APIRouter()
+SSE_HEARTBEAT_SECONDS = 8.0
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +115,7 @@ async def stream_statuses(_: dict = Depends(require_admin)):
                     yield f"event: statuses\ndata: {data}\n\n"
 
                 try:
-                    await asyncio.wait_for(queue.get(), timeout=25.0)
+                    await asyncio.wait_for(queue.get(), timeout=SSE_HEARTBEAT_SECONDS)
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
         finally:
@@ -159,7 +160,7 @@ async def tablet_events(tablet_id: str, tablet_secret: str | None = None):
                     break
 
                 try:
-                    await asyncio.wait_for(queue.get(), timeout=25.0)
+                    await asyncio.wait_for(queue.get(), timeout=SSE_HEARTBEAT_SECONDS)
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
         finally:

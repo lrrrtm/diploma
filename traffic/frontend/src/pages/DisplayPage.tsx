@@ -97,6 +97,7 @@ function PinDisplay({ pin }: { pin: string }) {
 // ---------------------------------------------------------------------------
 
 export default function DisplayPage() {
+  const STREAM_STALE_MS = 15000;
   const [displayState, setDisplayState] = useState<DisplayState>("unregistered");
   const [tablet, setTablet] = useState<TabletInfo | null>(null);
   const [session, setSession] = useState<CurrentSession | null>(null);
@@ -108,6 +109,7 @@ export default function DisplayPage() {
   const deviceIdRef = useRef<string | null>(getStoredDeviceId());
   const displayPinRef = useRef<string | null>(getStoredDisplayPin());
   const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastStreamActivityRef = useRef<number>(Date.now());
 
   // ---------------------------------------------------------------------------
   // QR generation (frontend HMAC — no backend polling for token)
@@ -214,6 +216,7 @@ export default function DisplayPage() {
         if (!response.ok || !response.body) {
           throw new Error(`stream failed with status ${response.status}`);
         }
+        lastStreamActivityRef.current = Date.now();
         setIsStreamDisconnected(false);
 
         const reader = response.body.getReader();
@@ -223,6 +226,7 @@ export default function DisplayPage() {
         while (!signal.aborted) {
           const { value, done } = await reader.read();
           if (done) break;
+          lastStreamActivityRef.current = Date.now();
 
           buffer = `${buffer}${decoder.decode(value, { stream: true })}`.replace(/\r\n/g, "\n");
           let boundary = buffer.indexOf("\n\n");
@@ -300,6 +304,33 @@ export default function DisplayPage() {
       if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onOffline = () => setIsStreamDisconnected(true);
+    const onOnline = () => {
+      // Keep strip visible until stream becomes healthy again.
+      lastStreamActivityRef.current = Date.now() - STREAM_STALE_MS;
+    };
+
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+
+    const watchdog = setInterval(() => {
+      if (navigator.onLine === false) {
+        setIsStreamDisconnected(true);
+        return;
+      }
+
+      const stale = Date.now() - lastStreamActivityRef.current > STREAM_STALE_MS;
+      if (stale) setIsStreamDisconnected(true);
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+      clearInterval(watchdog);
+    };
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Derived values
