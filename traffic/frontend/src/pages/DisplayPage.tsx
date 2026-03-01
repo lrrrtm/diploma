@@ -16,6 +16,7 @@ import { computeQrToken, currentWindow, msUntilNextWindow } from "@/lib/hmac";
 // ---------------------------------------------------------------------------
 
 type DisplayState = "unregistered" | "waiting" | "active";
+type StreamBannerState = "hidden" | "offline" | "recovered";
 
 interface TabletInfo {
   id: string;
@@ -104,12 +105,14 @@ export default function DisplayPage() {
   const [qrToken, setQrToken] = useState<string>("");
   const [todayLessons, setTodayLessons] = useState<RuzLesson[]>([]);
   const [regPin, setRegPin] = useState<string>("");
-  const [isStreamDisconnected, setIsStreamDisconnected] = useState(false);
+  const [streamBannerState, setStreamBannerState] = useState<StreamBannerState>("hidden");
 
   const deviceIdRef = useRef<string | null>(getStoredDeviceId());
   const displayPinRef = useRef<string | null>(getStoredDisplayPin());
   const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastStreamActivityRef = useRef<number>(Date.now());
+  const disconnectedRef = useRef<boolean>(false);
+  const hideBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---------------------------------------------------------------------------
   // QR generation (frontend HMAC — no backend polling for token)
@@ -138,6 +141,29 @@ export default function DisplayPage() {
     setDisplayState("unregistered");
     setQrToken("");
     if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+  }
+
+  function clearHideBannerTimer() {
+    if (!hideBannerTimerRef.current) return;
+    clearTimeout(hideBannerTimerRef.current);
+    hideBannerTimerRef.current = null;
+  }
+
+  function markStreamDisconnected() {
+    clearHideBannerTimer();
+    disconnectedRef.current = true;
+    setStreamBannerState("offline");
+  }
+
+  function markStreamConnected() {
+    if (!disconnectedRef.current) return;
+    clearHideBannerTimer();
+    disconnectedRef.current = false;
+    setStreamBannerState("recovered");
+    hideBannerTimerRef.current = setTimeout(() => {
+      setStreamBannerState("hidden");
+      hideBannerTimerRef.current = null;
+    }, 3000);
   }
 
   function applyStreamPayload(payload: TabletStreamPayload) {
@@ -186,9 +212,9 @@ export default function DisplayPage() {
       localStorage.setItem("traffic_device_id", res.data.device_id);
       localStorage.setItem("traffic_display_pin", res.data.display_pin);
       setRegPin(res.data.reg_pin);
-      setIsStreamDisconnected(false);
+      markStreamConnected();
     } catch {
-      setIsStreamDisconnected(true);
+      markStreamDisconnected();
       // retry on reconnect loop
     }
   }
@@ -217,7 +243,7 @@ export default function DisplayPage() {
           throw new Error(`stream failed with status ${response.status}`);
         }
         lastStreamActivityRef.current = Date.now();
-        setIsStreamDisconnected(false);
+        markStreamConnected();
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -263,7 +289,7 @@ export default function DisplayPage() {
         }
       } catch {
         if (!signal.aborted) {
-          setIsStreamDisconnected(true);
+          markStreamDisconnected();
         }
         // reconnect below
       }
@@ -302,11 +328,12 @@ export default function DisplayPage() {
     return () => {
       abortController.abort();
       if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+      clearHideBannerTimer();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const onOffline = () => setIsStreamDisconnected(true);
+    const onOffline = () => markStreamDisconnected();
     const onOnline = () => {
       // Keep strip visible until stream becomes healthy again.
       lastStreamActivityRef.current = Date.now() - STREAM_STALE_MS;
@@ -317,12 +344,12 @@ export default function DisplayPage() {
 
     const watchdog = setInterval(() => {
       if (navigator.onLine === false) {
-        setIsStreamDisconnected(true);
+        markStreamDisconnected();
         return;
       }
 
       const stale = Date.now() - lastStreamActivityRef.current > STREAM_STALE_MS;
-      if (stale) setIsStreamDisconnected(true);
+      if (stale) markStreamDisconnected();
     }, 1000);
 
     return () => {
@@ -348,13 +375,26 @@ export default function DisplayPage() {
 
   // The display_pin used for teacher session start (stored in localStorage)
   const displayPin = displayPinRef.current ?? "";
-  const disconnectedStrip = isStreamDisconnected
-    ? (
-      <div className="absolute left-0 top-0 z-50 w-full bg-yellow-400 px-2 py-1 text-center text-[11px] font-semibold leading-tight text-yellow-950 sm:text-xs">
-        Связь с сервером пропала, восстанавливаем подключение...
+  const bannerVisible = streamBannerState !== "hidden";
+  const bannerText =
+    streamBannerState === "recovered"
+      ? "Подключение восстановлено!"
+      : "Связь с сервером пропала, восстанавливаем подключение...";
+  const bannerColorClass =
+    streamBannerState === "recovered"
+      ? "bg-emerald-500 text-emerald-50"
+      : "bg-yellow-400 text-yellow-950";
+  const disconnectedStrip = (
+    <div
+      className={`pointer-events-none absolute left-0 top-0 z-50 w-full transform transition-transform duration-300 ease-out ${
+        bannerVisible ? "translate-y-0" : "-translate-y-full"
+      }`}
+    >
+      <div className={`w-full px-3 py-3 text-center text-sm font-semibold leading-snug sm:text-base transition-colors duration-500 ${bannerColorClass}`}>
+        {bannerText}
       </div>
-      )
-    : null;
+    </div>
+  );
 
   // ---------------------------------------------------------------------------
   // States

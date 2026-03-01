@@ -481,10 +481,12 @@ export default function AdminTabletsPage() {
                     </span>
                   </TableCell>
                   <TableCell
-                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : undefined}
+                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "text-center"}
                   >
                     {isMobile && <span className="text-xs text-muted-foreground">Статус</span>}
-                    <TabletStatusLight online={tabletOnlineState[t.id] ?? false} />
+                    <span className={isMobile ? undefined : "inline-flex justify-center w-full"}>
+                      <TabletStatusLight online={tabletOnlineState[t.id] ?? false} />
+                    </span>
                   </TableCell>
                   <TableCell
                     className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : undefined}
