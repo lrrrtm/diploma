@@ -173,6 +173,7 @@ export default function AdminTabletsPage() {
   const [pin, setPin] = useState("");
   const [otpChecking, setOtpChecking] = useState(false);
   const [otpInvalid, setOtpInvalid] = useState(false);
+  const otpWrapperRef = useRef<HTMLDivElement | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [buildings, setBuildings] = useState<Building[] | null>(null);
@@ -255,6 +256,9 @@ export default function AdminTabletsPage() {
     } catch {
       setOtpInvalid(true);
       setPin("");
+      requestAnimationFrame(() => {
+        otpWrapperRef.current?.querySelector<HTMLInputElement>("input")?.focus();
+      });
     } finally {
       setOtpChecking(false);
     }
@@ -431,7 +435,7 @@ export default function AdminTabletsPage() {
           if (!open) resetRegistrationState();
         }}
       >
-        <DialogContent className="w-[calc(100%-1rem)] sm:max-w-lg max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="w-[calc(100%-1rem)] sm:max-w-lg max-h-[90dvh] overflow-y-auto rounded-xl">
           <DialogHeader>
             <DialogTitle>Регистрация киоска</DialogTitle>
             <DialogDescription>
@@ -443,12 +447,7 @@ export default function AdminTabletsPage() {
 
           {registrationStep === "otp" ? (
             <div className="space-y-4 pt-1">
-              <div className="text-center space-y-1">
-                <p className="text-sm font-medium">Откройте `/kiosk` на устройстве</p>
-                <p className="text-xs text-muted-foreground">и введите код с экрана</p>
-              </div>
-
-              <div className="flex flex-col items-center gap-2">
+              <div ref={otpWrapperRef} className="flex flex-col items-center gap-2">
                 <InputOTP
                   maxLength={6}
                   value={pin}
@@ -480,19 +479,6 @@ export default function AdminTabletsPage() {
                 {otpChecking && (
                   <p className="text-sm text-muted-foreground">Проверка кода...</p>
                 )}
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setRegistrationOpen(false);
-                    resetRegistrationState();
-                  }}
-                >
-                  Отмена
-                </Button>
               </div>
             </div>
           ) : (
@@ -539,17 +525,7 @@ export default function AdminTabletsPage() {
                 </>
               )}
 
-              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setRegistrationOpen(false);
-                    resetRegistrationState();
-                  }}
-                >
-                  Отмена
-                </Button>
+              <div className="flex justify-end gap-2 pt-2">
                 <Button
                   type="button"
                   disabled={!canSaveRegistration}
