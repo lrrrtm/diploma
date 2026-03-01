@@ -523,7 +523,11 @@ export default function DisplayPage() {
   }
 
   if (displayState === "waiting" || displayState === "active") {
-    const pinSlots = (displayPin || "------").padEnd(6, "-").slice(0, 6).split("");
+    const normalizedTeacherPin = displayPin.replace(/\D/g, "").slice(0, 6);
+    const formattedTeacherPin =
+      normalizedTeacherPin.length === 6
+        ? `${normalizedTeacherPin.slice(0, 3)}-${normalizedTeacherPin.slice(3)}`
+        : "—";
 
     return (
       <div className="relative h-screen overflow-hidden bg-background text-foreground select-none">
@@ -531,7 +535,11 @@ export default function DisplayPage() {
 
         <div className="h-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
           <div className="grid h-full min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] lg:gap-6">
-            <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] gap-4 lg:gap-6">
+            <div
+              className={`grid min-h-0 min-w-0 gap-4 lg:gap-6 ${
+                isActiveMode ? "grid-rows-[auto_1fr]" : "grid-rows-[auto_1fr_auto]"
+              }`}
+            >
               <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
                 <p className="text-5xl font-semibold leading-none tracking-tight tabular-nums sm:text-6xl">
                   {timeLabel}
@@ -569,32 +577,21 @@ export default function DisplayPage() {
                           style={{ display: "block", width: "100%", height: "auto" }}
                         />
                       </div>
-                      <div className="mt-4 grid w-full grid-cols-[repeat(3,minmax(0,1fr))_auto_repeat(3,minmax(0,1fr))] items-center gap-1.5 sm:gap-2">
-                        {pinSlots.slice(0, 3).map((digit, index) => (
-                          <span
-                            key={`left-${index}`}
-                            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:text-[2.1rem]"
-                          >
-                            {digit}
-                          </span>
-                        ))}
-                        <span className="px-0.5 text-xl text-white/55 sm:text-2xl">-</span>
-                        {pinSlots.slice(3).map((digit, index) => (
-                          <span
-                            key={`right-${index}`}
-                            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:text-[2.1rem]"
-                          >
-                            {digit}
-                          </span>
-                        ))}
-                      </div>
-                      <p className="mt-3 w-full text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
-                        Код преподавателя
-                      </p>
                     </div>
                   </>
                 )}
               </div>
+
+              {!isActiveMode && (
+                <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
+                  <p className="font-mono text-4xl font-semibold tracking-wider text-white sm:text-5xl lg:text-[3.4rem] lg:leading-none">
+                    {formattedTeacherPin}
+                  </p>
+                  <p className="mt-3 text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
+                    Код преподавателя
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="min-h-0 min-w-0 rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-7 lg:p-8 flex flex-col">

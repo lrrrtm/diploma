@@ -171,7 +171,7 @@ function SearchableCombobox({
 function TabletStatusLight({ online }: { online: boolean }) {
   const colorClass = online ? "bg-emerald-500" : "bg-destructive";
   return (
-    <span className="inline-flex items-center">
+    <span className="inline-flex items-center justify-center">
       <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${colorClass}`}>
         <span className={`absolute inset-0 rounded-full ${colorClass} animate-ping opacity-75`} />
       </span>
@@ -454,7 +454,7 @@ export default function AdminTabletsPage() {
             <TableHeader className={isMobile ? "sr-only" : undefined}>
               <TableRow>
                 <TableHead className="w-[38%]">UUID киоска</TableHead>
-                <TableHead className="w-[12%]">Статус</TableHead>
+                <TableHead className="w-[12%] text-center">Статус</TableHead>
                 <TableHead className="w-[18%]">Корпус</TableHead>
                 <TableHead className="w-[18%]">Аудитория</TableHead>
                 <TableHead className="w-[14%] text-right">Действия</TableHead>
@@ -481,10 +481,10 @@ export default function AdminTabletsPage() {
                     </span>
                   </TableCell>
                   <TableCell
-                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "text-center"}
+                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "align-middle"}
                   >
                     {isMobile && <span className="text-xs text-muted-foreground">Статус</span>}
-                    <span className={isMobile ? undefined : "inline-flex justify-center w-full"}>
+                    <span className={isMobile ? undefined : "flex w-full items-center justify-center"}>
                       <TabletStatusLight online={tabletOnlineState[t.id] ?? false} />
                     </span>
                   </TableCell>
@@ -535,7 +535,7 @@ export default function AdminTabletsPage() {
           if (!open) resetRegistrationState();
         }}
       >
-        <DialogContent className="w-[calc(100%-1rem)] sm:max-w-lg max-h-[90dvh] overflow-y-auto rounded-xl">
+        <DialogContent className="w-[calc(100%-1rem)] sm:max-w-lg rounded-xl overflow-visible">
           <DialogHeader>
             <DialogTitle>Регистрация киоска</DialogTitle>
             <DialogDescription>
