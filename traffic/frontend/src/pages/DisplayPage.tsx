@@ -103,6 +103,7 @@ export default function DisplayPage() {
   const [qrToken, setQrToken] = useState<string>("");
   const [todayLessons, setTodayLessons] = useState<RuzLesson[]>([]);
   const [regPin, setRegPin] = useState<string>("");
+  const [isStreamDisconnected, setIsStreamDisconnected] = useState(false);
 
   const deviceIdRef = useRef<string | null>(getStoredDeviceId());
   const displayPinRef = useRef<string | null>(getStoredDisplayPin());
@@ -183,7 +184,9 @@ export default function DisplayPage() {
       localStorage.setItem("traffic_device_id", res.data.device_id);
       localStorage.setItem("traffic_display_pin", res.data.display_pin);
       setRegPin(res.data.reg_pin);
+      setIsStreamDisconnected(false);
     } catch {
+      setIsStreamDisconnected(true);
       // retry on reconnect loop
     }
   }
@@ -211,6 +214,7 @@ export default function DisplayPage() {
         if (!response.ok || !response.body) {
           throw new Error(`stream failed with status ${response.status}`);
         }
+        setIsStreamDisconnected(false);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -254,6 +258,9 @@ export default function DisplayPage() {
           }
         }
       } catch {
+        if (!signal.aborted) {
+          setIsStreamDisconnected(true);
+        }
         // reconnect below
       }
 
@@ -310,6 +317,13 @@ export default function DisplayPage() {
 
   // The display_pin used for teacher session start (stored in localStorage)
   const displayPin = displayPinRef.current ?? "";
+  const disconnectedStrip = isStreamDisconnected
+    ? (
+      <div className="absolute left-0 top-0 z-50 w-full bg-yellow-400 px-2 py-1 text-center text-[11px] font-semibold leading-tight text-yellow-950 sm:text-xs">
+        Связь с сервером пропала, восстанавливаем подключение...
+      </div>
+      )
+    : null;
 
   // ---------------------------------------------------------------------------
   // States
@@ -317,7 +331,8 @@ export default function DisplayPage() {
 
   if (displayState === "unregistered") {
     return (
-      <div className="h-screen overflow-hidden bg-background text-foreground select-none flex flex-col items-center justify-center gap-8 px-6 sm:px-8">
+      <div className="relative h-screen overflow-hidden bg-background text-foreground select-none flex flex-col items-center justify-center gap-8 px-6 sm:px-8">
+        {disconnectedStrip}
         <div className="flex flex-col items-center gap-6">
           {regPin ? (
             <PinDisplay pin={regPin} />
@@ -334,7 +349,8 @@ export default function DisplayPage() {
 
   if (displayState === "waiting") {
     return (
-      <div className="h-screen overflow-hidden bg-background text-foreground select-none flex">
+      <div className="relative h-screen overflow-hidden bg-background text-foreground select-none flex">
+        {disconnectedStrip}
         <div className="flex-1 flex items-center justify-center">
           {displayPin ? (
             <PinDisplay pin={displayPin} />
@@ -382,7 +398,8 @@ export default function DisplayPage() {
 
   // active
   return (
-    <div className="h-screen overflow-hidden bg-background text-foreground select-none flex">
+    <div className="relative h-screen overflow-hidden bg-background text-foreground select-none flex">
+      {disconnectedStrip}
       <div className="flex-1 flex items-center justify-center">
         <div className="bg-white p-6 rounded-3xl shadow-2xl">
           <QRCodeSVG value={studentQrValue ?? "loading"} size={520} level="M" />
