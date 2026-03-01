@@ -544,51 +544,54 @@ export default function DisplayPage() {
               <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6 flex min-h-0 flex-col overflow-hidden">
                 {isActiveMode ? (
                   <>
-                    <div className="flex flex-1 items-center justify-center">
-                      <div className="rounded-2xl bg-white p-3 shadow-xl">
-                        <QRCodeSVG value={studentQrValue ?? "loading"} size={220} level="M" />
-                      </div>
-                    </div>
-                    {session?.attendance_count !== undefined && (
-                      <p className="mt-4 text-center text-white/90 text-lg sm:text-xl">
-                        Отмечено: <span className="font-semibold">{session.attendance_count}</span>
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="flex w-full items-center justify-start">
-                      <div className="w-full max-w-[300px] rounded-2xl bg-white p-2 shadow-xl">
+                    <div className="mx-auto flex w-full max-w-[332px] flex-col">
+                      <div className="w-full rounded-2xl bg-white p-2 shadow-xl">
                         <QRCodeSVG
-                          value={teacherPortalQrValue}
-                          size={300}
+                          value={studentQrValue ?? "loading"}
+                          size={320}
                           level="M"
                           style={{ display: "block", width: "100%", height: "auto" }}
                         />
                       </div>
+                      <p className="mt-3 w-full text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
+                        Отсканируй QR-код в приложении, чтобы отметиться
+                      </p>
                     </div>
-                    <div className="mt-4 flex w-full max-w-[300px] items-center gap-1 sm:gap-1.5">
-                      {pinSlots.slice(0, 3).map((digit, index) => (
-                        <span
-                          key={`left-${index}`}
-                          className="inline-flex h-11 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:w-10 sm:text-[2.1rem]"
-                        >
-                          {digit}
-                        </span>
-                      ))}
-                      <span className="mx-0.5 text-xl text-white/55 sm:text-2xl">-</span>
-                      {pinSlots.slice(3).map((digit, index) => (
-                        <span
-                          key={`right-${index}`}
-                          className="inline-flex h-11 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:w-10 sm:text-[2.1rem]"
-                        >
-                          {digit}
-                        </span>
-                      ))}
+                  </>
+                ) : (
+                  <>
+                    <div className="mx-auto flex w-full max-w-[332px] flex-col">
+                      <div className="w-full rounded-2xl bg-white p-2 shadow-xl">
+                        <QRCodeSVG
+                          value={teacherPortalQrValue}
+                          size={320}
+                          level="M"
+                          style={{ display: "block", width: "100%", height: "auto" }}
+                        />
+                      </div>
+                      <div className="mt-4 grid w-full grid-cols-[repeat(3,minmax(0,1fr))_auto_repeat(3,minmax(0,1fr))] items-center gap-1.5 sm:gap-2">
+                        {pinSlots.slice(0, 3).map((digit, index) => (
+                          <span
+                            key={`left-${index}`}
+                            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:text-[2.1rem]"
+                          >
+                            {digit}
+                          </span>
+                        ))}
+                        <span className="px-0.5 text-xl text-white/55 sm:text-2xl">-</span>
+                        {pinSlots.slice(3).map((digit, index) => (
+                          <span
+                            key={`right-${index}`}
+                            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:text-[2.1rem]"
+                          >
+                            {digit}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-3 w-full text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
+                        Код преподавателя
+                      </p>
                     </div>
-                    <p className="mt-3 w-full max-w-[300px] text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
-                      Код преподавателя
-                    </p>
                   </>
                 )}
               </div>
