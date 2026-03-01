@@ -22,6 +22,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -36,6 +45,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SSOUser {
   id: string;
@@ -91,9 +101,23 @@ function generateLogin(fullName: string): string {
   return initials ? `${lastName}.${initials}` : lastName;
 }
 
+function buildPaginationItems(currentPage: number, totalPages: number): Array<number | "ellipsis-left" | "ellipsis-right"> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "ellipsis-right", totalPages];
+  }
+  if (currentPage >= totalPages - 3) {
+    return [1, "ellipsis-left", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, "ellipsis-left", currentPage - 1, currentPage, currentPage + 1, "ellipsis-right", totalPages];
+}
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
+  const isMobile = useIsMobile();
 
   const [users, setUsers] = useState<SSOUser[] | null>(null);
   const [appFilter, setAppFilter] = useState<string>("all");
@@ -107,6 +131,7 @@ export default function AdminPage() {
   const [usernameManual, setUsernameManual] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "taken">("idle");
   const checkAbortRef = useRef<AbortController | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadUsers = () => {
     const params = appFilter !== "all" ? `?app_filter=${appFilter}` : "";
@@ -123,6 +148,22 @@ export default function AdminPage() {
     if (!isLoggedIn) { navigate("/"); return; }
     loadUsers();
   }, [isLoggedIn, appFilter, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pageSize = isMobile ? 8 : 12;
+  const totalUsers = users?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
+  const paginatedUsers = users?.slice((currentPage - 1) * pageSize, currentPage * pageSize) ?? [];
+
+  useEffect(() => {
+    if (users === null) return;
+    const nextTotalPages = Math.max(1, Math.ceil(users.length / pageSize));
+    setCurrentPage((prev) => Math.min(prev, nextTotalPages));
+  }, [users, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [appFilter]);
 
   // Auto-generate and check username whenever fullName changes (unless manually overridden)
   useEffect(() => {
@@ -259,49 +300,98 @@ export default function AdminPage() {
             ) : users.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10">Нет пользователей</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Пользователь</TableHead>
-                    <TableHead>Приложение</TableHead>
-                    <TableHead>Роль</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.id} className={!u.is_active ? "opacity-50" : ""}>
-                      <TableCell>
-                        <p className="text-sm font-medium">{u.full_name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{u.username}</p>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${APP_BADGE_CLASS[u.app] ?? ""}`}
-                        >
-                          {APP_LABELS[u.app] ?? u.app}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {ROLE_LABELS[u.role] ?? u.role}
-                      </TableCell>
-                      <TableCell>
-                        {/* Can't delete sso admin itself */}
-                        {!(u.app === "sso" && u.role === "admin") && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget(u)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </TableCell>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Пользователь</TableHead>
+                      <TableHead>Приложение</TableHead>
+                      <TableHead>Роль</TableHead>
+                      <TableHead className="w-12" />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUsers.map((u) => (
+                      <TableRow key={u.id} className={!u.is_active ? "opacity-50" : ""}>
+                        <TableCell>
+                          <p className="text-sm font-medium">{u.full_name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{u.username}</p>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${APP_BADGE_CLASS[u.app] ?? ""}`}
+                          >
+                            {APP_LABELS[u.app] ?? u.app}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {ROLE_LABELS[u.role] ?? u.role}
+                        </TableCell>
+                        <TableCell>
+                          {/* Can't delete sso admin itself */}
+                          {!(u.app === "sso" && u.role === "admin") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget(u)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="border-t px-3 py-3 flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground text-center sm:text-left">
+                    Показаны {paginatedUsers.length} из {totalUsers}
+                  </p>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            setCurrentPage((prev) => Math.max(1, prev - 1));
+                          }}
+                          className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                        />
+                      </PaginationItem>
+                      {paginationItems.map((item, index) => (
+                        <PaginationItem key={`${item}-${index}`}>
+                          {typeof item === "number" ? (
+                            <PaginationLink
+                              href="#"
+                              isActive={item === currentPage}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                setCurrentPage(item);
+                              }}
+                            >
+                              {item}
+                            </PaginationLink>
+                          ) : (
+                            <PaginationEllipsis />
+                          )}
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                          }}
+                          className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
