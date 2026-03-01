@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { useAdminData } from "@/context/AdminDataContext";
 import { goToSSOLogin } from "@/lib/sso";
 import { toast } from "sonner";
 
@@ -130,6 +131,7 @@ export default function AdminRegisterPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
   const { isLoggedIn, role } = useAuth();
+  const { refresh: refreshAdminData } = useAdminData();
 
   const [step, setStep] = useState<RegStep>("building");
   const [stepDir, setStepDir] = useState<"forward" | "back">("forward");
@@ -204,6 +206,7 @@ export default function AdminRegisterPage() {
       setConfirmOpen(false);
       setSuccess(true);
       toast.success("Аудитория назначена");
+      refreshAdminData();
       setTimeout(() => navigate("/admin/tablets"), 1500);
     } catch {
       toast.error("Не удалось сохранить");
