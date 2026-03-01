@@ -2,7 +2,9 @@ services:
   # ---- Main app (poly.hex8d.space) ----
 
   main-backend:
-    build: ./main/backend
+    build:
+      context: .
+      dockerfile: main/backend/Dockerfile
     restart: unless-stopped
     environment:
       SECRET_KEY: ${SECRET_KEY}
@@ -12,10 +14,15 @@ services:
       SERVICES_URL: ${SERVICES_URL}
       TRAFFIC_URL: ${TRAFFIC_URL}
       LAUNCH_TOKEN_SECRET: ${LAUNCH_TOKEN_SECRET}
+      SCHEDULE_API_URL: ${SCHEDULE_API_URL:-http://schedule-backend:8000}
+    depends_on:
+      schedule-backend:
+        condition: service_started
     networks:
       main:
         aliases:
           - backend
+      schedule: {}
 
   main-frontend:
     build: ./main/frontend
@@ -28,6 +35,18 @@ services:
       - main
 
   # ---- SSO service (sso.poly.hex8d.space) ----
+
+  schedule-backend:
+    build:
+      context: .
+      dockerfile: schedule/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      RUZ_BASE_URL: ${RUZ_BASE_URL:-https://ruz.spbstu.ru/api/v1/ruz}
+    networks:
+      schedule:
+        aliases:
+          - schedule-backend
 
   sso-db:
     image: mysql:8.0
@@ -51,26 +70,27 @@ services:
           - sso-db
 
   sso-backend:
-    build: ./sso/backend
+    build:
+      context: .
+      dockerfile: sso/backend/Dockerfile
     restart: unless-stopped
     depends_on:
       sso-db:
         condition: service_healthy
+      schedule-backend:
+        condition: service_started
     environment:
       SSO_JWT_SECRET: ${SSO_JWT_SECRET}
       SSO_SERVICE_SECRET: ${SSO_SERVICE_SECRET}
       SSO_ADMIN_USERNAME: ${SSO_ADMIN_USERNAME}
       SSO_ADMIN_PASSWORD: ${SSO_ADMIN_PASSWORD}
-      RUZ_BASE_URL: ${RUZ_BASE_URL:-https://ruz.spbstu.ru/api/v1/ruz}
-      TEACHER_SYNC_ENABLED: ${TEACHER_SYNC_ENABLED:-false}
-      TEACHER_SYNC_INTERVAL_SECONDS: ${TEACHER_SYNC_INTERVAL_SECONDS:-3600}
-      TEACHER_SYNC_STARTUP_DELAY_SECONDS: ${TEACHER_SYNC_STARTUP_DELAY_SECONDS:-15}
       DATABASE_URL: mysql+pymysql://${SSO_MYSQL_USER}:${SSO_MYSQL_PASSWORD}@sso-db:3306/${SSO_MYSQL_DATABASE}
     networks:
       sso:
         aliases:
           - sso-backend
           - backend
+      schedule: {}
 
   sso-frontend:
     build: ./sso/frontend
@@ -106,7 +126,9 @@ services:
           - db
 
   services-backend:
-    build: ./services/backend
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
     restart: unless-stopped
     depends_on:
       services-db:
@@ -165,7 +187,9 @@ services:
           - db
 
   traffic-backend:
-    build: ./traffic/backend
+    build:
+      context: .
+      dockerfile: traffic/backend/Dockerfile
     restart: unless-stopped
     depends_on:
       traffic-db:
@@ -177,6 +201,10 @@ services:
       SSO_JWT_SECRET: ${SSO_JWT_SECRET}
       SSO_SERVICE_SECRET: ${SSO_SERVICE_SECRET}
       SSO_API_URL: http://sso-backend:8000
+      SCHEDULE_API_URL: ${SCHEDULE_API_URL:-http://schedule-backend:8000}
+      TRAFFIC_TEACHER_SYNC_ENABLED: ${TRAFFIC_TEACHER_SYNC_ENABLED:-false}
+      TRAFFIC_TEACHER_SYNC_INTERVAL_SECONDS: ${TRAFFIC_TEACHER_SYNC_INTERVAL_SECONDS:-3600}
+      TRAFFIC_TEACHER_SYNC_STARTUP_DELAY_SECONDS: ${TRAFFIC_TEACHER_SYNC_STARTUP_DELAY_SECONDS:-30}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
       DATABASE_URL: mysql+pymysql://${TRAFFIC_MYSQL_USER}:${TRAFFIC_MYSQL_PASSWORD}@db:3306/${TRAFFIC_MYSQL_DATABASE}
@@ -185,6 +213,7 @@ services:
         aliases:
           - backend
       sso: {}
+      schedule: {}
 
   traffic-frontend:
     build: ./traffic/frontend
@@ -221,3 +250,4 @@ networks:
   sso:
   services:
   traffic:
+  schedule:

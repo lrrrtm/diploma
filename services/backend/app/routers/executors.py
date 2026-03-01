@@ -1,4 +1,3 @@
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -7,6 +6,8 @@ from app.database import get_db
 from app.models.executor import Executor
 from app.schemas.executor import ExecutorCreate, ExecutorOut
 from app.dependencies import require_staff
+from poly_shared.clients.sso_client import SSOClient
+from poly_shared.errors import UpstreamRejected, UpstreamUnavailable
 
 router = APIRouter()
 
@@ -15,36 +16,34 @@ router = APIRouter()
 # SSO helpers
 # ---------------------------------------------------------------------------
 
-def _sso_headers() -> dict:
-    return {"X-Service-Secret": settings.SSO_SERVICE_SECRET}
-
-
 def _sso_create_executor(executor_id: str, username: str, password: str, name: str) -> None:
-    resp = httpx.post(
-        f"{settings.SSO_API_URL}/api/users/",
-        json={
-            "username": username,
-            "password": password,
-            "full_name": name,
-            "app": "services",
-            "role": "executor",
-            "entity_id": executor_id,
-        },
-        headers=_sso_headers(),
-        timeout=10,
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
     )
-    if resp.status_code not in (200, 201):
-        detail = resp.json().get("detail", "Ошибка создания пользователя в SSO")
-        raise HTTPException(status_code=400, detail=detail)
+    try:
+        client.provision_services_executor(
+            username=username,
+            password=password,
+            full_name=name,
+            entity_id=executor_id,
+        )
+    except UpstreamUnavailable:
+        raise HTTPException(status_code=502, detail="SSO недоступен: не удалось создать пользователя")
+    except UpstreamRejected as exc:
+        raise HTTPException(status_code=400, detail=exc.detail or "Ошибка создания пользователя в SSO")
 
 
 def _sso_delete_by_entity(entity_id: str) -> None:
-    httpx.delete(
-        f"{settings.SSO_API_URL}/api/users/by-entity/{entity_id}",
-        params={"app": "services"},
-        headers=_sso_headers(),
-        timeout=10,
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
     )
+    try:
+        client.delete_user_by_entity(entity_id=entity_id, app="services")
+    except (UpstreamUnavailable, UpstreamRejected):
+        # Entity is already removed in local DB; keep API operation idempotent.
+        return
 
 
 # ---------------------------------------------------------------------------

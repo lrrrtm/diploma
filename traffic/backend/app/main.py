@@ -1,18 +1,27 @@
+import asyncio
+from contextlib import suppress
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import engine, Base
+from app.config import settings
+from app.jobs.teacher_sync import run_teacher_sync_forever
 from app.routers import auth, sessions, tablets, teachers, schedule
 
-import app.models  # noqa: F401 — registers all models with Base
+import app.models  # noqa: F401 — registers all models with Base metadata
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    sync_task = None
+    if settings.TRAFFIC_TEACHER_SYNC_ENABLED:
+        sync_task = asyncio.create_task(run_teacher_sync_forever(), name="traffic-teacher-sync")
     yield
+    if sync_task is not None:
+        sync_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await sync_task
 
 
 app = FastAPI(title="Traffic — Attendance Mini-App", lifespan=lifespan)

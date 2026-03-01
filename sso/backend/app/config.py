@@ -21,13 +21,5 @@ class Settings(BaseSettings):
     # Token expiry
     SESSION_TOKEN_EXPIRE_HOURS: int = 24
 
-    # RUZ API base URL used by teacher sync-job
-    RUZ_BASE_URL: str = "https://ruz.spbstu.ru/api/v1/ruz"
-
-    # Automatic teacher sync-job settings
-    TEACHER_SYNC_ENABLED: bool = False
-    TEACHER_SYNC_INTERVAL_SECONDS: int = 3600
-    TEACHER_SYNC_STARTUP_DELAY_SECONDS: int = 15
-
 
 settings = Settings()

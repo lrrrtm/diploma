@@ -19,6 +19,13 @@ class Settings(BaseSettings):
 
     # Internal URL of the SSO backend reachable from this container
     SSO_API_URL: str = "http://sso-backend:8000"
+    # Internal URL of centralized schedule backend
+    SCHEDULE_API_URL: str = "http://schedule-backend:8000"
+
+    # Automatic teacher sync (RUZ -> traffic teachers -> SSO provisioning)
+    TRAFFIC_TEACHER_SYNC_ENABLED: bool = False
+    TRAFFIC_TEACHER_SYNC_INTERVAL_SECONDS: int = 3600
+    TRAFFIC_TEACHER_SYNC_STARTUP_DELAY_SECONDS: int = 30
     # Lifetime of JWT issued by traffic backend for Telegram mini-app login
     SESSION_TOKEN_EXPIRE_HOURS: int = 24
 
@@ -28,8 +35,6 @@ class Settings(BaseSettings):
     # Sessions auto-expire after this many minutes
     SESSION_MAX_MINUTES: int = 90
 
-    # RUZ API base URL
-    RUZ_BASE_URL: str = "https://ruz.spbstu.ru/api/v1/ruz"
     # Telegram bot token used to verify Mini App initData
     TELEGRAM_BOT_TOKEN: str = ""
     # Public bot username (without @), used to generate deep links

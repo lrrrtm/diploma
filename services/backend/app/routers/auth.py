@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from jose import jwt, JWTError
 
 from app.config import settings
+from poly_shared.auth.launch_token import verify_launch_token
+from poly_shared.errors import TokenValidationError
 
 router = APIRouter()
 
@@ -18,16 +19,13 @@ def verify_launch(body: LaunchTokenRequest):
     Returns verified student identity.
     """
     try:
-        payload = jwt.decode(
-            body.token, settings.LAUNCH_TOKEN_SECRET, algorithms=["HS256"]
+        return verify_launch_token(
+            token=body.token,
+            secret=settings.LAUNCH_TOKEN_SECRET,
+            algorithms=["HS256"],
         )
-    except JWTError:
+    except TokenValidationError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired launch token",
         )
-    return {
-        "student_external_id": payload["student_id"],
-        "student_name": payload["student_name"],
-        "student_email": payload["student_email"],
-    }

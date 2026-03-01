@@ -1,11 +1,12 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session as DBSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.teacher import Teacher
+from poly_shared.auth.sso_token import decode_sso_token
+from poly_shared.errors import TokenValidationError
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -14,10 +15,13 @@ def _decode_sso(credentials: HTTPAuthorizationCredentials | None) -> dict:
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        payload = jwt.decode(
-            credentials.credentials, settings.SSO_JWT_SECRET, algorithms=[settings.ALGORITHM]
+        payload = decode_sso_token(
+            token=credentials.credentials,
+            secret=settings.SSO_JWT_SECRET,
+            algorithm=settings.ALGORITHM,
+            expected_app=None,
         )
-    except JWTError:
+    except TokenValidationError:
         raise HTTPException(status_code=401, detail="Недействительный или просроченный токен")
     if payload.get("app") != "traffic":
         raise HTTPException(status_code=403, detail="Токен не предназначен для этого приложения")

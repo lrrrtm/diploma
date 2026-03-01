@@ -25,6 +25,7 @@ jobs:
       traffic_backend: ${{ steps.filter.outputs.traffic_backend }}
       traffic_frontend: ${{ steps.filter.outputs.traffic_frontend }}
       traffic_bot: ${{ steps.filter.outputs.traffic_bot }}
+      schedule_backend: ${{ steps.filter.outputs.schedule_backend }}
       sso_backend: ${{ steps.filter.outputs.sso_backend }}
       sso_frontend: ${{ steps.filter.outputs.sso_frontend }}
       frontend_changed: ${{ steps.summary.outputs.frontend_changed }}
@@ -42,6 +43,7 @@ jobs:
               - 'docker-compose.yml'
               - 'main/docker-compose.yml'
               - 'services/docker-compose.yml'
+              - 'shared/python/**'
             main_backend:
               - 'main/backend/**'
             main_frontend:
@@ -56,6 +58,8 @@ jobs:
               - 'traffic/frontend/**'
             traffic_bot:
               - 'bot/**'
+            schedule_backend:
+              - 'schedule/backend/**'
             sso_backend:
               - 'sso/backend/**'
             sso_frontend:
@@ -84,6 +88,7 @@ jobs:
              [ "${{ steps.filter.outputs.traffic_backend }}" = "true" ] || \
              [ "${{ steps.filter.outputs.traffic_frontend }}" = "true" ] || \
              [ "${{ steps.filter.outputs.traffic_bot }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.schedule_backend }}" = "true" ] || \
              [ "${{ steps.filter.outputs.sso_backend }}" = "true" ] || \
              [ "${{ steps.filter.outputs.sso_frontend }}" = "true" ]; then
             DEPLOY_REQUIRED=true
@@ -184,6 +189,9 @@ jobs:
             fi
             if [ "${{ needs.changes.outputs.traffic_bot }}" = "true" ]; then
               SERVICES="$SERVICES traffic-bot"
+            fi
+            if [ "${{ needs.changes.outputs.schedule_backend }}" = "true" ]; then
+              SERVICES="$SERVICES schedule-backend"
             fi
             if [ "${{ needs.changes.outputs.sso_backend }}" = "true" ]; then
               SERVICES="$SERVICES sso-backend"

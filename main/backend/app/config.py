@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # URL of the traffic (attendance) mini-app
     TRAFFIC_URL: str = "http://localhost:3012"
 
+    # Internal URL of centralized schedule backend
+    SCHEDULE_API_URL: str = "http://schedule-backend:8000"
+
     # Shared secret for signing launch tokens (must match services backend)
     LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
 

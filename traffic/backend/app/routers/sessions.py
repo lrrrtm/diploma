@@ -6,7 +6,6 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
@@ -18,6 +17,8 @@ from app.models.session import Session
 from app.models.tablet import Tablet
 from app.models.teacher import Teacher
 from app.realtime import hub
+from poly_shared.auth.launch_token import verify_launch_token
+from poly_shared.errors import TokenValidationError
 
 router = APIRouter()
 
@@ -196,15 +197,17 @@ async def mark_attendance(session_id: str, data: AttendRequest, db: DBSession = 
 
     # Verify student identity via launch token from main app
     try:
-        payload = jwt.decode(
-            data.launch_token, settings.LAUNCH_TOKEN_SECRET, algorithms=[settings.ALGORITHM]
+        identity = verify_launch_token(
+            token=data.launch_token,
+            secret=settings.LAUNCH_TOKEN_SECRET,
+            algorithms=[settings.ALGORITHM],
         )
-    except JWTError:
+    except TokenValidationError:
         raise HTTPException(status_code=401, detail="Не удалось подтвердить личность студента — открой приложение заново")
 
-    student_external_id = str(payload["student_id"])
-    student_name = payload.get("student_name", "")
-    student_email = payload.get("student_email", "")
+    student_external_id = identity["student_external_id"]
+    student_name = identity["student_name"]
+    student_email = identity["student_email"]
 
     existing = (
         db.query(Attendance)

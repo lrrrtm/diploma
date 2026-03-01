@@ -1,7 +1,6 @@
 import uuid
 import logging
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
@@ -10,6 +9,8 @@ from app.config import settings
 from app.database import get_db
 from app.dependencies import require_admin
 from app.models.teacher import Teacher
+from poly_shared.clients.sso_client import SSOClient
+from poly_shared.errors import UpstreamRejected, UpstreamUnavailable
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -29,47 +30,28 @@ class CreateTeacherRequest(BaseModel):
 # SSO helpers
 # ---------------------------------------------------------------------------
 
-def _sso_headers() -> dict:
-    return {"X-Service-Secret": settings.SSO_SERVICE_SECRET}
-
-
 def _sso_check_username(username: str) -> bool:
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
+    )
     try:
-        resp = httpx.get(
-            f"{settings.SSO_API_URL}/api/users/check-username",
-            params={"username": username},
-            headers=_sso_headers(),
-            timeout=10,
-        )
-    except httpx.RequestError:
+        return client.check_username(username)
+    except UpstreamUnavailable:
         raise HTTPException(status_code=502, detail="SSO недоступен: не удалось проверить логин")
-    if resp.status_code != 200:
-        try:
-            detail = resp.json().get("detail", "Ошибка проверки логина в SSO")
-        except ValueError:
-            detail = "Ошибка проверки логина в SSO"
-        raise HTTPException(status_code=400, detail=detail)
-    return bool(resp.json().get("available", False))
+    except UpstreamRejected as exc:
+        raise HTTPException(status_code=400, detail=exc.detail or "Ошибка проверки логина в SSO")
 
 
 def _sso_fetch_teacher_users() -> dict[str, dict]:
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
+    )
     try:
-        resp = httpx.get(
-            f"{settings.SSO_API_URL}/api/users/",
-            params={"app_filter": "traffic"},
-            headers=_sso_headers(),
-            timeout=10,
-        )
-    except httpx.RequestError as exc:
+        users = client.list_users(app_filter="traffic")
+    except (UpstreamUnavailable, UpstreamRejected) as exc:
         logger.warning("SSO unavailable while fetching teacher users: %s", exc)
-        return {}
-    if resp.status_code != 200:
-        logger.warning("SSO returned non-200 while fetching teacher users: %s", resp.status_code)
-        return {}
-
-    try:
-        users = resp.json()
-    except ValueError:
         return {}
 
     users_by_entity: dict[str, dict] = {}
@@ -90,39 +72,31 @@ def _sso_fetch_teacher_users() -> dict[str, dict]:
 
 
 def _sso_create_user(teacher_id: str, username: str, password: str, full_name: str) -> None:
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
+    )
     try:
-        resp = httpx.post(
-            f"{settings.SSO_API_URL}/api/users/",
-            json={
-                "username": username,
-                "password": password,
-                "full_name": full_name,
-                "app": "traffic",
-                "role": "teacher",
-                "entity_id": teacher_id,
-            },
-            headers=_sso_headers(),
-            timeout=10,
+        client.provision_traffic_teacher(
+            username=username,
+            password=password,
+            full_name=full_name,
+            entity_id=teacher_id,
         )
-    except httpx.RequestError:
+    except UpstreamUnavailable:
         raise HTTPException(status_code=502, detail="SSO недоступен: не удалось создать пользователя")
-    if resp.status_code not in (200, 201):
-        try:
-            detail = resp.json().get("detail", "Ошибка создания пользователя в SSO")
-        except ValueError:
-            detail = "Ошибка создания пользователя в SSO"
-        raise HTTPException(status_code=400, detail=detail)
+    except UpstreamRejected as exc:
+        raise HTTPException(status_code=400, detail=exc.detail or "Ошибка создания пользователя в SSO")
 
 
 def _sso_delete_user(teacher_id: str) -> None:
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
+    )
     try:
-        httpx.delete(
-            f"{settings.SSO_API_URL}/api/users/by-entity/{teacher_id}",
-            params={"app": "traffic"},
-            headers=_sso_headers(),
-            timeout=10,
-        )
-    except httpx.RequestError as exc:
+        client.delete_user_by_entity(entity_id=teacher_id, app="traffic")
+    except (UpstreamUnavailable, UpstreamRejected) as exc:
         logger.warning("Failed to delete SSO user by entity %s: %s", teacher_id, exc)
 
 
@@ -206,6 +180,7 @@ def delete_teacher(
 def _serialize(t: Teacher, sso_user: dict | None = None) -> dict:
     return {
         "id": t.id,
+        "ruz_teacher_id": t.ruz_teacher_id,
         "username": sso_user["username"] if sso_user else None,
         "sso_user_id": sso_user["sso_user_id"] if sso_user else None,
         "telegram_linked": sso_user["telegram_linked"] if sso_user else False,

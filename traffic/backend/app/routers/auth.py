@@ -4,15 +4,17 @@ import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from jose import JWTError, jwt
+from jose import jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.teacher import Teacher
+from poly_shared.auth.launch_token import verify_launch_token
+from poly_shared.clients.sso_client import SSOClient
+from poly_shared.errors import TokenValidationError, UpstreamRejected, UpstreamUnavailable
 
 router = APIRouter()
 
@@ -83,26 +85,20 @@ def _verify_telegram_init_data(init_data: str) -> dict:
     return {"telegram_id": telegram_id}
 
 
-def _sso_headers() -> dict:
-    return {"X-Service-Secret": settings.SSO_SERVICE_SECRET}
-
-
 def _fetch_sso_user_by_telegram(telegram_id: int) -> dict:
-    response = httpx.get(
-        f"{settings.SSO_API_URL}/api/users/by-telegram/{telegram_id}",
-        params={"app_filter": "traffic"},
-        headers=_sso_headers(),
-        timeout=10,
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
     )
-    if response.status_code == 404:
+    try:
+        user = client.get_user_by_telegram(telegram_id=telegram_id, app_filter="traffic")
+    except UpstreamUnavailable:
+        raise HTTPException(status_code=502, detail="SSO недоступен")
+    except UpstreamRejected as exc:
+        raise HTTPException(status_code=400, detail=exc.detail or "Ошибка SSO")
+    if user is None:
         raise HTTPException(status_code=401, detail="Telegram аккаунт не привязан к преподавателю")
-    if response.status_code != 200:
-        try:
-            detail = response.json().get("detail", "Ошибка SSO")
-        except ValueError:
-            detail = "Ошибка SSO"
-        raise HTTPException(status_code=400, detail=detail)
-    return response.json()
+    return user
 
 
 def _issue_teacher_token(user: dict) -> str:
@@ -121,16 +117,13 @@ def _issue_teacher_token(user: dict) -> str:
 @router.post("/verify-launch")
 def verify_launch(body: LaunchTokenRequest):
     try:
-        payload = jwt.decode(
-            body.token, settings.LAUNCH_TOKEN_SECRET, algorithms=[settings.ALGORITHM]
+        return verify_launch_token(
+            token=body.token,
+            secret=settings.LAUNCH_TOKEN_SECRET,
+            algorithms=[settings.ALGORITHM],
         )
-    except JWTError:
+    except TokenValidationError:
         raise HTTPException(status_code=401, detail="Invalid or expired launch token")
-    return {
-        "student_external_id": str(payload["student_id"]),
-        "student_name": payload["student_name"],
-        "student_email": payload.get("student_email", ""),
-    }
 
 
 @router.post("/telegram-login", response_model=TelegramLoginResponse)

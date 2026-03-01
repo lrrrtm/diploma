@@ -1,10 +1,11 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from poly_shared.auth.sso_token import decode_sso_token
+from poly_shared.errors import TokenValidationError
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
@@ -14,9 +15,14 @@ def get_current_auth(token: str | None = Depends(oauth2_scheme)) -> dict | None:
     if token is None:
         return None
     try:
-        payload = jwt.decode(token, settings.SSO_JWT_SECRET, algorithms=[settings.ALGORITHM])
+        payload = decode_sso_token(
+            token=token,
+            secret=settings.SSO_JWT_SECRET,
+            algorithm=settings.ALGORITHM,
+            expected_app=None,
+        )
         return payload
-    except JWTError:
+    except TokenValidationError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Недействительный токен",

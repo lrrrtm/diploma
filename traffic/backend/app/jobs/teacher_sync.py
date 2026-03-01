@@ -1,0 +1,242 @@
+import asyncio
+import logging
+import secrets
+import uuid
+from collections.abc import Iterable
+
+import httpx
+
+from app.config import settings
+from app.database import SessionLocal
+from app.models.teacher import Teacher
+from poly_shared.clients.sso_client import SSOClient
+from poly_shared.errors import UpstreamRejected, UpstreamUnavailable
+
+logger = logging.getLogger(__name__)
+
+_TRANS = {
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ё": "e",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "y",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "kh",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "shch",
+    "ъ": "",
+    "ы": "y",
+    "ь": "",
+    "э": "e",
+    "ю": "yu",
+    "я": "ya",
+}
+
+
+def _translit(value: str) -> str:
+    return "".join(_TRANS.get(char, char) for char in value.lower())
+
+
+def _username_base(full_name: str, ruz_teacher_id: int) -> str:
+    parts = [part for part in full_name.strip().split() if part]
+    if not parts:
+        return f"teacher{ruz_teacher_id}"
+
+    last_name = "".join(ch for ch in _translit(parts[0]) if ch.isalnum())
+    initials = ""
+    for part in parts[1:]:
+        if not part:
+            continue
+        first = "".join(ch for ch in _translit(part[0]) if "a" <= ch <= "z")
+        initials += first
+
+    base = f"{last_name}.{initials}" if initials else last_name
+    base = base.strip(".")
+    if not base:
+        base = f"teacher{ruz_teacher_id}"
+    return base[:100]
+
+
+async def _fetch_teachers_from_schedule() -> list[dict]:
+    url = f"{settings.SCHEDULE_API_URL}/api/schedule/teachers"
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(
+            url,
+            headers={"Accept": "application/json", "User-Agent": "Polytech-Traffic-Sync/1.0"},
+        )
+    response.raise_for_status()
+    payload = response.json()
+    teachers = payload.get("teachers", [])
+    if not isinstance(teachers, list):
+        return []
+    return teachers
+
+
+def _normalize(raw_teachers: Iterable[dict]) -> list[tuple[int, str]]:
+    result: list[tuple[int, str]] = []
+    seen: set[int] = set()
+    for item in raw_teachers:
+        if not isinstance(item, dict):
+            continue
+        ruz_teacher_id = item.get("id")
+        full_name = item.get("full_name")
+        if not isinstance(ruz_teacher_id, int) or ruz_teacher_id <= 0:
+            continue
+        if not isinstance(full_name, str) or not full_name.strip():
+            continue
+        if ruz_teacher_id in seen:
+            continue
+        seen.add(ruz_teacher_id)
+        result.append((ruz_teacher_id, full_name.strip()))
+    return result
+
+
+def _pick_available_username(client: SSOClient, full_name: str, ruz_teacher_id: int) -> str:
+    base = _username_base(full_name, ruz_teacher_id)
+    for suffix in range(0, 10_000):
+        candidate = base if suffix == 0 else f"{base[: max(1, 100 - len(str(suffix + 1)))]}{suffix + 1}"
+        if client.check_username(candidate):
+            return candidate
+    raise RuntimeError(f"Could not pick username for teacher {ruz_teacher_id}")
+
+
+def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
+    db = SessionLocal()
+    created_local = 0
+    updated_local = 0
+    created_or_linked_sso = 0
+    skipped = 0
+    failed = 0
+
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
+    )
+
+    try:
+        local_by_ruz = {
+            teacher.ruz_teacher_id: teacher
+            for teacher in db.query(Teacher).filter(Teacher.ruz_teacher_id.isnot(None)).all()
+            if isinstance(teacher.ruz_teacher_id, int)
+        }
+
+        sso_users = client.list_users(app_filter="traffic")
+        sso_by_entity: dict[str, dict] = {}
+        sso_by_ruz: dict[int, dict] = {}
+        for user in sso_users:
+            if user.get("role") != "teacher":
+                continue
+            entity_id = user.get("entity_id")
+            ruz_teacher_id = user.get("ruz_teacher_id")
+            if isinstance(entity_id, str):
+                sso_by_entity[entity_id] = user
+            if isinstance(ruz_teacher_id, int):
+                sso_by_ruz[ruz_teacher_id] = user
+
+        for ruz_teacher_id, full_name in teachers:
+            teacher = local_by_ruz.get(ruz_teacher_id)
+            if teacher is None:
+                teacher = Teacher(
+                    id=str(uuid.uuid4()),
+                    full_name=full_name,
+                    ruz_teacher_id=ruz_teacher_id,
+                )
+                db.add(teacher)
+                db.commit()
+                db.refresh(teacher)
+                local_by_ruz[ruz_teacher_id] = teacher
+                created_local += 1
+            elif teacher.full_name != full_name:
+                teacher.full_name = full_name
+                db.commit()
+                updated_local += 1
+            else:
+                skipped += 1
+
+            existing_sso = sso_by_entity.get(teacher.id)
+            if existing_sso is not None:
+                continue
+
+            try:
+                existing_by_ruz = sso_by_ruz.get(ruz_teacher_id)
+                if existing_by_ruz and isinstance(existing_by_ruz.get("username"), str):
+                    username = existing_by_ruz["username"]
+                else:
+                    username = _pick_available_username(client, full_name, ruz_teacher_id)
+
+                client.provision_traffic_teacher(
+                    username=username,
+                    password=secrets.token_urlsafe(24),
+                    full_name=full_name,
+                    entity_id=teacher.id,
+                    ruz_teacher_id=ruz_teacher_id,
+                )
+                created_or_linked_sso += 1
+            except (UpstreamRejected, UpstreamUnavailable, RuntimeError):
+                failed += 1
+                logger.exception("Failed to provision SSO teacher for ruz_teacher_id=%s", ruz_teacher_id)
+
+        return {
+            "fetched": len(teachers),
+            "created_local": created_local,
+            "updated_local": updated_local,
+            "created_or_linked_sso": created_or_linked_sso,
+            "skipped": skipped,
+            "failed": failed,
+        }
+    finally:
+        db.close()
+
+
+async def run_teacher_sync_once() -> dict[str, int]:
+    raw = await _fetch_teachers_from_schedule()
+    normalized = _normalize(raw)
+    return await asyncio.to_thread(_sync_to_traffic_and_sso, normalized)
+
+
+async def run_teacher_sync_forever() -> None:
+    startup_delay = max(0, settings.TRAFFIC_TEACHER_SYNC_STARTUP_DELAY_SECONDS)
+    interval = max(60, settings.TRAFFIC_TEACHER_SYNC_INTERVAL_SECONDS)
+
+    if startup_delay > 0:
+        await asyncio.sleep(startup_delay)
+
+    while True:
+        try:
+            stats = await run_teacher_sync_once()
+            logger.info(
+                (
+                    "Traffic teacher sync completed: fetched=%s created_local=%s "
+                    "updated_local=%s created_or_linked_sso=%s skipped=%s failed=%s"
+                ),
+                stats["fetched"],
+                stats["created_local"],
+                stats["updated_local"],
+                stats["created_or_linked_sso"],
+                stats["skipped"],
+                stats["failed"],
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Traffic teacher sync failed")
+
+        await asyncio.sleep(interval)
