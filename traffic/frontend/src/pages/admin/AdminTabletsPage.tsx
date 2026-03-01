@@ -53,6 +53,10 @@ interface ComboboxOption {
   subLabel?: string;
 }
 
+interface TabletStatusPayload {
+  statuses: { tablet_id: string; online: boolean }[];
+}
+
 interface SearchableComboboxProps {
   label: string;
   placeholder: string;
@@ -164,6 +168,18 @@ function SearchableCombobox({
   );
 }
 
+function TabletStatusLight({ online }: { online: boolean }) {
+  const colorClass = online ? "bg-emerald-500" : "bg-destructive";
+  return (
+    <span className="inline-flex items-center">
+      <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${colorClass}`}>
+        <span className={`absolute inset-0 rounded-full ${colorClass} animate-ping opacity-75`} />
+      </span>
+      <span className="sr-only">{online ? "Онлайн" : "Оффлайн"}</span>
+    </span>
+  );
+}
+
 export default function AdminTabletsPage() {
   const { tablets, refresh } = useAdminData();
   const isMobile = useIsMobile();
@@ -182,6 +198,7 @@ export default function AdminTabletsPage() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [occupiedByBuilding, setOccupiedByBuilding] = useState<Map<number, Set<number>>>(new Map());
   const [savingRegistration, setSavingRegistration] = useState(false);
+  const [tabletOnlineState, setTabletOnlineState] = useState<Record<string, boolean>>({});
 
   async function confirmDelete() {
     if (!pendingDeleteId) return;
@@ -324,6 +341,80 @@ export default function AdminTabletsPage() {
   const canSaveRegistration = !!deviceId && !!selectedBuilding && !!selectedRoom && !savingRegistration;
   const registered = tablets?.filter((t) => t.is_registered) ?? null;
 
+  useEffect(() => {
+    let disposed = false;
+    const abortController = new AbortController();
+
+    async function connectStatusStream() {
+      while (!disposed) {
+        try {
+          const token = localStorage.getItem("traffic_token");
+          const response = await fetch("/api/tablets/stream/statuses", {
+            headers: {
+              Accept: "text/event-stream",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            signal: abortController.signal,
+          });
+
+          if (!response.ok || !response.body) {
+            throw new Error(`status stream failed: ${response.status}`);
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (!disposed) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer = `${buffer}${decoder.decode(value, { stream: true })}`.replace(/\r\n/g, "\n");
+            let boundary = buffer.indexOf("\n\n");
+
+            while (boundary !== -1) {
+              const rawEvent = buffer.slice(0, boundary);
+              buffer = buffer.slice(boundary + 2);
+              boundary = buffer.indexOf("\n\n");
+
+              const data = rawEvent
+                .split("\n")
+                .filter((line) => line.startsWith("data:"))
+                .map((line) => line.slice(5).trim())
+                .join("\n");
+
+              if (!data) continue;
+
+              try {
+                const payload = JSON.parse(data) as TabletStatusPayload;
+                const nextState: Record<string, boolean> = {};
+                for (const status of payload.statuses ?? []) {
+                  nextState[status.tablet_id] = status.online;
+                }
+                setTabletOnlineState(nextState);
+              } catch {
+                // ignore malformed event
+              }
+            }
+          }
+        } catch {
+          // reconnect below
+        }
+
+        if (!disposed) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+    }
+
+    connectStatusStream();
+
+    return () => {
+      disposed = true;
+      abortController.abort();
+    };
+  }, []);
+
   return (
     <>
       <div className="flex items-center justify-between mb-4">
@@ -362,10 +453,11 @@ export default function AdminTabletsPage() {
           <Table>
             <TableHeader className={isMobile ? "sr-only" : undefined}>
               <TableRow>
-                <TableHead className="w-[45%]">UUID киоска</TableHead>
-                <TableHead className="w-[20%]">Корпус</TableHead>
-                <TableHead className="w-[20%]">Аудитория</TableHead>
-                <TableHead className="w-[15%] text-right">Действия</TableHead>
+                <TableHead className="w-[38%]">UUID киоска</TableHead>
+                <TableHead className="w-[12%]">Статус</TableHead>
+                <TableHead className="w-[18%]">Корпус</TableHead>
+                <TableHead className="w-[18%]">Аудитория</TableHead>
+                <TableHead className="w-[14%] text-right">Действия</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -387,6 +479,12 @@ export default function AdminTabletsPage() {
                     <span className="font-mono text-xs break-all text-right sm:text-left">
                       {t.id}
                     </span>
+                  </TableCell>
+                  <TableCell
+                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : undefined}
+                  >
+                    {isMobile && <span className="text-xs text-muted-foreground">Статус</span>}
+                    <TabletStatusLight online={tabletOnlineState[t.id] ?? false} />
                   </TableCell>
                   <TableCell
                     className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : undefined}

@@ -36,6 +36,12 @@ interface CurrentSession {
   attendance_count?: number;
 }
 
+interface TabletStreamPayload {
+  tablet: (TabletInfo & { reg_pin?: string }) | null;
+  session: CurrentSession;
+  server_time?: string;
+}
+
 interface RuzLesson {
   time_start: string;
   time_end: string;
@@ -101,7 +107,6 @@ export default function DisplayPage() {
   const deviceIdRef = useRef<string | null>(getStoredDeviceId());
   const displayPinRef = useRef<string | null>(getStoredDisplayPin());
   const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---------------------------------------------------------------------------
   // QR generation (frontend HMAC — no backend polling for token)
@@ -119,8 +124,54 @@ export default function DisplayPage() {
     );
   }
 
+  function resetDeviceState() {
+    localStorage.removeItem("traffic_device_id");
+    localStorage.removeItem("traffic_display_pin");
+    deviceIdRef.current = null;
+    displayPinRef.current = null;
+    setTablet(null);
+    setSession(null);
+    setRegPin("");
+    setDisplayState("unregistered");
+    setQrToken("");
+    if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+  }
+
+  function applyStreamPayload(payload: TabletStreamPayload) {
+    if (!payload.tablet) {
+      resetDeviceState();
+      return;
+    }
+
+    const tabletData = payload.tablet;
+    setTablet(tabletData);
+
+    if (!tabletData.is_registered) {
+      setDisplayState("unregistered");
+      setSession(null);
+      setQrToken("");
+      if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+      if (tabletData.reg_pin) setRegPin(tabletData.reg_pin);
+      return;
+    }
+
+    const sessionData = payload.session;
+    if (sessionData?.active) {
+      setSession(sessionData);
+      setDisplayState("active");
+      if (sessionData.qr_secret && sessionData.session_id && sessionData.rotate_seconds) {
+        generateQr(sessionData.qr_secret, sessionData.session_id, sessionData.rotate_seconds);
+      }
+    } else {
+      setSession(null);
+      setDisplayState("waiting");
+      setQrToken("");
+      if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+    }
+  }
+
   // ---------------------------------------------------------------------------
-  // Polling
+  // Device init and stream
   // ---------------------------------------------------------------------------
 
   async function initDevice() {
@@ -133,71 +184,74 @@ export default function DisplayPage() {
       localStorage.setItem("traffic_display_pin", res.data.display_pin);
       setRegPin(res.data.reg_pin);
     } catch {
-      // retry on next poll
+      // retry on reconnect loop
     }
   }
 
-  async function pollTablet() {
-    const deviceId = deviceIdRef.current;
-    if (!deviceId) {
-      await initDevice();
-      schedulePoll(3000);
-      return;
-    }
-    try {
-      const res = await api.get<TabletInfo & { reg_pin?: string }>(`/tablets/${deviceId}`);
-      setTablet(res.data);
-      if (!res.data.is_registered) {
-        if (res.data.reg_pin) setRegPin(res.data.reg_pin);
-        setDisplayState("unregistered");
-        schedulePoll(3000);
-      } else {
-        pollSession();
+  async function connectTabletStream(signal: AbortSignal) {
+    while (!signal.aborted) {
+      if (!deviceIdRef.current) {
+        await initDevice();
       }
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 404) {
-        localStorage.removeItem("traffic_device_id");
-        localStorage.removeItem("traffic_display_pin");
-        deviceIdRef.current = null;
-        displayPinRef.current = null;
-        setTablet(null);
-        setSession(null);
-        setRegPin("");
-        setDisplayState("unregistered");
-        if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
-      }
-      schedulePoll(5000);
-    }
-  }
 
-  async function pollSession() {
-    const deviceId = deviceIdRef.current;
-    if (!deviceId) return;
-    try {
-      const res = await api.get<CurrentSession>(
-        `/sessions/current?device_id=${deviceId}&tablet_secret=${displayPinRef.current ?? ""}`,
-      );
-      if (res.data.active) {
-        setSession(res.data);
-        setDisplayState("active");
-        if (res.data.qr_secret && res.data.session_id && res.data.rotate_seconds) {
-          generateQr(res.data.qr_secret, res.data.session_id, res.data.rotate_seconds);
+      const deviceId = deviceIdRef.current;
+      if (!deviceId) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        continue;
+      }
+
+      const tabletSecret = displayPinRef.current ?? "";
+
+      try {
+        const response = await fetch(
+          `/api/tablets/${encodeURIComponent(deviceId)}/events?tablet_secret=${encodeURIComponent(tabletSecret)}`,
+          { headers: { Accept: "text/event-stream" }, signal },
+        );
+
+        if (!response.ok || !response.body) {
+          throw new Error(`stream failed with status ${response.status}`);
         }
-      } else {
-        setSession(null);
-        setDisplayState("waiting");
-        if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
-      }
-    } catch {
-      // keep current state
-    }
-    schedulePoll(3000);
-  }
 
-  function schedulePoll(ms: number) {
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-    pollTimerRef.current = setTimeout(pollTablet, ms);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!signal.aborted) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer = `${buffer}${decoder.decode(value, { stream: true })}`.replace(/\r\n/g, "\n");
+          let boundary = buffer.indexOf("\n\n");
+
+          while (boundary !== -1) {
+            const rawEvent = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            boundary = buffer.indexOf("\n\n");
+
+            const data = rawEvent
+              .split("\n")
+              .filter((line) => line.startsWith("data:"))
+              .map((line) => line.slice(5).trim())
+              .join("\n");
+
+            if (!data) continue;
+
+            try {
+              const payload = JSON.parse(data) as TabletStreamPayload;
+              applyStreamPayload(payload);
+            } catch {
+              // ignore malformed event
+            }
+          }
+        }
+      } catch {
+        // reconnect below
+      }
+
+      if (!signal.aborted) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -222,9 +276,11 @@ export default function DisplayPage() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    pollTablet();
+    const abortController = new AbortController();
+    connectTabletStream(abortController.signal);
+
     return () => {
-      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      abortController.abort();
       if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

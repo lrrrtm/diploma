@@ -17,6 +17,7 @@ from app.models.attendance import Attendance
 from app.models.session import Session
 from app.models.tablet import Tablet
 from app.models.teacher import Teacher
+from app.realtime import hub
 
 router = APIRouter()
 
@@ -59,7 +60,7 @@ class AttendRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/")
-def create_session(
+async def create_session(
     data: CreateSessionRequest,
     teacher: Teacher = Depends(require_teacher),
     db: DBSession = Depends(get_db),
@@ -87,6 +88,7 @@ def create_session(
     db.add(session)
     db.commit()
     db.refresh(session)
+    await hub.publish_tablet(data.tablet_id)
     return _serialize_session(session)
 
 
@@ -184,7 +186,7 @@ def get_attendees(
 
 
 @router.post("/{session_id}/attend")
-def mark_attendance(session_id: str, data: AttendRequest, db: DBSession = Depends(get_db)):
+async def mark_attendance(session_id: str, data: AttendRequest, db: DBSession = Depends(get_db)):
     session = db.get(Session, session_id)
     if not session or not session.is_active:
         raise HTTPException(status_code=404, detail="Занятие не найдено или уже завершено")
@@ -224,11 +226,12 @@ def mark_attendance(session_id: str, data: AttendRequest, db: DBSession = Depend
     )
     db.add(record)
     db.commit()
+    await hub.publish_tablet(session.tablet_id)
     return {"status": "ok", "message": "Посещаемость отмечена"}
 
 
 @router.delete("/{session_id}")
-def close_session(
+async def close_session(
     session_id: str,
     teacher: Teacher = Depends(require_teacher),
     db: DBSession = Depends(get_db),
@@ -239,6 +242,7 @@ def close_session(
     session.is_active = False
     session.ended_at = datetime.now(timezone.utc)
     db.commit()
+    await hub.publish_tablet(session.tablet_id)
     return {"status": "closed"}
 
 

@@ -1,0 +1,71 @@
+import asyncio
+from collections import defaultdict
+
+
+class TabletRealtimeHub:
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self.online_tablets: set[str] = set()
+        self._status_subscribers: set[asyncio.Queue[str]] = set()
+        self._tablet_subscribers: dict[str, set[asyncio.Queue[str]]] = defaultdict(set)
+
+    async def set_online(self, tablet_id: str) -> None:
+        async with self._lock:
+            self.online_tablets.add(tablet_id)
+        await self.publish_status()
+
+    async def set_offline(self, tablet_id: str) -> None:
+        async with self._lock:
+            self.online_tablets.discard(tablet_id)
+        await self.publish_status()
+
+    async def subscribe_status(self) -> asyncio.Queue[str]:
+        queue: asyncio.Queue[str] = asyncio.Queue()
+        async with self._lock:
+            self._status_subscribers.add(queue)
+        return queue
+
+    async def unsubscribe_status(self, queue: asyncio.Queue[str]) -> None:
+        async with self._lock:
+            self._status_subscribers.discard(queue)
+
+    async def subscribe_tablet(self, tablet_id: str) -> asyncio.Queue[str]:
+        queue: asyncio.Queue[str] = asyncio.Queue()
+        async with self._lock:
+            self._tablet_subscribers[tablet_id].add(queue)
+        return queue
+
+    async def unsubscribe_tablet(self, tablet_id: str, queue: asyncio.Queue[str]) -> None:
+        async with self._lock:
+            subscribers = self._tablet_subscribers.get(tablet_id)
+            if not subscribers:
+                return
+            subscribers.discard(queue)
+            if not subscribers:
+                self._tablet_subscribers.pop(tablet_id, None)
+
+    async def publish_status(self) -> None:
+        async with self._lock:
+            subscribers = list(self._status_subscribers)
+        for queue in subscribers:
+            self._safe_signal(queue)
+
+    async def publish_tablet(self, tablet_id: str) -> None:
+        async with self._lock:
+            subscribers = list(self._tablet_subscribers.get(tablet_id, set()))
+        for queue in subscribers:
+            self._safe_signal(queue)
+
+    async def get_online_tablets(self) -> set[str]:
+        async with self._lock:
+            return set(self.online_tablets)
+
+    @staticmethod
+    def _safe_signal(queue: asyncio.Queue[str]) -> None:
+        try:
+            queue.put_nowait("update")
+        except asyncio.QueueFull:
+            pass
+
+
+hub = TabletRealtimeHub()
