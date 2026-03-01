@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Users, X } from "lucide-react";
+import { Users, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import api from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { goToSSOLogin } from "@/lib/sso";
@@ -47,6 +55,12 @@ interface SessionStartLesson {
 interface SessionStartOptions {
   tablet: TabletInfo;
   lessons: SessionStartLesson[];
+}
+
+interface NoticeDialogState {
+  title: string;
+  message: string;
+  actionLabel: string;
 }
 
 function pickSuggestedLessonIndex(lessons: SessionStartLesson[]): number {
@@ -90,7 +104,7 @@ export default function TeacherSessionPage() {
   const [selectedLessonIndex, setSelectedLessonIndex] = useState<number | null>(null);
 
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [noticeDialog, setNoticeDialog] = useState<NoticeDialogState | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -131,10 +145,18 @@ export default function TeacherSessionPage() {
     };
   }, [session]);
 
+  function openNoticeDialog(
+    title: string,
+    message: string,
+    actionLabel: "Понятно" | "Хорошо" = "Понятно",
+  ) {
+    setNoticeDialog({ title, message, actionLabel });
+  }
+
   async function handlePinComplete(value: string) {
     if (value.length !== 6) return;
     setPinSearching(true);
-    setError(null);
+    setNoticeDialog(null);
 
     try {
       const res = await api.get<SessionStartOptions>(`/sessions/start-options?pin=${encodeURIComponent(value)}`);
@@ -143,14 +165,18 @@ export default function TeacherSessionPage() {
 
       if (res.data.lessons.length === 0) {
         setSelectedLessonIndex(null);
-        setError("В этой аудитории у вас нет занятий на сегодня. Начать сессию нельзя.");
+        openNoticeDialog(
+          "Сессию нельзя начать",
+          "В этой аудитории у вас нет занятий на сегодня. Начать сессию нельзя.",
+          "Понятно",
+        );
       } else {
         const suggested = pickSuggestedLessonIndex(res.data.lessons);
         setSelectedLessonIndex(suggested);
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? "Не удалось проверить код киоска");
+      openNoticeDialog("Ошибка", msg ?? "Не удалось проверить код киоска", "Хорошо");
       setTabletInfo(null);
       setAvailableLessons([]);
       setSelectedLessonIndex(null);
@@ -169,11 +195,11 @@ export default function TeacherSessionPage() {
 
   const handleStart = async () => {
     if (!tabletInfo || !selectedLesson) {
-      setError("Выберите занятие из расписания");
+      openNoticeDialog("Сессию нельзя начать", "Выберите занятие из расписания", "Понятно");
       return;
     }
 
-    setError(null);
+    setNoticeDialog(null);
     setStarting(true);
     try {
       const res = await api.post<SessionData>("/sessions/", {
@@ -189,7 +215,7 @@ export default function TeacherSessionPage() {
       setPin("");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? "Не удалось создать занятие");
+      openNoticeDialog("Ошибка", msg ?? "Не удалось создать занятие", "Хорошо");
     } finally {
       setStarting(false);
     }
@@ -205,7 +231,7 @@ export default function TeacherSessionPage() {
       setAvailableLessons([]);
       setSelectedLessonIndex(null);
       setPin("");
-      setError(null);
+      setNoticeDialog(null);
       toast.success("Занятие завершено");
     } catch {
       toast.error("Не удалось завершить занятие");
@@ -237,7 +263,7 @@ export default function TeacherSessionPage() {
                   value={pin}
                   onChange={(value) => {
                     setPin(value);
-                    if (error) setError(null);
+                    if (noticeDialog) setNoticeDialog(null);
                   }}
                   onComplete={handlePinComplete}
                   disabled={pinSearching || starting}
@@ -293,13 +319,6 @@ export default function TeacherSessionPage() {
                 </Button>
               </div>
             )}
-
-            {error && (
-              <Alert variant="destructive" className="w-full max-w-md">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
           </div>
         </div>
       ) : (
@@ -354,6 +373,20 @@ export default function TeacherSessionPage() {
           )}
         </div>
       )}
+
+      <AlertDialog open={noticeDialog !== null} onOpenChange={(open) => !open && setNoticeDialog(null)}>
+        <AlertDialogContent className="w-[calc(100%-2rem)] rounded-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{noticeDialog?.title ?? "Уведомление"}</AlertDialogTitle>
+            <AlertDialogDescription>{noticeDialog?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setNoticeDialog(null)}>
+              {noticeDialog?.actionLabel ?? "Понятно"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Eye, EyeOff, Link2, Plus, QrCode, RefreshCw, Trash2, Users } from "lucide-react";
+import { Eye, EyeOff, Link2, Plus, QrCode, RefreshCw, Trash2, Unlink, Users } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +89,7 @@ export default function AdminTeachersPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingUnlinkTelegramId, setPendingUnlinkTelegramId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [telegramLinkDialogOpen, setTelegramLinkDialogOpen] = useState(false);
   const [telegramLinkLoading, setTelegramLinkLoading] = useState(false);
@@ -128,6 +129,20 @@ export default function AdminTeachersPage() {
       toast.error("Не удалось удалить преподавателя");
     } finally {
       setPendingDeleteId(null);
+    }
+  }
+
+  async function confirmUnlinkTelegram() {
+    if (!pendingUnlinkTelegramId) return;
+    try {
+      await api.delete(`/teachers/${pendingUnlinkTelegramId}/telegram-link`);
+      toast.success("Telegram успешно отвязан");
+      refresh();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ?? "Не удалось отвязать Telegram");
+    } finally {
+      setPendingUnlinkTelegramId(null);
     }
   }
 
@@ -340,7 +355,7 @@ export default function AdminTeachersPage() {
                         >
                           {isMobile && <span className="text-xs text-muted-foreground">Логин</span>}
                           <span className="text-right sm:text-left break-all">
-                            {teacher.username ? `@${teacher.username}` : "—"}
+                            {teacher.username ?? "—"}
                           </span>
                         </TableCell>
                         <TableCell
@@ -367,6 +382,17 @@ export default function AdminTeachersPage() {
                               aria-label={`Показать QR для привязки Telegram ${teacher.full_name}`}
                             >
                               <QrCode className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-amber-500"
+                              onClick={() => setPendingUnlinkTelegramId(teacher.id)}
+                              title="Отвязать Telegram"
+                              aria-label={`Отвязать Telegram у преподавателя ${teacher.full_name}`}
+                              disabled={!teacher.telegram_linked}
+                            >
+                              <Unlink className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -444,6 +470,16 @@ export default function AdminTeachersPage() {
         }}
         title="Удалить преподавателя?"
         onConfirm={confirmDelete}
+      />
+      <ConfirmDialog
+        open={pendingUnlinkTelegramId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingUnlinkTelegramId(null);
+        }}
+        title="Отвязать Telegram?"
+        description="Связь с Telegram будет удалена. Преподавателю нужно будет заново пройти привязку по QR."
+        confirmLabel="Отвязать"
+        onConfirm={confirmUnlinkTelegram}
       />
 
       <Dialog

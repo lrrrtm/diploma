@@ -269,3 +269,23 @@ class SSOClient:
                 detail="Некорректный формат пользователя SSO",
             )
         return payload
+
+    def unlink_user_telegram(self, *, user_id: str) -> dict[str, Any]:
+        response = self._request(
+            "DELETE",
+            f"/api/users/{user_id}/telegram-link",
+        )
+        if response.status_code != 200:
+            raise UpstreamRejected(
+                service="sso",
+                status_code=response.status_code,
+                message="failed to unlink telegram",
+                detail=self._detail_from_response(response, "Ошибка отвязки Telegram в SSO"),
+            )
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        return payload

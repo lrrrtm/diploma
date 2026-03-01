@@ -48,7 +48,7 @@ def _sso_check_username(username: str) -> bool:
         raise HTTPException(status_code=400, detail=exc.detail or "Ошибка проверки логина в SSO")
 
 
-def _sso_fetch_teacher_users() -> dict[str, dict]:
+def _sso_fetch_teacher_users(*, strict: bool = False) -> dict[str, dict]:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
         service_secret=settings.SSO_SERVICE_SECRET,
@@ -56,6 +56,10 @@ def _sso_fetch_teacher_users() -> dict[str, dict]:
     try:
         users = client.list_users(app_filter="traffic")
     except (UpstreamUnavailable, UpstreamRejected) as exc:
+        if strict:
+            if isinstance(exc, UpstreamUnavailable):
+                raise HTTPException(status_code=502, detail="SSO недоступен")
+            raise HTTPException(status_code=400, detail=exc.detail or "Ошибка получения пользователей SSO")
         logger.warning("SSO unavailable while fetching teacher users: %s", exc)
         return {}
 
@@ -67,9 +71,9 @@ def _sso_fetch_teacher_users() -> dict[str, dict]:
         username = user.get("username")
         sso_user_id = user.get("id")
         telegram_linked = bool(user.get("telegram_linked"))
-        if isinstance(entity_id, str) and isinstance(username, str):
+        if isinstance(entity_id, str):
             users_by_entity[entity_id] = {
-                "username": username,
+                "username": username if isinstance(username, str) else None,
                 "sso_user_id": sso_user_id if isinstance(sso_user_id, str) else None,
                 "telegram_linked": telegram_linked,
             }
@@ -103,6 +107,19 @@ def _sso_delete_user(teacher_id: str) -> None:
         client.delete_user_by_entity(entity_id=teacher_id, app="traffic")
     except (UpstreamUnavailable, UpstreamRejected) as exc:
         logger.warning("Failed to delete SSO user by entity %s: %s", teacher_id, exc)
+
+
+def _sso_unlink_telegram(sso_user_id: str) -> None:
+    client = SSOClient(
+        base_url=settings.SSO_API_URL,
+        service_secret=settings.SSO_SERVICE_SECRET,
+    )
+    try:
+        client.unlink_user_telegram(user_id=sso_user_id)
+    except UpstreamUnavailable:
+        raise HTTPException(status_code=502, detail="SSO недоступен: не удалось отвязать Telegram")
+    except UpstreamRejected as exc:
+        raise HTTPException(status_code=400, detail=exc.detail or "Ошибка отвязки Telegram в SSO")
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +197,26 @@ def delete_teacher(
     db.commit()
     _sso_delete_user(teacher_id)
     return {"status": "deleted"}
+
+
+@router.delete("/{teacher_id}/telegram-link")
+def unlink_teacher_telegram(
+    teacher_id: str,
+    db: DBSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    teacher = db.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Преподаватель не найден")
+
+    users_by_entity = _sso_fetch_teacher_users(strict=True)
+    user_info = users_by_entity.get(teacher_id)
+    sso_user_id = user_info.get("sso_user_id") if isinstance(user_info, dict) else None
+    if not isinstance(sso_user_id, str):
+        raise HTTPException(status_code=404, detail="Учётка преподавателя в SSO не найдена")
+
+    _sso_unlink_telegram(sso_user_id)
+    return {"status": "unlinked"}
 
 
 @router.get("/sync/status")

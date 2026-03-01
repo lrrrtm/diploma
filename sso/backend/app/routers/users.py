@@ -219,6 +219,25 @@ def link_telegram(
     return _serialize(user)
 
 
+@router.delete("/{user_id}/telegram-link")
+def unlink_telegram(
+    user_id: str,
+    _: str = Depends(_require_sso_admin_or_service),
+    db: DBSession = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    link = db.query(TelegramLink).filter(TelegramLink.user_id == user_id).first()
+    if link is not None:
+        db.delete(link)
+        db.commit()
+        db.refresh(user)
+
+    return _serialize(user)
+
+
 @router.patch("/{user_id}")
 def update_user(
     user_id: str,
