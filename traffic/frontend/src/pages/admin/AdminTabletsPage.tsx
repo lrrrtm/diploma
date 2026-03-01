@@ -127,7 +127,7 @@ export default function AdminTabletsPage() {
       )}
 
       {/* PIN entry dialog */}
-      <Dialog open={pinDialogOpen} onOpenChange={(o) => { setPinDialogOpen(o); if (!o) setPin(""); }}>
+      <Dialog open={pinDialogOpen} onOpenChange={(o: boolean) => { setPinDialogOpen(o); if (!o) setPin(""); }}>
         <DialogContent className="w-[calc(100%-2rem)] rounded-lg max-w-sm">
           <DialogHeader>
             <DialogTitle>Введите код киоска</DialogTitle>
