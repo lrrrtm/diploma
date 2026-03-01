@@ -126,6 +126,7 @@ export default function DisplayPage() {
       const res = await api.get<TabletInfo & { reg_pin?: string }>(`/tablets/${deviceId}`);
       setTablet(res.data);
       if (!res.data.is_registered) {
+        if (res.data.reg_pin) setRegPin(res.data.reg_pin);
         setDisplayState("unregistered");
         schedulePoll(3000);
       } else {
@@ -229,22 +230,20 @@ export default function DisplayPage() {
 
   if (displayState === "unregistered") {
     return (
-      <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex">
-        <div className="flex-1 flex items-center justify-center">
+      <div className="h-screen overflow-hidden bg-gray-950 text-white select-none flex flex-col items-center justify-center gap-10 px-8">
+        <h1 className="text-5xl font-bold text-center leading-tight">
+          Регистрация аудитории
+        </h1>
+        <div className="flex flex-col items-center gap-6">
           {regPin ? (
             <PinDisplay pin={regPin} />
           ) : (
             <Spinner className="h-16 w-16 text-gray-600" />
           )}
         </div>
-        <div className="flex-1 flex flex-col justify-center px-16 gap-6">
-          <h1 className="text-5xl font-bold leading-tight">
-            Регистрация аудитории
-          </h1>
-          <p className="text-2xl text-gray-400 leading-relaxed">
-            Введите этот код в интерфейсе администратора, чтобы привязать киоск к аудитории
-          </p>
-        </div>
+        <p className="text-2xl text-gray-400 text-center leading-relaxed max-w-xl">
+          Введите этот код в интерфейсе администратора, чтобы привязать киоск к аудитории
+        </p>
       </div>
     );
   }

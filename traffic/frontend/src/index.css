@@ -97,3 +97,13 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
 }
+
+/* Remove focus rings on touch-primary devices (mobile/tablet) */
+@media (pointer: coarse) {
+  *:focus-visible {
+    outline: none !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000) !important;
+  }
+}

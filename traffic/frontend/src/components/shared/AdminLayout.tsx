@@ -47,7 +47,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + "/");
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh">
       <Sidebar collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
@@ -134,8 +134,10 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="h-4" />
         </header>
-        <div className="flex-1 overflow-y-auto p-4 max-w-5xl mx-auto w-full">
-          {children}
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-4">
+          <div className="flex-1 max-w-5xl mx-auto w-full flex flex-col">
+            {children}
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
