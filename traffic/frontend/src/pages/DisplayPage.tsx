@@ -239,6 +239,15 @@ export default function DisplayPage() {
             try {
               const payload = JSON.parse(data) as TabletStreamPayload;
               applyStreamPayload(payload);
+
+              if (payload.tablet === null) {
+                try {
+                  await reader.cancel();
+                } catch {
+                  // ignore reader cancel errors
+                }
+                break;
+              }
             } catch {
               // ignore malformed event
             }

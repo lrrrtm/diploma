@@ -150,6 +150,10 @@ async def tablet_events(tablet_id: str, tablet_secret: str | None = None):
                     last_data = data
                     yield f"event: tablet\ndata: {data}\n\n"
 
+                # If tablet no longer exists, close stream so client can re-init a new device.
+                if payload.get("tablet") is None:
+                    break
+
                 try:
                     await asyncio.wait_for(queue.get(), timeout=25.0)
                 except asyncio.TimeoutError:
