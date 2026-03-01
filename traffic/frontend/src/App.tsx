@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import DisplayPage from "@/pages/DisplayPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
@@ -12,6 +12,7 @@ import { AdminLayout } from "@/components/shared/AdminLayout";
 import { TeacherLayout } from "@/components/shared/TeacherLayout";
 import { useAuth } from "@/context/AuthContext";
 import { goToSSOLogin } from "@/lib/sso";
+import { isTelegramMiniApp, loginTeacherViaTelegramMiniApp } from "@/lib/telegram";
 
 function RedirectScreen() {
   return (
@@ -22,9 +23,39 @@ function RedirectScreen() {
 }
 
 function RequireRole({ role: requiredRole, children }: { role: "admin" | "teacher"; children: ReactNode }) {
-  const { isLoggedIn, role } = useAuth();
+  const { isLoggedIn, role, login } = useAuth();
+  const [telegramAuthPending, setTelegramAuthPending] = useState(requiredRole === "teacher");
+  const telegramAttemptedRef = useRef(false);
 
   useEffect(() => {
+    if (requiredRole !== "teacher") {
+      setTelegramAuthPending(false);
+    }
+
+    if (isLoggedIn) {
+      setTelegramAuthPending(false);
+    }
+
+    if (!isLoggedIn && requiredRole === "teacher" && !telegramAttemptedRef.current) {
+      telegramAttemptedRef.current = true;
+      if (!isTelegramMiniApp()) {
+        setTelegramAuthPending(false);
+      } else {
+        void loginTeacherViaTelegramMiniApp()
+          .then((token) => {
+            if (token) {
+              login(token);
+            }
+          })
+          .finally(() => {
+            setTelegramAuthPending(false);
+          });
+      }
+      return;
+    }
+
+    if (telegramAuthPending) return;
+
     if (!isLoggedIn) {
       goToSSOLogin();
       return;
@@ -35,8 +66,9 @@ function RequireRole({ role: requiredRole, children }: { role: "admin" | "teache
       else if (role === "teacher") window.location.replace("/teacher/session");
       else goToSSOLogin();
     }
-  }, [isLoggedIn, role, requiredRole]);
+  }, [isLoggedIn, role, requiredRole, login, telegramAuthPending]);
 
+  if (telegramAuthPending) return <RedirectScreen />;
   if (!isLoggedIn || role !== requiredRole) return <RedirectScreen />;
 
   return <>{children}</>;

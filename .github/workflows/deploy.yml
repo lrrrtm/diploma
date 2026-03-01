@@ -24,6 +24,7 @@ jobs:
       services_frontend: ${{ steps.filter.outputs.services_frontend }}
       traffic_backend: ${{ steps.filter.outputs.traffic_backend }}
       traffic_frontend: ${{ steps.filter.outputs.traffic_frontend }}
+      traffic_bot: ${{ steps.filter.outputs.traffic_bot }}
       sso_backend: ${{ steps.filter.outputs.sso_backend }}
       sso_frontend: ${{ steps.filter.outputs.sso_frontend }}
       frontend_changed: ${{ steps.summary.outputs.frontend_changed }}
@@ -53,6 +54,8 @@ jobs:
               - 'traffic/backend/**'
             traffic_frontend:
               - 'traffic/frontend/**'
+            traffic_bot:
+              - 'bot/**'
             sso_backend:
               - 'sso/backend/**'
             sso_frontend:
@@ -80,6 +83,7 @@ jobs:
              [ "${{ steps.filter.outputs.services_frontend }}" = "true" ] || \
              [ "${{ steps.filter.outputs.traffic_backend }}" = "true" ] || \
              [ "${{ steps.filter.outputs.traffic_frontend }}" = "true" ] || \
+             [ "${{ steps.filter.outputs.traffic_bot }}" = "true" ] || \
              [ "${{ steps.filter.outputs.sso_backend }}" = "true" ] || \
              [ "${{ steps.filter.outputs.sso_frontend }}" = "true" ]; then
             DEPLOY_REQUIRED=true
@@ -177,6 +181,9 @@ jobs:
             fi
             if [ "${{ needs.changes.outputs.traffic_frontend }}" = "true" ]; then
               SERVICES="$SERVICES traffic-frontend"
+            fi
+            if [ "${{ needs.changes.outputs.traffic_bot }}" = "true" ]; then
+              SERVICES="$SERVICES traffic-bot"
             fi
             if [ "${{ needs.changes.outputs.sso_backend }}" = "true" ]; then
               SERVICES="$SERVICES sso-backend"

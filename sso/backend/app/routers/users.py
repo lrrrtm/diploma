@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.orm import Session as DBSession, joinedload
 
 from app.config import settings
 from app.database import get_db
+from app.models.telegram_link import TelegramLink
 from app.models.user import User
 from app.routers.auth import decode_token
 
@@ -69,6 +70,12 @@ class UpdateUserRequest(BaseModel):
     is_active: bool | None = None
 
 
+class LinkTelegramRequest(BaseModel):
+    telegram_id: int
+    telegram_username: str | None = None
+    chat_id: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -91,11 +98,34 @@ def list_users(
 ):
     if caller == "service" and not app_filter:
         raise HTTPException(status_code=400, detail="Для service-запроса требуется app_filter")
-    q = db.query(User)
+    q = db.query(User).options(joinedload(User.telegram_link))
     if app_filter:
         q = q.filter(User.app == app_filter)
     users = q.order_by(User.app, User.role, User.created_at).all()
     return [_serialize(u) for u in users]
+
+
+@router.get("/by-telegram/{telegram_id}")
+def get_user_by_telegram(
+    telegram_id: int,
+    app_filter: str | None = None,
+    caller: str = Depends(_require_sso_admin_or_service),
+    db: DBSession = Depends(get_db),
+):
+    if caller == "service" and not app_filter:
+        raise HTTPException(status_code=400, detail="Для service-запроса требуется app_filter")
+
+    query = (
+        db.query(User)
+        .join(TelegramLink, TelegramLink.user_id == User.id)
+        .filter(TelegramLink.telegram_id == telegram_id)
+    )
+    if app_filter:
+        query = query.filter(User.app == app_filter)
+    user = query.first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь с таким Telegram ID не найден")
+    return _serialize(user)
 
 
 @router.post("/", status_code=201)
@@ -126,6 +156,39 @@ def create_user(
         entity_id=data.entity_id,
     )
     db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _serialize(user)
+
+
+@router.post("/{user_id}/telegram-link")
+def link_telegram(
+    user_id: str,
+    data: LinkTelegramRequest,
+    _: str = Depends(_require_sso_admin_or_service),
+    db: DBSession = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    existing_for_telegram = (
+        db.query(TelegramLink)
+        .filter(TelegramLink.telegram_id == data.telegram_id)
+        .first()
+    )
+    if existing_for_telegram and existing_for_telegram.user_id != user_id:
+        raise HTTPException(status_code=400, detail="Этот Telegram уже привязан к другому пользователю")
+
+    link = db.query(TelegramLink).filter(TelegramLink.user_id == user_id).first()
+    if link is None:
+        link = TelegramLink(user_id=user_id, telegram_id=data.telegram_id)
+        db.add(link)
+
+    link.telegram_id = data.telegram_id
+    link.telegram_username = data.telegram_username
+    link.chat_id = data.chat_id
+
     db.commit()
     db.refresh(user)
     return _serialize(user)
@@ -187,6 +250,8 @@ def delete_user_by_entity(
 # ---------------------------------------------------------------------------
 
 def _serialize(u: User) -> dict:
+    telegram_id = u.telegram_link.telegram_id if u.telegram_link else None
+    telegram_username = u.telegram_link.telegram_username if u.telegram_link else None
     return {
         "id": u.id,
         "username": u.username,
@@ -194,6 +259,9 @@ def _serialize(u: User) -> dict:
         "app": u.app,
         "role": u.role,
         "entity_id": u.entity_id,
+        "telegram_id": telegram_id,
+        "telegram_username": telegram_username,
+        "telegram_linked": telegram_id is not None,
         "is_active": u.is_active,
         "created_at": u.created_at.isoformat() if u.created_at else None,
     }

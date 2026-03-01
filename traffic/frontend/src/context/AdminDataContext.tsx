@@ -13,6 +13,8 @@ export interface Tablet {
 export interface Teacher {
   id: string;
   username: string | null;
+  sso_user_id: string | null;
+  telegram_linked: boolean;
   full_name: string;
   created_at: string | null;
 }

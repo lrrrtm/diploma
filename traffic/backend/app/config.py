@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     # Internal URL of the SSO backend reachable from this container
     SSO_API_URL: str = "http://sso-backend:8000"
+    # Lifetime of JWT issued by traffic backend for Telegram mini-app login
+    SESSION_TOKEN_EXPIRE_HOURS: int = 24
 
     # How often the student QR token rotates (seconds)
     QR_ROTATE_SECONDS: int = 5
@@ -28,6 +30,12 @@ class Settings(BaseSettings):
 
     # RUZ API base URL
     RUZ_BASE_URL: str = "https://ruz.spbstu.ru/api/v1/ruz"
+    # Telegram bot token used to verify Mini App initData
+    TELEGRAM_BOT_TOKEN: str = ""
+    # Public bot username (without @), used to generate deep links
+    TELEGRAM_BOT_USERNAME: str = ""
+    # Maximum accepted age for Telegram initData auth_date
+    TELEGRAM_AUTH_MAX_AGE_SECONDS: int = 300
 
 
 settings = Settings()

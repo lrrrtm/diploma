@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Eye, EyeOff, Plus, RefreshCw, Trash2, Users } from "lucide-react";
+import { Eye, EyeOff, Link2, Plus, QrCode, RefreshCw, Trash2, Users } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +66,10 @@ export default function AdminTeachersPage() {
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [telegramLinkDialogOpen, setTelegramLinkDialogOpen] = useState(false);
+  const [telegramLinkLoading, setTelegramLinkLoading] = useState(false);
+  const [telegramRegisterLink, setTelegramRegisterLink] = useState("");
+  const [telegramRegisterTeacherName, setTelegramRegisterTeacherName] = useState("");
 
   const [fullName, setFullName] = useState("");
   const [generatedUsername, setGeneratedUsername] = useState("");
@@ -99,6 +104,22 @@ export default function AdminTeachersPage() {
       toast.error("Не удалось удалить преподавателя");
     } finally {
       setPendingDeleteId(null);
+    }
+  }
+
+  async function openTelegramLinkDialog(teacherId: string, teacherName: string) {
+    setTelegramRegisterTeacherName(teacherName);
+    setTelegramLinkLoading(true);
+    setTelegramRegisterLink("");
+    setTelegramLinkDialogOpen(true);
+    try {
+      const response = await api.get<{ link: string }>(`/teachers/${teacherId}/telegram-register-link`);
+      setTelegramRegisterLink(response.data.link);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ?? "Не удалось получить ссылку регистрации в Telegram");
+    } finally {
+      setTelegramLinkLoading(false);
     }
   }
 
@@ -224,8 +245,9 @@ export default function AdminTeachersPage() {
           <Table>
             <TableHeader className={isMobile ? "sr-only" : undefined}>
               <TableRow>
-                <TableHead className="w-[52%]">Преподаватель</TableHead>
-                <TableHead className="w-[34%]">Логин</TableHead>
+                <TableHead className="w-[42%]">Преподаватель</TableHead>
+                <TableHead className="w-[30%]">Логин</TableHead>
+                <TableHead className="w-[14%] text-center">Telegram</TableHead>
                 <TableHead className="w-[14%] text-right">Действия</TableHead>
               </TableRow>
             </TableHeader>
@@ -258,18 +280,41 @@ export default function AdminTeachersPage() {
                     </span>
                   </TableCell>
                   <TableCell
+                    className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "text-center"}
+                  >
+                    {isMobile && <span className="text-xs text-muted-foreground">Telegram</span>}
+                    <span
+                      className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                        teacher.telegram_linked ? "bg-emerald-500" : "bg-destructive"
+                      }`}
+                      title={teacher.telegram_linked ? "Привязан" : "Не привязан"}
+                    />
+                  </TableCell>
+                  <TableCell
                     className={isMobile ? "flex justify-end px-0 pt-2 pb-1" : "text-right"}
                   >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => setPendingDeleteId(teacher.id)}
-                      title="Удалить преподавателя"
-                      aria-label={`Удалить преподавателя ${teacher.full_name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="inline-flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-primary"
+                        onClick={() => openTelegramLinkDialog(teacher.id, teacher.full_name)}
+                        title="QR для привязки Telegram"
+                        aria-label={`Показать QR для привязки Telegram ${teacher.full_name}`}
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setPendingDeleteId(teacher.id)}
+                        title="Удалить преподавателя"
+                        aria-label={`Удалить преподавателя ${teacher.full_name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -373,6 +418,49 @@ export default function AdminTeachersPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={telegramLinkDialogOpen} onOpenChange={setTelegramLinkDialogOpen}>
+        <DialogContent className="w-[calc(100%-1rem)] sm:max-w-sm rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Привязка Telegram</DialogTitle>
+            <DialogDescription>
+              {telegramRegisterTeacherName}
+            </DialogDescription>
+          </DialogHeader>
+
+          {telegramLinkLoading ? (
+            <div className="space-y-3 py-2">
+              <Skeleton className="mx-auto h-56 w-56 rounded-lg" />
+              <Skeleton className="h-4 w-full rounded" />
+              <Skeleton className="h-4 w-4/5 rounded" />
+            </div>
+          ) : telegramRegisterLink ? (
+            <div className="space-y-4 py-1">
+              <div className="flex justify-center">
+                <div className="rounded-lg bg-white p-3 shadow-sm">
+                  <QRCodeSVG value={telegramRegisterLink} size={220} level="M" />
+                </div>
+              </div>
+              <a
+                href={telegramRegisterLink}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-sm text-primary underline break-all"
+              >
+                <Link2 className="h-4 w-4 shrink-0" />
+                {telegramRegisterLink}
+              </a>
+              <p className="text-xs text-muted-foreground">
+                Преподаватель сканирует QR, нажимает старт в боте и аккаунт связывается автоматически.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-2">
+              Не удалось получить ссылку регистрации.
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </>

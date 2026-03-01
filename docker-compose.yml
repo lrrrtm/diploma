@@ -173,6 +173,8 @@ services:
       SSO_JWT_SECRET: ${SSO_JWT_SECRET}
       SSO_SERVICE_SECRET: ${SSO_SERVICE_SECRET}
       SSO_API_URL: http://sso-backend:8000
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
       DATABASE_URL: mysql+pymysql://${TRAFFIC_MYSQL_USER}:${TRAFFIC_MYSQL_PASSWORD}@db:3306/${TRAFFIC_MYSQL_DATABASE}
     networks:
       traffic:
@@ -189,6 +191,20 @@ services:
       - traffic-backend
     networks:
       - traffic
+
+  traffic-bot:
+    build: ./bot
+    restart: unless-stopped
+    depends_on:
+      sso-backend:
+        condition: service_started
+    environment:
+      BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      SSO_API_URL: http://sso-backend:8000
+      SSO_SERVICE_SECRET: ${SSO_SERVICE_SECRET}
+      TRAFFIC_TEACHER_URL: ${TRAFFIC_TEACHER_URL}
+    networks:
+      - sso
 
 volumes:
   sso_db_data:
