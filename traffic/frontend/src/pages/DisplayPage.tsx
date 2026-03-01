@@ -557,12 +557,17 @@ export default function DisplayPage() {
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center justify-center">
-                      <div className="rounded-2xl bg-white p-2 shadow-xl">
-                        <QRCodeSVG value={teacherPortalQrValue} size={244} level="M" />
+                    <div className="flex w-full items-center justify-start">
+                      <div className="w-full max-w-[300px] rounded-2xl bg-white p-2 shadow-xl">
+                        <QRCodeSVG
+                          value={teacherPortalQrValue}
+                          size={300}
+                          level="M"
+                          style={{ display: "block", width: "100%", height: "auto" }}
+                        />
                       </div>
                     </div>
-                    <div className="mt-5 flex items-center justify-center gap-1 sm:gap-1.5">
+                    <div className="mt-4 flex w-full max-w-[300px] items-center gap-1 sm:gap-1.5">
                       {pinSlots.slice(0, 3).map((digit, index) => (
                         <span
                           key={`left-${index}`}
@@ -581,7 +586,7 @@ export default function DisplayPage() {
                         </span>
                       ))}
                     </div>
-                    <p className="mt-4 w-full text-left text-white/90 text-lg sm:text-xl font-medium">
+                    <p className="mt-3 w-full max-w-[300px] text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
                       Код преподавателя
                     </p>
                   </>
