@@ -1,3 +1,6 @@
+from urllib.parse import quote_plus
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,7 +9,12 @@ class Settings(BaseSettings):
 
     ALGORITHM: str = "HS256"
 
-    DATABASE_URL: str = "mysql+pymysql://traffic:traffic@db:3306/traffic"
+    DATABASE_URL: str | None = None
+    MYSQL_HOST: str = "db"
+    MYSQL_PORT: int = 3306
+    MYSQL_DATABASE: str = "traffic"
+    MYSQL_USER: str = "traffic"
+    MYSQL_PASSWORD: str = "traffic"
 
     # Shared secret for verifying launch tokens from main app
     LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
@@ -41,6 +49,18 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_USERNAME: str = ""
     # Maximum accepted age for Telegram initData auth_date
     TELEGRAM_AUTH_MAX_AGE_SECONDS: int = 300
+
+    @model_validator(mode="after")
+    def build_database_url(self) -> "Settings":
+        if self.DATABASE_URL:
+            return self
+        username = quote_plus(self.MYSQL_USER)
+        password = quote_plus(self.MYSQL_PASSWORD)
+        self.DATABASE_URL = (
+            f"mysql+pymysql://{username}:{password}"
+            f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
+        )
+        return self
 
 
 settings = Settings()

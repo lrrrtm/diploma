@@ -1,3 +1,5 @@
+from urllib.parse import quote_plus
+
 from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,8 +29,10 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
+        username = quote_plus(self.MYSQL_USER)
+        password = quote_plus(self.MYSQL_PASSWORD)
         return (
-            f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
+            f"mysql+pymysql://{username}:{password}"
             f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
         )
 
