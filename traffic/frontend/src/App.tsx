@@ -7,9 +7,7 @@ import TeacherHistoryPage from "@/pages/TeacherHistoryPage";
 import TeacherSessionDetailPage from "@/pages/TeacherSessionDetailPage";
 import StudentScanPage from "@/pages/StudentScanPage";
 import AdminTabletsPage from "@/pages/admin/AdminTabletsPage";
-import AdminRegisterPage from "@/pages/admin/AdminRegisterPage";
 import AdminTeachersPage from "@/pages/admin/AdminTeachersPage";
-import AdminAddKioskPage from "@/pages/admin/AdminAddKioskPage";
 import AdminAddTeacherPage from "@/pages/admin/AdminAddTeacherPage";
 import { AdminLayout } from "@/components/shared/AdminLayout";
 import { TeacherLayout } from "@/components/shared/TeacherLayout";
@@ -89,8 +87,6 @@ export default function App() {
       <Route path="/admin" element={<RequireRole role="admin"><AdminLayout /></RequireRole>}>
         <Route index element={<Navigate to="tablets" replace />} />
         <Route path="tablets" element={<AdminTabletsPage />} />
-        <Route path="tablets/add" element={<AdminAddKioskPage />} />
-        <Route path="tablets/register/:deviceId" element={<AdminRegisterPage />} />
         <Route path="teachers" element={<AdminTeachersPage />} />
         <Route path="teachers/add" element={<AdminAddTeacherPage />} />
       </Route>
