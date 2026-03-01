@@ -558,31 +558,31 @@ export default function DisplayPage() {
                 ) : (
                   <>
                     <div className="flex items-center justify-center">
-                      <div className="rounded-2xl bg-white p-3 shadow-xl">
-                        <QRCodeSVG value={teacherPortalQrValue} size={220} level="M" />
+                      <div className="rounded-2xl bg-white p-2 shadow-xl">
+                        <QRCodeSVG value={teacherPortalQrValue} size={244} level="M" />
                       </div>
                     </div>
-                    <div className="mt-5 flex items-center justify-center gap-1.5 sm:gap-2">
+                    <div className="mt-5 flex items-center justify-center gap-1 sm:gap-1.5">
                       {pinSlots.slice(0, 3).map((digit, index) => (
                         <span
                           key={`left-${index}`}
-                          className="inline-flex h-12 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-14 sm:w-12 sm:text-4xl"
+                          className="inline-flex h-11 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:w-10 sm:text-[2.1rem]"
                         >
                           {digit}
                         </span>
                       ))}
-                      <span className="mx-0.5 text-2xl text-white/55 sm:text-3xl">-</span>
+                      <span className="mx-0.5 text-xl text-white/55 sm:text-2xl">-</span>
                       {pinSlots.slice(3).map((digit, index) => (
                         <span
                           key={`right-${index}`}
-                          className="inline-flex h-12 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl font-semibold font-mono sm:h-14 sm:w-12 sm:text-4xl"
+                          className="inline-flex h-11 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-[1.9rem] font-semibold font-mono sm:h-12 sm:w-10 sm:text-[2.1rem]"
                         >
                           {digit}
                         </span>
                       ))}
                     </div>
-                    <p className="mt-5 text-center text-white/85 text-base sm:text-lg leading-relaxed">
-                      Введите этот код в интерфейсе преподавателя, чтобы запустить проверку посещаемости
+                    <p className="mt-4 w-full text-left text-white/90 text-lg sm:text-xl font-medium">
+                      Код преподавателя
                     </p>
                   </>
                 )}
