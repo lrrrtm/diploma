@@ -5,6 +5,7 @@ type Role = "admin" | "teacher" | null;
 interface AuthState {
   token: string | null;
   role: Role;
+  fullName: string | null;
   teacherId: string | null;
   teacherName: string | null;
 }
@@ -18,6 +19,7 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue>({
   token: null,
   role: null,
+  fullName: null,
   teacherId: null,
   teacherName: null,
   login: () => {},
@@ -29,6 +31,7 @@ function loadState(): AuthState {
   return {
     token: localStorage.getItem("traffic_token"),
     role: (localStorage.getItem("traffic_role") as Role) ?? null,
+    fullName: localStorage.getItem("traffic_full_name"),
     teacherId: localStorage.getItem("traffic_teacher_id"),
     teacherName: localStorage.getItem("traffic_teacher_name"),
   };
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem("traffic_token", token);
     localStorage.setItem("traffic_role", role);
+    localStorage.setItem("traffic_full_name", fullName);
     if (isTeacher && entityId) localStorage.setItem("traffic_teacher_id", entityId);
     else localStorage.removeItem("traffic_teacher_id");
     if (isTeacher) localStorage.setItem("traffic_teacher_name", fullName);
@@ -59,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({
       token,
       role,
+      fullName,
       teacherId: isTeacher ? entityId : null,
       teacherName: isTeacher ? fullName : null,
     });
@@ -67,9 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     localStorage.removeItem("traffic_token");
     localStorage.removeItem("traffic_role");
+    localStorage.removeItem("traffic_full_name");
     localStorage.removeItem("traffic_teacher_id");
     localStorage.removeItem("traffic_teacher_name");
-    setState({ token: null, role: null, teacherId: null, teacherName: null });
+    setState({ token: null, role: null, fullName: null, teacherId: null, teacherName: null });
   }
 
   return (
