@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Eye, EyeOff, Link2, Plus, QrCode, RefreshCw, Trash2, Users } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -86,6 +86,7 @@ export default function AdminTeachersPage() {
   const { teachers, refresh } = useAdminData();
   const isMobile = useIsMobile();
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -206,16 +207,29 @@ export default function AdminTeachersPage() {
     !saving;
 
   const pageSize = isMobile ? 8 : 12;
-  const totalItems = teachers?.length ?? 0;
+  const filteredTeachers = useMemo(() => {
+    if (!teachers) return [];
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return teachers;
+    return teachers.filter((teacher) => {
+      const haystack = `${teacher.full_name} ${teacher.username ?? ""}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [teachers, searchQuery]);
+  const totalItems = filteredTeachers.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const paginationItems = buildPaginationItems(currentPage, totalPages);
-  const paginatedTeachers = teachers?.slice((currentPage - 1) * pageSize, currentPage * pageSize) ?? [];
+  const paginatedTeachers = filteredTeachers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => {
     if (teachers === null) return;
-    const nextTotalPages = Math.max(1, Math.ceil(teachers.length / pageSize));
+    const nextTotalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     setCurrentPage((prev) => Math.min(prev, nextTotalPages));
-  }, [teachers, pageSize]);
+  }, [teachers, pageSize, totalItems]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   async function handleCreateTeacher(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -277,133 +291,149 @@ export default function AdminTeachersPage() {
         </div>
       ) : (
         <>
-          <div className="rounded-lg border bg-card overflow-hidden">
-            <Table>
-              <TableHeader className={isMobile ? "sr-only" : undefined}>
-                <TableRow>
-                  <TableHead className="w-[42%]">Преподаватель</TableHead>
-                  <TableHead className="w-[30%]">Логин</TableHead>
-                  <TableHead className="w-[14%] text-center">Telegram</TableHead>
-                  <TableHead className="w-[14%] text-right">Действия</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedTeachers.map((teacher) => (
-                  <TableRow
-                    key={teacher.id}
-                    className={isMobile ? "block px-3 py-2 border-b last:border-b-0" : undefined}
-                  >
-                    <TableCell
-                      className={
-                        isMobile
-                          ? "flex items-center justify-between gap-3 px-0 py-1"
-                          : "font-medium"
-                      }
-                    >
-                      {isMobile && <span className="text-xs text-muted-foreground">Преподаватель</span>}
-                      <span className="text-right sm:text-left">{teacher.full_name}</span>
-                    </TableCell>
-                    <TableCell
-                      className={
-                        isMobile
-                          ? "flex items-center justify-between gap-3 px-0 py-1"
-                          : "font-mono text-xs"
-                      }
-                    >
-                      {isMobile && <span className="text-xs text-muted-foreground">Логин</span>}
-                      <span className="text-right sm:text-left break-all">
-                        {teacher.username ? `@${teacher.username}` : "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell
-                      className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "text-center"}
-                    >
-                      {isMobile && <span className="text-xs text-muted-foreground">Telegram</span>}
-                      <span
-                        className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                          teacher.telegram_linked ? "bg-emerald-500" : "bg-destructive"
-                        }`}
-                        title={teacher.telegram_linked ? "Привязан" : "Не привязан"}
-                      />
-                    </TableCell>
-                    <TableCell
-                      className={isMobile ? "flex justify-end px-0 pt-2 pb-1" : "text-right"}
-                    >
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-primary"
-                          onClick={() => openTelegramLinkDialog(teacher.id, teacher.full_name)}
-                          title="QR для привязки Telegram"
-                          aria-label={`Показать QR для привязки Telegram ${teacher.full_name}`}
-                        >
-                          <QrCode className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => setPendingDeleteId(teacher.id)}
-                          title="Удалить преподавателя"
-                          aria-label={`Удалить преподавателя ${teacher.full_name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="mb-3">
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Поиск преподавателя или логина..."
+            />
           </div>
-          <div className="flex flex-col gap-2 mt-3">
-            <p className="text-xs text-muted-foreground text-center sm:text-left">
-              Показаны {paginatedTeachers.length} из {totalItems}
-            </p>
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setCurrentPage((prev) => Math.max(1, prev - 1));
-                    }}
-                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
-                  />
-                </PaginationItem>
-                {paginationItems.map((item, index) => (
-                  <PaginationItem key={`${item}-${index}`}>
-                    {typeof item === "number" ? (
-                      <PaginationLink
+
+          {filteredTeachers.length === 0 ? (
+            <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+              По вашему запросу ничего не найдено
+            </div>
+          ) : (
+            <>
+              <div className="rounded-lg border bg-card overflow-hidden">
+                <Table>
+                  <TableHeader className={isMobile ? "sr-only" : undefined}>
+                    <TableRow>
+                      <TableHead className="w-[42%]">Преподаватель</TableHead>
+                      <TableHead className="w-[30%]">Логин</TableHead>
+                      <TableHead className="w-[14%] text-center">Telegram</TableHead>
+                      <TableHead className="w-[14%] text-right">Действия</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedTeachers.map((teacher) => (
+                      <TableRow
+                        key={teacher.id}
+                        className={isMobile ? "block px-3 py-2 border-b last:border-b-0" : undefined}
+                      >
+                        <TableCell
+                          className={
+                            isMobile
+                              ? "flex items-center justify-between gap-3 px-0 py-1"
+                              : "font-medium"
+                          }
+                        >
+                          {isMobile && <span className="text-xs text-muted-foreground">Преподаватель</span>}
+                          <span className="text-right sm:text-left">{teacher.full_name}</span>
+                        </TableCell>
+                        <TableCell
+                          className={
+                            isMobile
+                              ? "flex items-center justify-between gap-3 px-0 py-1"
+                              : "font-mono text-xs"
+                          }
+                        >
+                          {isMobile && <span className="text-xs text-muted-foreground">Логин</span>}
+                          <span className="text-right sm:text-left break-all">
+                            {teacher.username ? `@${teacher.username}` : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell
+                          className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "text-center"}
+                        >
+                          {isMobile && <span className="text-xs text-muted-foreground">Telegram</span>}
+                          <span
+                            className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                              teacher.telegram_linked ? "bg-emerald-500" : "bg-destructive"
+                            }`}
+                            title={teacher.telegram_linked ? "Привязан" : "Не привязан"}
+                          />
+                        </TableCell>
+                        <TableCell
+                          className={isMobile ? "flex justify-end px-0 pt-2 pb-1" : "text-right"}
+                        >
+                          <div className="inline-flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() => openTelegramLinkDialog(teacher.id, teacher.full_name)}
+                              title="QR для привязки Telegram"
+                              aria-label={`Показать QR для привязки Telegram ${teacher.full_name}`}
+                            >
+                              <QrCode className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => setPendingDeleteId(teacher.id)}
+                              title="Удалить преподавателя"
+                              aria-label={`Удалить преподавателя ${teacher.full_name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex flex-col gap-2 mt-3">
+                <p className="text-xs text-muted-foreground text-center sm:text-left">
+                  Показаны {paginatedTeachers.length} из {totalItems}
+                </p>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
                         href="#"
-                        isActive={item === currentPage}
                         onClick={(event) => {
                           event.preventDefault();
-                          setCurrentPage(item);
+                          setCurrentPage((prev) => Math.max(1, prev - 1));
                         }}
-                      >
-                        {item}
-                      </PaginationLink>
-                    ) : (
-                      <PaginationEllipsis />
-                    )}
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-                    }}
-                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+                        className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                      />
+                    </PaginationItem>
+                    {paginationItems.map((item, index) => (
+                      <PaginationItem key={`${item}-${index}`}>
+                        {typeof item === "number" ? (
+                          <PaginationLink
+                            href="#"
+                            isActive={item === currentPage}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setCurrentPage(item);
+                            }}
+                          >
+                            {item}
+                          </PaginationLink>
+                        ) : (
+                          <PaginationEllipsis />
+                        )}
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                        }}
+                        className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -536,9 +566,6 @@ export default function AdminTeachersPage() {
                 <Link2 className="h-4 w-4 shrink-0" />
                 {telegramRegisterLink}
               </a>
-              <p className="text-xs text-muted-foreground">
-                Преподаватель сканирует QR, нажимает старт в боте и аккаунт связывается автоматически.
-              </p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-2">

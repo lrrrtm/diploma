@@ -535,11 +535,7 @@ export default function DisplayPage() {
 
         <div className="h-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
           <div className="grid h-full min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] lg:gap-6">
-            <div
-              className={`grid min-h-0 min-w-0 gap-4 lg:gap-6 ${
-                isActiveMode ? "grid-rows-[auto_1fr]" : "grid-rows-[auto_1fr_auto]"
-              }`}
-            >
+            <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] gap-4 lg:gap-6">
               <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
                 <p className="text-5xl font-semibold leading-none tracking-tight tabular-nums sm:text-6xl">
                   {timeLabel}
@@ -577,21 +573,16 @@ export default function DisplayPage() {
                           style={{ display: "block", width: "100%", height: "auto" }}
                         />
                       </div>
+                      <p className="mt-4 w-full text-left text-4xl font-semibold tracking-wide text-white sm:text-5xl">
+                        {formattedTeacherPin}
+                      </p>
+                      <p className="mt-2 w-full text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
+                        Код преподавателя
+                      </p>
                     </div>
                   </>
                 )}
               </div>
-
-              {!isActiveMode && (
-                <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6">
-                  <p className="font-mono text-4xl font-semibold tracking-wider text-white sm:text-5xl lg:text-[3.4rem] lg:leading-none">
-                    {formattedTeacherPin}
-                  </p>
-                  <p className="mt-3 text-left text-white/90 text-lg sm:text-xl font-medium leading-tight">
-                    Код преподавателя
-                  </p>
-                </div>
-              )}
             </div>
 
             <div className="min-h-0 min-w-0 rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-7 lg:p-8 flex flex-col">

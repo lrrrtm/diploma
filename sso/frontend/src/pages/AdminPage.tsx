@@ -1,18 +1,11 @@
-import { useEffect, useRef, useState, FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2, Users, Eye, EyeOff } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Users, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -120,7 +113,7 @@ export default function AdminPage() {
   const isMobile = useIsMobile();
 
   const [users, setUsers] = useState<SSOUser[] | null>(null);
-  const [appFilter, setAppFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SSOUser | null>(null);
   const [creating, setCreating] = useState(false);
@@ -134,9 +127,8 @@ export default function AdminPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const loadUsers = () => {
-    const params = appFilter !== "all" ? `?app_filter=${appFilter}` : "";
     api
-      .get<SSOUser[]>(`/users/${params}`)
+      .get<SSOUser[]>("/users/")
       .then((r) => setUsers(r.data))
       .catch(() => {
         toast.error("Не удалось загрузить пользователей");
@@ -147,23 +139,32 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isLoggedIn) { navigate("/"); return; }
     loadUsers();
-  }, [isLoggedIn, appFilter, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageSize = isMobile ? 8 : 12;
-  const totalUsers = users?.length ?? 0;
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return users;
+    return users.filter((user) => {
+      const haystack = `${user.full_name} ${user.username} ${APP_LABELS[user.app] ?? user.app} ${ROLE_LABELS[user.role] ?? user.role}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [users, searchQuery]);
+  const totalUsers = filteredUsers.length;
   const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
   const paginationItems = buildPaginationItems(currentPage, totalPages);
-  const paginatedUsers = users?.slice((currentPage - 1) * pageSize, currentPage * pageSize) ?? [];
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => {
     if (users === null) return;
-    const nextTotalPages = Math.max(1, Math.ceil(users.length / pageSize));
+    const nextTotalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
     setCurrentPage((prev) => Math.min(prev, nextTotalPages));
-  }, [users, pageSize]);
+  }, [users, pageSize, totalUsers]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [appFilter]);
+  }, [searchQuery]);
 
   // Auto-generate and check username whenever fullName changes (unless manually overridden)
   useEffect(() => {
@@ -251,56 +252,47 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <Toaster position="top-right" richColors />
-        {/* Summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(["all", "services", "traffic"] as const).map((app) => {
-            const count =
-              app === "all"
-                ? (users?.length ?? "—")
-                : (users?.filter((u) => u.app === app).length ?? "—");
-            const label =
-              app === "all" ? "Всего пользователей" : APP_LABELS[app];
-            return (
-              <Card
-                key={app}
-                className={`cursor-pointer transition-colors ${appFilter === app ? "border-primary" : ""}`}
-                onClick={() => setAppFilter(app)}
-              >
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-2xl font-bold">{count}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-semibold">Пользователи</h1>
+        <div className="flex gap-1">
+          <Button size="icon" variant="ghost" onClick={loadUsers} title="Обновить">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button size="icon" onClick={() => setCreateOpen(true)} title="Добавить администратора">
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
+      </div>
 
-        {/* Users table */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between py-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Пользователи
-              {appFilter !== "all" && (
-                <Badge variant="secondary">{APP_LABELS[appFilter]}</Badge>
-              )}
-            </CardTitle>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Добавить администратора
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            {users === null ? (
-              <div className="p-4 space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
-            ) : users.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-10">Нет пользователей</p>
-            ) : (
-              <>
+      {users === null ? (
+        <div className="rounded-lg border bg-card p-3 space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full rounded-md" />
+          ))}
+        </div>
+      ) : users.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-2">
+          <Users className="h-10 w-10 text-muted-foreground" />
+          <p className="text-muted-foreground text-sm">Нет пользователей</p>
+          <p className="text-xs text-muted-foreground">Нажмите +, чтобы добавить администратора</p>
+        </div>
+      ) : (
+        <>
+          <div className="mb-3">
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Поиск пользователя..."
+            />
+          </div>
+
+          {filteredUsers.length === 0 ? (
+            <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+              По вашему запросу ничего не найдено
+            </div>
+          ) : (
+            <>
+              <div className="rounded-lg border bg-card overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -328,7 +320,6 @@ export default function AdminPage() {
                           {ROLE_LABELS[u.role] ?? u.role}
                         </TableCell>
                         <TableCell>
-                          {/* Can't delete sso admin itself */}
                           {!(u.app === "sso" && u.role === "admin") && (
                             <Button
                               variant="ghost"
@@ -344,57 +335,58 @@ export default function AdminPage() {
                     ))}
                   </TableBody>
                 </Table>
-                <div className="border-t px-3 py-3 flex flex-col gap-2">
-                  <p className="text-xs text-muted-foreground text-center sm:text-left">
-                    Показаны {paginatedUsers.length} из {totalUsers}
-                  </p>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            setCurrentPage((prev) => Math.max(1, prev - 1));
-                          }}
-                          className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
-                        />
+              </div>
+              <div className="flex flex-col gap-2 mt-3">
+                <p className="text-xs text-muted-foreground text-center sm:text-left">
+                  Показаны {paginatedUsers.length} из {totalUsers}
+                </p>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setCurrentPage((prev) => Math.max(1, prev - 1));
+                        }}
+                        className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                      />
+                    </PaginationItem>
+                    {paginationItems.map((item, index) => (
+                      <PaginationItem key={`${item}-${index}`}>
+                        {typeof item === "number" ? (
+                          <PaginationLink
+                            href="#"
+                            isActive={item === currentPage}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setCurrentPage(item);
+                            }}
+                          >
+                            {item}
+                          </PaginationLink>
+                        ) : (
+                          <PaginationEllipsis />
+                        )}
                       </PaginationItem>
-                      {paginationItems.map((item, index) => (
-                        <PaginationItem key={`${item}-${index}`}>
-                          {typeof item === "number" ? (
-                            <PaginationLink
-                              href="#"
-                              isActive={item === currentPage}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                setCurrentPage(item);
-                              }}
-                            >
-                              {item}
-                            </PaginationLink>
-                          ) : (
-                            <PaginationEllipsis />
-                          )}
-                        </PaginationItem>
-                      ))}
-                      <PaginationItem>
-                        <PaginationNext
-                          href="#"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-                          }}
-                          className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                        }}
+                        className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </>
+          )}
+        </>
+      )}
 
       {/* Create admin dialog */}
       <AlertDialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetCreateForm(); }}>
