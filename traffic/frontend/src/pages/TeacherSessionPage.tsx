@@ -1,18 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Users, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
 import {
   InputOTP,
   InputOTPGroup,
@@ -40,18 +31,38 @@ interface SessionData {
   tablet_id: string;
 }
 
-interface RuzLesson {
-  time_start: string;
-  time_end: string;
-  subject: string;
-  teachers: { full_name: string }[];
-  typeObj: { abbr: string };
-}
-
 interface TabletInfo {
   tablet_id: string;
   building_name: string | null;
   room_name: string | null;
+}
+
+interface SessionStartLesson {
+  subject: string;
+  time_start: string;
+  time_end: string;
+  type_abbr: string;
+}
+
+interface SessionStartOptions {
+  tablet: TabletInfo;
+  lessons: SessionStartLesson[];
+}
+
+function pickSuggestedLessonIndex(lessons: SessionStartLesson[]): number {
+  if (lessons.length === 0) return -1;
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const index = lessons.findIndex((lesson) => {
+    const [sh, sm] = lesson.time_start.split(":").map(Number);
+    const [eh, em] = lesson.time_end.split(":").map(Number);
+    if (Number.isNaN(sh) || Number.isNaN(sm) || Number.isNaN(eh) || Number.isNaN(em)) {
+      return false;
+    }
+    const start = sh * 60 + sm;
+    const end = eh * 60 + em;
+    return nowMinutes >= start && nowMinutes <= end;
+  });
+  return index >= 0 ? index : 0;
 }
 
 export default function TeacherSessionPage() {
@@ -59,16 +70,15 @@ export default function TeacherSessionPage() {
 
   const [session, setSession] = useState<SessionData | null | "none">(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
-  const [discipline, setDiscipline] = useState("");
-  const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [scheduleSuggestions, setScheduleSuggestions] = useState<RuzLesson[]>([]);
 
-  // PIN Sheet state
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [pinSearching, setPinSearching] = useState(false);
   const [tabletInfo, setTabletInfo] = useState<TabletInfo | null>(null);
+  const [availableLessons, setAvailableLessons] = useState<SessionStartLesson[]>([]);
+  const [selectedLessonIndex, setSelectedLessonIndex] = useState<number | null>(null);
+
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -77,18 +87,15 @@ export default function TeacherSessionPage() {
       goToSSOLogin();
       return;
     }
-    // Check if there's already an active session for this teacher
     loadActiveSession();
   }, [isLoggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadActiveSession() {
     try {
-      // List sessions — if there's an active one, load it
       const res = await api.get<SessionData[]>("/sessions/");
       const active = res.data.find((s) => s.is_active);
       if (active) {
         setSession(active);
-        loadScheduleSuggestions(active.tablet_id);
       } else {
         setSession("none");
       }
@@ -97,40 +104,6 @@ export default function TeacherSessionPage() {
     }
   }
 
-  async function loadScheduleSuggestions(tabletId: string) {
-    try {
-      const tabletRes = await api.get<{
-        building_id: number | null;
-        room_id: number | null;
-      }>(`/tablets/${tabletId}`);
-      const { building_id, room_id } = tabletRes.data;
-      if (!building_id || !room_id) return;
-
-      const today = new Date().toISOString().split("T")[0];
-      const schedRes = await api.get(
-        `/schedule/buildings/${building_id}/rooms/${room_id}/scheduler?date=${today}`,
-      );
-      const todayWeekday = new Date().getDay() || 7;
-      const day = schedRes.data.days?.find((d: { weekday: number }) => d.weekday === todayWeekday);
-      const lessons: RuzLesson[] = day?.lessons ?? [];
-
-      const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-      const withMinutes = lessons.map((l) => {
-        const [h, m] = l.time_start.split(":").map(Number);
-        return { lesson: l, startMin: h * 60 + m };
-      });
-      const current = withMinutes.find(({ lesson, startMin }) => {
-        const [eh, em] = lesson.time_end.split(":").map(Number);
-        return startMin <= nowMinutes && nowMinutes <= eh * 60 + em;
-      });
-      if (current) setDiscipline(current.lesson.subject);
-      setScheduleSuggestions(lessons);
-    } catch {
-      // schedule not critical
-    }
-  }
-
-  // Poll attendees while session is active
   useEffect(() => {
     if (!session || session === "none") return;
     const fetchAttendees = () => {
@@ -141,40 +114,66 @@ export default function TeacherSessionPage() {
     };
     fetchAttendees();
     pollRef.current = setInterval(fetchAttendees, 5000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [session]);
 
-  // PIN completed — look up tablet
   async function handlePinComplete(value: string) {
     if (value.length !== 6) return;
     setPinSearching(true);
+    setError(null);
+
     try {
-      const res = await api.get<TabletInfo>(`/tablets/by-display-pin?pin=${value}`);
-      setTabletInfo(res.data);
-      await loadScheduleSuggestions(res.data.tablet_id);
+      const res = await api.get<SessionStartOptions>(`/sessions/start-options?pin=${encodeURIComponent(value)}`);
+      setTabletInfo(res.data.tablet);
+      setAvailableLessons(res.data.lessons);
+
+      if (res.data.lessons.length === 0) {
+        setSelectedLessonIndex(null);
+        setError("В этой аудитории у вас нет занятий на сегодня. Начать сессию нельзя.");
+      } else {
+        const suggested = pickSuggestedLessonIndex(res.data.lessons);
+        setSelectedLessonIndex(suggested);
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(msg ?? "Киоск с таким кодом не найден");
+      setError(msg ?? "Не удалось проверить код киоска");
+      setTabletInfo(null);
+      setAvailableLessons([]);
+      setSelectedLessonIndex(null);
       setPin("");
     } finally {
       setPinSearching(false);
     }
   }
 
+  const selectedLesson = useMemo(() => {
+    if (selectedLessonIndex === null) return null;
+    return availableLessons[selectedLessonIndex] ?? null;
+  }, [availableLessons, selectedLessonIndex]);
+
+  const canStart = !!tabletInfo && !!selectedLesson && !starting;
+
   const handleStart = async () => {
-    if (!discipline.trim()) { setError("Введите название дисциплины"); return; }
-    if (!tabletInfo) { setError("Выберите киоск (введите код)"); return; }
+    if (!tabletInfo || !selectedLesson) {
+      setError("Выберите занятие из расписания");
+      return;
+    }
+
     setError(null);
     setStarting(true);
     try {
       const res = await api.post<SessionData>("/sessions/", {
         tablet_id: tabletInfo.tablet_id,
-        discipline: discipline.trim(),
+        discipline: selectedLesson.subject,
+        schedule_snapshot: JSON.stringify(selectedLesson),
       });
       setSession(res.data);
       setAttendees([]);
-      setSheetOpen(false);
       setTabletInfo(null);
+      setAvailableLessons([]);
+      setSelectedLessonIndex(null);
       setPin("");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -190,8 +189,11 @@ export default function TeacherSessionPage() {
       await api.delete(`/sessions/${session.id}`);
       setSession("none");
       setAttendees([]);
-      setDiscipline("");
       setTabletInfo(null);
+      setAvailableLessons([]);
+      setSelectedLessonIndex(null);
+      setPin("");
+      setError(null);
       toast.success("Занятие завершено");
     } catch {
       toast.error("Не удалось завершить занятие");
@@ -209,26 +211,87 @@ export default function TeacherSessionPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto w-full">
+    <div className="max-w-2xl mx-auto w-full">
       {session === "none" ? (
-        /* ── No active session ── */
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">Текущая сессия</h2>
-            <Button size="sm" onClick={() => { setTabletInfo(null); setPin(""); setSheetOpen(true); }}>
-              Начать занятие
-            </Button>
+          <h2 className="text-lg font-bold">Сессия</h2>
+
+          <div className="min-h-[64vh] flex flex-col items-center justify-center gap-6">
+            <div className="w-full max-w-md space-y-3">
+              <p className="text-sm font-medium text-center">Введите код киоска</p>
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={pin}
+                  onChange={(value) => {
+                    setPin(value);
+                    if (error) setError(null);
+                  }}
+                  onComplete={handlePinComplete}
+                  disabled={pinSearching || starting}
+                  autoFocus
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                  </InputOTPGroup>
+                  <InputOTPSeparator />
+                  <InputOTPGroup>
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+              {pinSearching && (
+                <p className="text-xs text-muted-foreground text-center">Проверяем код киоска...</p>
+              )}
+              {tabletInfo && (
+                <p className="text-sm text-center text-green-600 dark:text-green-400 font-medium">
+                  Аудитория: {tabletInfo.building_name}, ауд. {tabletInfo.room_name}
+                </p>
+              )}
+            </div>
+
+            {tabletInfo && availableLessons.length > 0 && (
+              <div className="w-full max-w-md space-y-3">
+                <p className="text-sm font-medium">Выберите занятие</p>
+                <div className="space-y-2">
+                  {availableLessons.map((lesson, index) => (
+                    <Button
+                      key={`${lesson.time_start}-${lesson.time_end}-${lesson.subject}-${index}`}
+                      variant={selectedLessonIndex === index ? "default" : "outline"}
+                      className="w-full h-auto py-2.5 justify-start text-left"
+                      onClick={() => setSelectedLessonIndex(index)}
+                    >
+                      <span className="font-mono text-xs shrink-0">{lesson.time_start}-{lesson.time_end}</span>
+                      <span className="mx-2 truncate">{lesson.subject}</span>
+                      <span className="text-xs opacity-80 shrink-0">{lesson.type_abbr}</span>
+                    </Button>
+                  ))}
+                </div>
+                <Button className="w-full" onClick={handleStart} disabled={!canStart}>
+                  {starting ? "Запуск..." : "Начать занятие"}
+                </Button>
+              </div>
+            )}
+
+            {error && (
+              <Alert variant="destructive" className="w-full max-w-md">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            Нет активного занятия. Нажмите «Начать занятие» и введите код с экрана киоска.
-          </p>
         </div>
       ) : (
-        /* ── Active session ── */
         <div className="space-y-4">
+          <h2 className="text-lg font-bold">Сессия</h2>
+
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h2 className="text-lg font-bold">{session.discipline}</h2>
+              <h3 className="text-lg font-bold">{session.discipline}</h3>
               <p className="text-sm text-muted-foreground">Занятие идёт</p>
             </div>
             <Button
@@ -274,101 +337,6 @@ export default function TeacherSessionPage() {
           )}
         </div>
       )}
-
-      {/* ── Start session Sheet ── */}
-      <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (!o) { setPin(""); setTabletInfo(null); setError(null); } }}>
-        <SheetContent side="bottom" className="rounded-t-xl max-h-[90vh] overflow-y-auto">
-          <SheetHeader className="mb-4">
-            <SheetTitle>Начать занятие</SheetTitle>
-            <SheetDescription>
-              Введите 6-значный код с экрана киоска, затем укажите дисциплину
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="space-y-5 pb-4">
-            {/* Step 1: PIN */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Код киоска</p>
-              <div className="flex justify-center">
-                <InputOTP
-                  maxLength={6}
-                  value={pin}
-                  onChange={setPin}
-                  onComplete={handlePinComplete}
-                  disabled={pinSearching}
-                >
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                  </InputOTPGroup>
-                  <InputOTPSeparator />
-                  <InputOTPGroup>
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
-              </div>
-              {pinSearching && (
-                <p className="text-xs text-muted-foreground text-center">Поиск киоска...</p>
-              )}
-              {tabletInfo && (
-                <p className="text-sm text-center text-green-600 dark:text-green-400 font-medium">
-                  Аудитория: {tabletInfo.building_name}, ауд. {tabletInfo.room_name}
-                </p>
-              )}
-            </div>
-
-            {/* Step 2: Discipline (shown after tablet found) */}
-            {tabletInfo && (
-              <>
-                {scheduleSuggestions.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">Расписание — выберите дисциплину:</p>
-                    <div className="flex flex-col gap-1">
-                      {scheduleSuggestions.map((l, i) => (
-                        <Button
-                          key={i}
-                          variant="outline"
-                          onClick={() => setDiscipline(l.subject)}
-                          className="justify-start h-auto py-2 font-normal"
-                        >
-                          <span className="text-muted-foreground font-mono shrink-0">{l.time_start}</span>
-                          <span className="font-medium mx-2 truncate">{l.subject}</span>
-                          <span className="text-muted-foreground text-xs shrink-0">{l.typeObj?.abbr}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="discipline">Дисциплина</Label>
-                  <Input
-                    id="discipline"
-                    value={discipline}
-                    onChange={(e) => setDiscipline(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleStart()}
-                    placeholder="Название дисциплины"
-                  />
-                </div>
-
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button onClick={handleStart} disabled={starting} className="w-full">
-                  {starting ? "Запуск..." : "Начать занятие"}
-                </Button>
-              </>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

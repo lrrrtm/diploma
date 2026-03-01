@@ -3,7 +3,7 @@ import hmac
 import secrets
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -18,7 +18,8 @@ from app.models.tablet import Tablet
 from app.models.teacher import Teacher
 from app.realtime import hub
 from poly_shared.auth.launch_token import verify_launch_token
-from poly_shared.errors import TokenValidationError
+from poly_shared.clients.schedule_client import ScheduleClient
+from poly_shared.errors import TokenValidationError, UpstreamRejected, UpstreamUnavailable
 
 router = APIRouter()
 
@@ -56,6 +57,25 @@ class AttendRequest(BaseModel):
     launch_token: str
 
 
+def _normalize_date(value: str) -> str:
+    return value.replace(".", "-")
+
+
+def _lesson_teacher_ids(lesson: dict) -> set[int]:
+    result: set[int] = set()
+    for teacher in lesson.get("teachers") or []:
+        if not isinstance(teacher, dict):
+            continue
+        for key in ("id", "teacher_id", "ruz_teacher_id"):
+            raw = teacher.get(key)
+            if isinstance(raw, int):
+                result.add(raw)
+                continue
+            if isinstance(raw, str) and raw.isdigit():
+                result.add(int(raw))
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -91,6 +111,83 @@ async def create_session(
     db.refresh(session)
     await hub.publish_tablet(data.tablet_id)
     return _serialize_session(session)
+
+
+@router.get("/start-options")
+def get_session_start_options(
+    pin: str,
+    teacher: Teacher = Depends(require_teacher),
+    db: DBSession = Depends(get_db),
+):
+    tablet = db.query(Tablet).filter(Tablet.display_pin == pin).first()
+    if not tablet:
+        raise HTTPException(status_code=404, detail="Киоск с таким кодом не найден")
+    if not tablet.is_registered or tablet.building_id is None or tablet.room_id is None:
+        raise HTTPException(status_code=400, detail="Киоск ещё не зарегистрирован")
+    if teacher.ruz_teacher_id is None:
+        raise HTTPException(status_code=400, detail="У преподавателя не задан RUZ ID")
+
+    schedule_client = ScheduleClient(base_url=settings.SCHEDULE_API_URL)
+    today_key = date.today().isoformat()
+
+    try:
+        scheduler = schedule_client.get_room_scheduler(
+            building_id=tablet.building_id,
+            room_id=tablet.room_id,
+            date=today_key,
+        )
+    except UpstreamUnavailable:
+        raise HTTPException(status_code=502, detail="Сервис расписания недоступен")
+    except UpstreamRejected:
+        raise HTTPException(status_code=502, detail="Не удалось получить расписание аудитории")
+
+    days = scheduler.get("days", []) if isinstance(scheduler, dict) else []
+    if not isinstance(days, list):
+        days = []
+
+    weekday = date.today().isoweekday()
+    day_payload: dict | None = None
+    normalized_today = _normalize_date(today_key)
+    for item in days:
+        if not isinstance(item, dict):
+            continue
+        if item.get("weekday") == weekday:
+            day_payload = item
+            break
+        raw_date = item.get("date")
+        if isinstance(raw_date, str) and _normalize_date(raw_date) == normalized_today:
+            day_payload = item
+            break
+
+    lessons_raw = day_payload.get("lessons", []) if isinstance(day_payload, dict) else []
+    if not isinstance(lessons_raw, list):
+        lessons_raw = []
+
+    eligible_lessons: list[dict] = []
+    for lesson in lessons_raw:
+        if not isinstance(lesson, dict):
+            continue
+        teacher_ids = _lesson_teacher_ids(lesson)
+        if teacher.ruz_teacher_id not in teacher_ids:
+            continue
+        type_obj = lesson.get("typeObj") or {}
+        eligible_lessons.append(
+            {
+                "subject": lesson.get("subject", ""),
+                "time_start": lesson.get("time_start", ""),
+                "time_end": lesson.get("time_end", ""),
+                "type_abbr": type_obj.get("abbr", "") if isinstance(type_obj, dict) else "",
+            }
+        )
+
+    return {
+        "tablet": {
+            "tablet_id": tablet.id,
+            "building_name": tablet.building_name,
+            "room_name": tablet.room_name,
+        },
+        "lessons": eligible_lessons,
+    }
 
 
 @router.get("/current")
