@@ -226,7 +226,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Profile — Sheet on mobile, Dialog on desktop */}
       {isMobile ? (
         <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
-          <SheetContent side="bottom" className="p-0 rounded-t-2xl">
+          <SheetContent className="h-auto p-0">
             <SheetTitle className="sr-only">Профиль</SheetTitle>
             {profileContent}
           </SheetContent>
