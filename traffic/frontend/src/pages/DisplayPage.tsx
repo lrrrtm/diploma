@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Cloud,
+  CloudDrizzle,
+  CloudFog,
+  CloudLightning,
+  CloudMoon,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  MoonStar,
+  Sun,
+} from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import {
   InputOTP,
@@ -48,6 +61,12 @@ interface RuzLesson {
   subject: string;
   typeObj: { abbr: string; name?: string };
   teachers: { full_name: string }[];
+}
+
+interface WeatherInfo {
+  temperatureC: number;
+  weatherCode: number;
+  isDay: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +168,26 @@ function PinDisplay({ pin }: { pin: string }) {
   );
 }
 
+function resolveWeatherPresentation(code: number, isDay: boolean): { label: string; Icon: LucideIcon } {
+  if (code === 0) {
+    return isDay
+      ? { label: "Ясно", Icon: Sun }
+      : { label: "Ясно", Icon: MoonStar };
+  }
+  if (code === 1 || code === 2) {
+    return isDay
+      ? { label: "Переменная облачность", Icon: CloudSun }
+      : { label: "Переменная облачность", Icon: CloudMoon };
+  }
+  if (code === 3) return { label: "Пасмурно", Icon: Cloud };
+  if (code === 45 || code === 48) return { label: "Туман", Icon: CloudFog };
+  if ([51, 53, 55, 56, 57].includes(code)) return { label: "Морось", Icon: CloudDrizzle };
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return { label: "Дождь", Icon: CloudRain };
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return { label: "Снег", Icon: CloudSnow };
+  if ([95, 96, 99].includes(code)) return { label: "Гроза", Icon: CloudLightning };
+  return { label: "Облачно", Icon: Cloud };
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -157,6 +196,7 @@ export default function DisplayPage() {
   const STREAM_STALE_MS = 15000;
   const SCHEDULE_REFRESH_MS = 5 * 60 * 1000;
   const DATE_CHECK_INTERVAL_MS = 30 * 1000;
+  const WEATHER_REFRESH_MS = 10 * 60 * 1000;
   const [displayState, setDisplayState] = useState<DisplayState>("unregistered");
   const [tablet, setTablet] = useState<TabletInfo | null>(null);
   const [session, setSession] = useState<CurrentSession | null>(null);
@@ -164,6 +204,7 @@ export default function DisplayPage() {
   const [todayLessons, setTodayLessons] = useState<RuzLesson[]>([]);
   const [regPin, setRegPin] = useState<string>("");
   const [now, setNow] = useState<Date>(() => new Date());
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [streamBannerState, setStreamBannerState] = useState<StreamBannerState>("hidden");
   const [streamBannerTone, setStreamBannerTone] = useState<StreamBannerTone>("offline");
 
@@ -427,6 +468,61 @@ export default function DisplayPage() {
   }, []);
 
   useEffect(() => {
+    let disposed = false;
+
+    const loadWeather = async () => {
+      try {
+        const url = new URL("https://api.open-meteo.com/v1/forecast");
+        url.searchParams.set("latitude", "60.007045");
+        url.searchParams.set("longitude", "30.372756");
+        url.searchParams.set("current", "temperature_2m,weather_code,is_day");
+        url.searchParams.set("timezone", "Europe/Moscow");
+
+        const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as {
+          current?: {
+            temperature_2m?: number;
+            weather_code?: number;
+            is_day?: number;
+          };
+        };
+
+        const temperature = payload.current?.temperature_2m;
+        const weatherCode = payload.current?.weather_code;
+        const isDayRaw = payload.current?.is_day;
+        if (
+          disposed ||
+          typeof temperature !== "number" ||
+          typeof weatherCode !== "number" ||
+          (isDayRaw !== 0 && isDayRaw !== 1)
+        ) {
+          return;
+        }
+
+        setWeather({
+          temperatureC: temperature,
+          weatherCode,
+          isDay: isDayRaw === 1,
+        });
+      } catch {
+        // ignore weather fetch errors and keep last successful state
+      }
+    };
+
+    void loadWeather();
+    const timer = setInterval(() => {
+      void loadWeather();
+    }, WEATHER_REFRESH_MS);
+
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+    };
+  }, [WEATHER_REFRESH_MS]);
+
+  useEffect(() => {
     const onOffline = () => markStreamDisconnected();
     const onOnline = () => {
       // Keep strip visible until stream becomes healthy again.
@@ -470,8 +566,17 @@ export default function DisplayPage() {
   const isActiveMode = displayState === "active";
   const teacherPin = displayPinRef.current ?? "";
   const teacherPortalQrValue = "https://traffic.poly.hex8d.space/";
-  const timeLabel = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  const dateLabel = now.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  const timeLabel = now.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Moscow",
+  });
+  const dateLabel = now.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Moscow",
+  });
+  const weatherView = weather ? resolveWeatherPresentation(weather.weatherCode, weather.isDay) : null;
   const activeLessonIndex = useMemo(
     () => (isActiveMode ? findActiveLessonIndex(todayLessons, session?.discipline, now) : -1),
     [isActiveMode, now, session?.discipline, todayLessons],
@@ -543,6 +648,21 @@ export default function DisplayPage() {
                 <p className="mt-3 text-2xl text-white/85 sm:text-3xl">
                   {dateLabel}
                 </p>
+                <div className="mt-4 border-t border-white/10 pt-3">
+                  {weather && weatherView ? (
+                    <div className="flex items-center gap-2.5 text-white/90">
+                      <weatherView.Icon className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" />
+                      <p className="text-base font-medium sm:text-lg">
+                        {Math.round(weather.temperatureC)}°C, {weatherView.label}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2.5 text-white/70">
+                      <Spinner className="h-4 w-4" />
+                      <p className="text-sm sm:text-base">Загружаем погоду...</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-slate-800/55 p-5 text-white shadow-2xl backdrop-blur-md sm:p-6 flex min-h-0 flex-col overflow-hidden">
