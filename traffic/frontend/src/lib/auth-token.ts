@@ -2,6 +2,7 @@ import { isTelegramMiniApp } from "@/lib/telegram";
 
 const AUTH_KEYS = [
   "traffic_token",
+  "traffic_refresh_token",
   "traffic_role",
   "traffic_full_name",
   "traffic_teacher_id",
@@ -20,6 +21,10 @@ export function setMemoryToken(token: string | null): void {
 
 export function getAuthToken(): string | null {
   return memoryToken ?? localStorage.getItem("traffic_token");
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem("traffic_refresh_token");
 }
 
 export function clearPersistedAuth(): void {

@@ -269,7 +269,8 @@ async def cas_callback(ticket: str = Query(...)):
         name = email.split("@")[0]
 
     token = _create_token(student_id=email, email=email, name=name)
-    redirect_url = f"{settings.FRONTEND_URL}/?token={quote(token)}"
+    # Send token via URL fragment, not query string, to avoid leaking in access logs and Referer.
+    redirect_url = f"{settings.FRONTEND_URL}/#token={quote(token)}"
     return RedirectResponse(url=redirect_url)
 
 

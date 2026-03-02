@@ -10,7 +10,8 @@ import type { AuthInfo } from "@/types";
 interface AuthContextType {
   auth: AuthInfo | null;
   token: string | null;
-  loginFromToken: (token: string) => void;
+  refreshToken: string | null;
+  loginFromToken: (token: string, refreshToken: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -30,8 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(
     () => localStorage.getItem("token")
   );
+  const [refreshToken, setRefreshToken] = useState<string | null>(
+    () => localStorage.getItem("refresh_token")
+  );
 
-  const loginFromToken = useCallback((token: string) => {
+  const loginFromToken = useCallback((token: string, refreshToken: string) => {
     const payload = parseJwtPayload(token);
     const role = payload.role as AuthInfo["role"];
     const entityId = (payload.entity_id as string | null) ?? null;
@@ -42,15 +46,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       executor_id: role === "executor" ? entityId : null,
     };
     localStorage.setItem("token", token);
+    localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem("auth", JSON.stringify(authInfo));
     setToken(token);
+    setRefreshToken(refreshToken);
     setAuth(authInfo);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
     localStorage.removeItem("auth");
     setToken(null);
+    setRefreshToken(null);
     setAuth(null);
   }, []);
 
@@ -59,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         auth,
         token,
+        refreshToken,
         loginFromToken,
         logout,
         isAuthenticated: !!token && !!auth,

@@ -81,6 +81,10 @@ function getStoredDisplayPin(): string | null {
   return localStorage.getItem("traffic_display_pin");
 }
 
+function getStoredTabletSecret(): string | null {
+  return localStorage.getItem("traffic_tablet_secret");
+}
+
 function getLocalDateKey(date: Date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -210,6 +214,7 @@ export default function DisplayPage() {
 
   const deviceIdRef = useRef<string | null>(getStoredDeviceId());
   const displayPinRef = useRef<string | null>(getStoredDisplayPin());
+  const tabletSecretRef = useRef<string | null>(getStoredTabletSecret());
   const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastStreamActivityRef = useRef<number>(Date.now());
   const disconnectedRef = useRef<boolean>(false);
@@ -234,8 +239,10 @@ export default function DisplayPage() {
   function resetDeviceState() {
     localStorage.removeItem("traffic_device_id");
     localStorage.removeItem("traffic_display_pin");
+    localStorage.removeItem("traffic_tablet_secret");
     deviceIdRef.current = null;
     displayPinRef.current = null;
+    tabletSecretRef.current = null;
     setTablet(null);
     setSession(null);
     setRegPin("");
@@ -309,11 +316,13 @@ export default function DisplayPage() {
   async function initDevice() {
     if (deviceIdRef.current) return;
     try {
-      const res = await api.post<{ device_id: string; reg_pin: string; display_pin: string }>("/tablets/init");
+      const res = await api.post<{ device_id: string; reg_pin: string; display_pin: string; tablet_secret: string }>("/tablets/init");
       deviceIdRef.current = res.data.device_id;
       displayPinRef.current = res.data.display_pin;
+      tabletSecretRef.current = res.data.tablet_secret;
       localStorage.setItem("traffic_device_id", res.data.device_id);
       localStorage.setItem("traffic_display_pin", res.data.display_pin);
+      localStorage.setItem("traffic_tablet_secret", res.data.tablet_secret);
       setRegPin(res.data.reg_pin);
       markStreamConnected();
     } catch {
@@ -334,7 +343,7 @@ export default function DisplayPage() {
         continue;
       }
 
-      const tabletSecret = displayPinRef.current ?? "";
+      const tabletSecret = tabletSecretRef.current ?? "";
 
       try {
         const response = await fetch(

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     BOT_TOKEN: str
     SSO_API_URL: str = "http://sso-backend:8000"
-    SSO_SERVICE_SECRET: str
+    BOT_SSO_SERVICE_SECRET: str
     TRAFFIC_TEACHER_URL: str = "https://traffic.poly.hex8d.space/teacher"
 
 
@@ -49,7 +49,7 @@ async def link_telegram_to_sso_user(ctx: AppContext, user_id: str, message: Mess
         "telegram_username": message.from_user.username,
         "chat_id": message.chat.id,
     }
-    headers = {"X-Service-Secret": ctx.settings.SSO_SERVICE_SECRET}
+    headers = {"X-Service-Secret": ctx.settings.BOT_SSO_SERVICE_SECRET}
 
     async with httpx.AsyncClient(timeout=10) as client:
         response = await client.post(
@@ -74,7 +74,7 @@ async def is_registered_teacher(ctx: AppContext, message: Message) -> tuple[bool
     if not message.from_user:
         return None, "Не удалось определить Telegram-пользователя."
 
-    headers = {"X-Service-Secret": ctx.settings.SSO_SERVICE_SECRET}
+    headers = {"X-Service-Secret": ctx.settings.BOT_SSO_SERVICE_SECRET}
     params = {"app_filter": "traffic"}
     telegram_id = message.from_user.id
 

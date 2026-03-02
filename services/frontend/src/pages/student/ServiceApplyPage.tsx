@@ -50,9 +50,6 @@ export default function ServiceApplyPage() {
     try {
       const formData = new FormData();
       formData.append("service_id", String(service.id));
-      formData.append("student_external_id", student.student_external_id);
-      formData.append("student_name", student.student_name);
-      formData.append("student_email", student.student_email);
       formData.append("form_data", JSON.stringify(formValues));
       files.forEach((file) => formData.append("files", file));
 

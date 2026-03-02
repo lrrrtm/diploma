@@ -11,6 +11,7 @@ type Role = "admin" | "teacher" | null;
 
 interface AuthState {
   token: string | null;
+  refreshToken: string | null;
   role: Role;
   fullName: string | null;
   teacherId: string | null;
@@ -18,13 +19,14 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (token: string) => void;
+  login: (token: string, refreshToken?: string) => void;
   logout: () => void;
   isLoggedIn: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   token: null,
+  refreshToken: null,
   role: null,
   fullName: null,
   teacherId: null,
@@ -41,6 +43,7 @@ function loadState(): AuthState {
     setMemoryToken(null);
     return {
       token: null,
+      refreshToken: null,
       role: null,
       fullName: null,
       teacherId: null,
@@ -52,6 +55,7 @@ function loadState(): AuthState {
   setMemoryToken(token);
   return {
     token,
+    refreshToken: localStorage.getItem("traffic_refresh_token"),
     role: (localStorage.getItem("traffic_role") as Role) ?? null,
     fullName: localStorage.getItem("traffic_full_name"),
     teacherId: localStorage.getItem("traffic_teacher_id"),
@@ -67,7 +71,7 @@ function parseJwtPayload(token: string): Record<string, unknown> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(loadState);
 
-  function login(token: string) {
+  function login(token: string, refreshToken?: string) {
     const payload = parseJwtPayload(token);
     const role = (payload.role as string) as "admin" | "teacher";
     const entityId = (payload.entity_id as string | null) ?? null;
@@ -81,6 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearPersistedAuth();
     } else {
       localStorage.setItem("traffic_token", token);
+      if (refreshToken) localStorage.setItem("traffic_refresh_token", refreshToken);
+      else localStorage.removeItem("traffic_refresh_token");
       localStorage.setItem("traffic_role", role);
       localStorage.setItem("traffic_full_name", fullName);
       if (isTeacher && entityId) localStorage.setItem("traffic_teacher_id", entityId);
@@ -91,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setState({
       token,
+      refreshToken: useEphemeral ? null : (refreshToken ?? null),
       role,
       fullName,
       teacherId: isTeacher ? entityId : null,
@@ -100,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function logout() {
     clearAllAuth();
-    setState({ token: null, role: null, fullName: null, teacherId: null, teacherName: null });
+    setState({ token: null, refreshToken: null, role: null, fullName: null, teacherId: null, teacherName: null });
   }
 
   return (

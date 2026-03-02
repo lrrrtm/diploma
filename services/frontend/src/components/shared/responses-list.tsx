@@ -1,5 +1,6 @@
 import { Building2, Download, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { downloadAttachment } from "@/lib/attachments";
 import type { ApplicationResponseInfo } from "@/types";
 
 interface ResponsesListProps {
@@ -9,6 +10,14 @@ interface ResponsesListProps {
 
 export function ResponsesList({ responses, title = "История ответов" }: ResponsesListProps) {
   if (responses.length === 0) return null;
+
+  const handleDownload = async (attachmentId: string, filename: string) => {
+    try {
+      await downloadAttachment(attachmentId, filename);
+    } catch {
+      // noop
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -32,16 +41,15 @@ export function ResponsesList({ responses, title = "История ответо�
             {resp.attachments.length > 0 && (
               <div className="space-y-1">
                 {resp.attachments.map((att) => (
-                  <a
+                  <button
                     key={att.id}
-                    href={`/uploads/${att.file_path}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    type="button"
+                    onClick={() => handleDownload(att.id, att.filename)}
                     className="flex items-center gap-2 p-2 bg-secondary rounded-md text-sm hover:bg-secondary/80 transition-colors"
                   >
                     <Download className="h-4 w-4 text-muted-foreground" />
                     {att.filename}
-                  </a>
+                  </button>
                 ))}
               </div>
             )}

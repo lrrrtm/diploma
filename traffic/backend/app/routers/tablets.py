@@ -5,7 +5,7 @@ import random
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
@@ -16,6 +16,7 @@ from app.dependencies import require_admin
 from app.models.attendance import Attendance
 from app.models.session import Session
 from app.models.tablet import Tablet
+from app.rate_limit import pin_lookup_limiter
 from app.realtime import hub
 
 router = APIRouter()
@@ -36,6 +37,14 @@ def _unique_pin(db: DBSession, exclude_field: str | None = None) -> str:
         if not q.first():
             return pin
     raise RuntimeError("Could not generate unique PIN")
+
+
+def _unique_tablet_secret(db: DBSession) -> str:
+    for _ in range(100):
+        candidate = uuid.uuid4().hex + uuid.uuid4().hex
+        if not db.query(Tablet).filter(Tablet.tablet_secret == candidate).first():
+            return candidate
+    raise RuntimeError("Could not generate unique tablet secret")
 
 
 # ---------------------------------------------------------------------------
@@ -65,15 +74,30 @@ def init_tablet(db: DBSession = Depends(get_db)):
         id=str(uuid.uuid4()),
         reg_pin=reg_pin,
         display_pin=display_pin,
+        tablet_secret=_unique_tablet_secret(db),
     )
     db.add(tablet)
     db.commit()
-    return {"device_id": tablet.id, "reg_pin": tablet.reg_pin, "display_pin": tablet.display_pin}
+    return {
+        "device_id": tablet.id,
+        "reg_pin": tablet.reg_pin,
+        "display_pin": tablet.display_pin,
+        "tablet_secret": tablet.tablet_secret,
+    }
 
 
 @router.get("/by-reg-pin")
-def find_by_reg_pin(pin: str, db: DBSession = Depends(get_db), _: dict = Depends(require_admin)):
+def find_by_reg_pin(
+    pin: str,
+    request: Request,
+    db: DBSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
     """Admin calls this after entering the PIN shown on an unregistered kiosk."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not pin_lookup_limiter.allow(f"reg-pin:{client_ip}"):
+        raise HTTPException(status_code=429, detail="Слишком много попыток, попробуйте позже")
+
     tablet = db.query(Tablet).filter(Tablet.reg_pin == pin).first()
     if not tablet:
         raise HTTPException(status_code=404, detail="Киоск с таким кодом не найден")
@@ -81,8 +105,12 @@ def find_by_reg_pin(pin: str, db: DBSession = Depends(get_db), _: dict = Depends
 
 
 @router.get("/by-display-pin")
-def find_by_display_pin(pin: str, db: DBSession = Depends(get_db)):
+def find_by_display_pin(pin: str, request: Request, db: DBSession = Depends(get_db)):
     """Teacher calls this after entering the PIN shown on a registered waiting kiosk."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not pin_lookup_limiter.allow(f"display-pin:{client_ip}"):
+        raise HTTPException(status_code=429, detail="Слишком много попыток, попробуйте позже")
+
     tablet = db.query(Tablet).filter(Tablet.display_pin == pin).first()
     if not tablet:
         raise HTTPException(status_code=404, detail="Киоск с таким кодом не найден")
@@ -248,7 +276,7 @@ def _serialize_session_state(session: Session, tablet: Tablet, db: DBSession, ta
         "rotate_seconds": session.rotate_seconds,
         "attendance_count": attendance_count,
     }
-    authenticated = tablet_secret is not None and hmac.compare_digest(tablet_secret, tablet.display_pin)
+    authenticated = tablet_secret is not None and hmac.compare_digest(tablet_secret, tablet.tablet_secret)
     if authenticated:
         payload["qr_secret"] = session.qr_secret
     return payload

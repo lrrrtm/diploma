@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
@@ -15,7 +16,13 @@ from app.schemas.application import (
     ApplicationResponseOut,
     AttachmentResponse,
 )
-from app.dependencies import get_current_auth, require_staff, require_staff_or_admin, require_staff_executor_or_admin
+from app.dependencies import (
+    get_current_auth,
+    get_current_student,
+    require_staff,
+    require_staff_or_admin,
+    require_staff_executor_or_admin,
+)
 
 router = APIRouter()
 
@@ -68,25 +75,76 @@ def _build_brief(app: Application) -> ApplicationBrief:
 
 
 def _save_file(upload: UploadFile) -> tuple[str, str]:
-    ext = os.path.splitext(upload.filename)[1] if upload.filename else ""
+    ext = (os.path.splitext(upload.filename)[1] if upload.filename else "").lower()
+    allowed_extensions = {
+        value.strip().lower()
+        for value in settings.ALLOWED_UPLOAD_EXTENSIONS.split(",")
+        if value.strip()
+    }
+    if allowed_extensions and ext not in allowed_extensions:
+        raise HTTPException(status_code=400, detail="Недопустимый формат файла")
+
+    content = upload.file.read()
+    if len(content) > settings.MAX_UPLOAD_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="Файл превышает допустимый размер")
+
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = os.path.join(settings.UPLOAD_DIR, unique_name)
     with open(file_path, "wb") as f:
-        content = upload.file.read()
         f.write(content)
     return upload.filename or unique_name, unique_name
+
+
+def _check_application_access(
+    *,
+    application: Application,
+    db: Session,
+    auth: dict | None,
+    student: dict | None,
+) -> None:
+    if auth and auth.get("role") == "staff":
+        from app.models.department import Department
+        entity_id = auth.get("entity_id")
+        if not db.get(Department, entity_id):
+            raise HTTPException(status_code=401, detail="Структура удалена", headers={"WWW-Authenticate": "Bearer"})
+        if not application.service or application.service.department_id != entity_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
+        return
+
+    if auth and auth.get("role") == "executor":
+        from app.models.executor import Executor
+        entity_id = auth.get("entity_id")
+        executor = db.get(Executor, entity_id)
+        if not executor:
+            raise HTTPException(status_code=401, detail="Исполнитель удалён", headers={"WWW-Authenticate": "Bearer"})
+        if application.executor_id != entity_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
+        if not application.service or application.service.department_id != executor.department_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
+        return
+
+    if auth and auth.get("role") == "admin":
+        return
+
+    if student:
+        if application.student_external_id != student["student_external_id"]:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
+        return
+
+    raise HTTPException(status_code=401, detail="Недостаточно прав")
 
 
 @router.post("/", response_model=ApplicationSchema, status_code=201)
 async def create_application(
     service_id: str = Form(...),
-    student_external_id: str = Form(...),
-    student_name: str = Form(...),
-    student_email: str = Form(default=""),
     form_data: str = Form("{}"),
     files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
+    student: dict = Depends(get_current_student),
 ):
+    if not student:
+        raise HTTPException(status_code=401, detail="Необходима повторная авторизация студента")
+
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service or not service.is_active:
         raise HTTPException(status_code=404, detail="Услуга не найдена или неактивна")
@@ -98,9 +156,9 @@ async def create_application(
 
     application = Application(
         service_id=service_id,
-        student_external_id=student_external_id,
-        student_name=student_name,
-        student_email=student_email or None,
+        student_external_id=student["student_external_id"],
+        student_name=student["student_name"],
+        student_email=(student.get("student_email") or None),
         form_data=parsed_form_data,
         status=ApplicationStatus.PENDING,
     )
@@ -133,9 +191,9 @@ async def create_application(
 
 @router.get("/", response_model=list[ApplicationBrief])
 def list_applications(
-    student_external_id: str | None = None,
     db: Session = Depends(get_db),
     auth: dict | None = Depends(get_current_auth),
+    student: dict | None = Depends(get_current_student),
 ):
     query = (
         db.query(Application)
@@ -145,9 +203,7 @@ def list_applications(
         )
     )
 
-    if student_external_id:
-        query = query.filter(Application.student_external_id == student_external_id)
-    elif auth and auth.get("role") == "staff":
+    if auth and auth.get("role") == "staff":
         from app.models.department import Department
         entity_id = auth.get("entity_id")
         if not db.get(Department, entity_id):
@@ -161,8 +217,10 @@ def list_applications(
         query = query.filter(Application.executor_id == entity_id)
     elif auth and auth.get("role") == "admin":
         pass
+    elif student:
+        query = query.filter(Application.student_external_id == student["student_external_id"])
     else:
-        raise HTTPException(status_code=400, detail="Укажите student_external_id или авторизуйтесь")
+        raise HTTPException(status_code=401, detail="Недостаточно прав")
 
     applications = query.order_by(Application.created_at.desc()).all()
     return [_build_brief(a) for a in applications]
@@ -171,9 +229,9 @@ def list_applications(
 @router.get("/{application_id}", response_model=ApplicationSchema)
 def get_application(
     application_id: str,
-    student_external_id: str | None = None,
     db: Session = Depends(get_db),
     auth: dict | None = Depends(get_current_auth),
+    student: dict | None = Depends(get_current_student),
 ):
     application = (
         db.query(Application)
@@ -190,30 +248,44 @@ def get_application(
     if not application:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
-    # Access control
-    if student_external_id:
-        if application.student_external_id != student_external_id:
-            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
-    elif auth and auth.get("role") == "staff":
-        from app.models.department import Department
-        entity_id = auth.get("entity_id")
-        if not db.get(Department, entity_id):
-            raise HTTPException(status_code=401, detail="Структура удалена", headers={"WWW-Authenticate": "Bearer"})
-        if application.service.department_id != entity_id:
-            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
-    elif auth and auth.get("role") == "executor":
-        from app.models.executor import Executor
-        entity_id = auth.get("entity_id")
-        if not db.get(Executor, entity_id):
-            raise HTTPException(status_code=401, detail="Исполнитель удалён", headers={"WWW-Authenticate": "Bearer"})
-        if application.executor_id != entity_id:
-            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
-    elif auth and auth.get("role") == "admin":
-        pass
-    else:
-        raise HTTPException(status_code=400, detail="Укажите student_external_id или авторизуйтесь")
+    _check_application_access(application=application, db=db, auth=auth, student=student)
 
     return _build_application_response(application)
+
+
+@router.get("/attachments/{attachment_id}/download")
+def download_attachment(
+    attachment_id: str,
+    db: Session = Depends(get_db),
+    auth: dict | None = Depends(get_current_auth),
+    student: dict | None = Depends(get_current_student),
+):
+    attachment = (
+        db.query(Attachment)
+        .options(joinedload(Attachment.application).joinedload(Application.service))
+        .filter(Attachment.id == attachment_id)
+        .first()
+    )
+    if not attachment or not attachment.application:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    _check_application_access(
+        application=attachment.application,
+        db=db,
+        auth=auth,
+        student=student,
+    )
+
+    safe_name = os.path.basename(attachment.file_path)
+    file_path = os.path.join(settings.UPLOAD_DIR, safe_name)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    return FileResponse(
+        path=file_path,
+        filename=attachment.filename,
+        media_type="application/octet-stream",
+    )
 
 
 @router.patch("/{application_id}/assign")
@@ -226,6 +298,8 @@ def assign_executor(
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if not application.service or application.service.department_id != auth["department_id"]:
+        raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
 
     executor_id = data.get("executor_id")
     if executor_id:
@@ -251,6 +325,10 @@ def update_application_status(
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if auth.get("role") == "staff":
+        service = db.query(Service).filter(Service.id == application.service_id).first()
+        if not service or service.department_id != auth["department_id"]:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
 
     new_status = status_update.get("status")
     if new_status:
@@ -281,8 +359,12 @@ async def respond_to_application(
     if auth["role"] == "executor":
         if application.executor_id != auth["executor_id"]:
             raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
+        if application.service.department_id != auth["department_id"]:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
         department_id = auth["department_id"]
     elif auth["role"] == "staff":
+        if application.service.department_id != auth["department_id"]:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой заявке")
         department_id = auth["department_id"]
     else:
         department_id = application.service.department_id

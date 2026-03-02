@@ -20,6 +20,7 @@ import { ResponsesList } from "@/components/shared/responses-list";
 import { RespondForm } from "@/components/shared/respond-form";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/api/client";
+import { downloadAttachment } from "@/lib/attachments";
 import type { ApplicationDetail, Executor } from "@/types";
 
 export default function StaffApplicationDetailPage() {
@@ -84,6 +85,14 @@ export default function StaffApplicationDetailPage() {
     } catch (err) {
       toast.error("Не удалось отправить ответ");
       throw err;
+    }
+  };
+
+  const handleDownload = async (attachmentId: string, filename: string) => {
+    try {
+      await downloadAttachment(attachmentId, filename);
+    } catch {
+      toast.error("Не удалось скачать файл");
     }
   };
 
@@ -195,16 +204,15 @@ export default function StaffApplicationDetailPage() {
                   <h3 className="font-medium text-sm">Документы от студента</h3>
                   <div className="space-y-1">
                     {application.attachments.map((att) => (
-                      <a
+                      <button
                         key={att.id}
-                        href={`/uploads/${att.file_path}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        type="button"
+                        onClick={() => handleDownload(att.id, att.filename)}
                         className="flex items-center gap-2 p-2 bg-secondary rounded-md text-sm hover:bg-secondary/80 transition-colors"
                       >
                         <Download className="h-4 w-4 text-muted-foreground" />
                         {att.filename}
-                      </a>
+                      </button>
                     ))}
                   </div>
                 </div>

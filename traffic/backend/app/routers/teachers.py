@@ -39,7 +39,7 @@ class CreateTeacherRequest(BaseModel):
 def _sso_check_username(username: str) -> bool:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
     )
     try:
         return client.check_username(username)
@@ -60,7 +60,7 @@ def _sso_fetch_teacher_users(
 
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
     )
     try:
         users = client.list_users(
@@ -95,7 +95,7 @@ def _sso_fetch_teacher_users(
 def _sso_create_user(teacher_id: str, username: str, password: str, full_name: str) -> None:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
     )
     try:
         client.provision_traffic_teacher(
@@ -113,7 +113,7 @@ def _sso_create_user(teacher_id: str, username: str, password: str, full_name: s
 def _sso_delete_user(teacher_id: str) -> None:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
     )
     try:
         client.delete_user_by_entity(entity_id=teacher_id, app="traffic")
@@ -124,7 +124,7 @@ def _sso_delete_user(teacher_id: str) -> None:
 def _sso_unlink_telegram(sso_user_id: str) -> None:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
     )
     try:
         client.unlink_user_telegram(user_id=sso_user_id)

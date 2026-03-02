@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { ResponsesList } from "@/components/shared/responses-list";
 import { useStudent } from "@/context/StudentContext";
 import api from "@/api/client";
+import { downloadAttachment } from "@/lib/attachments";
 import type { ApplicationDetail } from "@/types";
 
 const detailCache: Record<string, ApplicationDetail> = {};
@@ -26,13 +27,19 @@ export default function ApplicationDetailPage() {
   const [application, setApplication] = useState<ApplicationDetail | null>(cached ?? null);
   const [loading, setLoading] = useState(!cached);
 
+  const handleDownload = async (attachmentId: string, filename: string) => {
+    try {
+      await downloadAttachment(attachmentId, filename);
+    } catch {
+      // noop: local page doesn't use toaster
+    }
+  };
+
   useEffect(() => {
     if (!student || !id) return;
     if (detailCache[id]) return;
     api
-      .get<ApplicationDetail>(`/applications/${id}`, {
-        params: { student_external_id: student.student_external_id },
-      })
+      .get<ApplicationDetail>(`/applications/${id}`)
       .then((res) => {
         detailCache[id] = res.data;
         setApplication(res.data);
@@ -123,16 +130,15 @@ export default function ApplicationDetailPage() {
                   <h3 className="font-medium text-sm">Прикрепленные файлы</h3>
                   <div className="space-y-1">
                     {application.attachments.map((att) => (
-                      <a
+                      <button
                         key={att.id}
-                        href={`/uploads/${att.file_path}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        type="button"
+                        onClick={() => handleDownload(att.id, att.filename)}
                         className="flex items-center gap-2 p-2 bg-secondary rounded-md text-sm hover:bg-secondary/80 transition-colors"
                       >
                         <Download className="h-4 w-4 text-muted-foreground" />
                         {att.filename}
-                      </a>
+                      </button>
                     ))}
                   </div>
                 </div>

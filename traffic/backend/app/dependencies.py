@@ -42,7 +42,7 @@ def require_admin_or_service(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     x_service_secret: str | None = Header(default=None),
 ) -> dict:
-    if x_service_secret and x_service_secret == settings.SSO_SERVICE_SECRET:
+    if x_service_secret and x_service_secret == settings.TRAFFIC_INTERNAL_SERVICE_SECRET:
         return {"caller": "service"}
     payload = _decode_sso(credentials)
     if payload.get("role") != "admin":
@@ -72,7 +72,7 @@ def require_teacher(
 
         client = SSOClient(
             base_url=settings.SSO_API_URL,
-            service_secret=settings.SSO_SERVICE_SECRET,
+            service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
         )
         try:
             current_user = client.get_user_by_telegram(telegram_id=telegram_id, app_filter="traffic")

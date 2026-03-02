@@ -34,6 +34,16 @@ export default function LoginPage() {
   const appLabel = params.get("app_name") ?? (app === "sso" ? "Политехник.SSO" : app);
   const AppIcon = APP_ICONS[app] ?? ShieldCheck;
 
+  const buildRedirectWithTokens = (targetUrl: string, accessToken: string, refreshToken: string): string => {
+    const target = new URL(targetUrl, window.location.origin);
+    const hash = new URLSearchParams({
+      token: accessToken,
+      refresh_token: refreshToken,
+    });
+    target.hash = hash.toString();
+    return target.toString();
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -49,9 +59,9 @@ export default function LoginPage() {
 
       // If the user is SSO admin, store token and redirect to admin panel
       if (data.app === "sso" && data.role === "admin") {
-        login(data.access_token, data.full_name);
+        login(data.access_token, data.refresh_token, data.full_name);
         if (redirectTo) {
-          window.location.replace(`${redirectTo}?token=${encodeURIComponent(data.access_token)}`);
+          window.location.replace(buildRedirectWithTokens(redirectTo, data.access_token, data.refresh_token));
         } else {
           window.location.replace("/admin");
         }
@@ -60,10 +70,10 @@ export default function LoginPage() {
 
       // For app users — redirect back to their app with the token
       if (redirectTo) {
-        window.location.replace(`${redirectTo}?token=${encodeURIComponent(data.access_token)}`);
+        window.location.replace(buildRedirectWithTokens(redirectTo, data.access_token, data.refresh_token));
       } else {
         // No redirect — just show success (shouldn't normally happen)
-        login(data.access_token, data.full_name);
+        login(data.access_token, data.refresh_token, data.full_name);
         window.location.replace("/");
       }
     } catch (err: unknown) {

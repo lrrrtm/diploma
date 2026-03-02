@@ -2,11 +2,12 @@ import { createContext, useContext, useState, ReactNode } from "react";
 
 interface AuthState {
   token: string | null;
+  refreshToken: string | null;
   fullName: string | null;
 }
 
 interface AuthContextValue extends AuthState {
-  login: (token: string, fullName: string) => void;
+  login: (token: string, refreshToken: string, fullName: string) => void;
   logout: () => void;
   isLoggedIn: boolean;
 }
@@ -16,19 +17,22 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(() => ({
     token: localStorage.getItem("sso_token"),
+    refreshToken: localStorage.getItem("sso_refresh_token"),
     fullName: localStorage.getItem("sso_full_name"),
   }));
 
-  const login = (token: string, fullName: string) => {
+  const login = (token: string, refreshToken: string, fullName: string) => {
     localStorage.setItem("sso_token", token);
+    localStorage.setItem("sso_refresh_token", refreshToken);
     localStorage.setItem("sso_full_name", fullName);
-    setState({ token, fullName });
+    setState({ token, refreshToken, fullName });
   };
 
   const logout = () => {
     localStorage.removeItem("sso_token");
+    localStorage.removeItem("sso_refresh_token");
     localStorage.removeItem("sso_full_name");
-    setState({ token: null, fullName: null });
+    setState({ token: null, refreshToken: null, fullName: null });
   };
 
   return (

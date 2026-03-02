@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import DisplayPage from "@/pages/DisplayPage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import TeacherSessionPage from "@/pages/TeacherSessionPage";
@@ -109,7 +109,28 @@ function RootRedirect() {
   return <RedirectScreen />;
 }
 
+const TITLE_PREFIX = "Политехник.Посещаемость";
+
+function resolvePageTitle(pathname: string): string {
+  if (pathname === "/kiosk") return "Киоск";
+  if (pathname === "/scan") return "Сканер";
+  if (pathname === "/auth/callback") return "Авторизация";
+  if (pathname === "/teacher/session") return "Сессия";
+  if (pathname === "/teacher/history") return "История сессий";
+  if (pathname.startsWith("/teacher/history/")) return "Детали сессии";
+  if (pathname === "/admin/tablets") return "Админка: Киоски";
+  if (pathname === "/admin/teachers") return "Админка: Преподаватели";
+  if (pathname.startsWith("/admin")) return "Админка";
+  return "Главная";
+}
+
 export default function App() {
+  const location = useLocation();
+
+  useEffect(() => {
+    document.title = `${TITLE_PREFIX} - ${resolvePageTitle(location.pathname)}`;
+  }, [location.pathname]);
+
   return (
     <Routes>
       {/* Root — redirects to SSO or cabinet if already logged in */}

@@ -1,21 +1,33 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
+from app.audit import log_audit, request_context, service_actor
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
+from app.service_auth import resolve_service_caller
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def _require_service_secret(x_service_secret: str | None = Header(default=None)) -> None:
-    if not x_service_secret or x_service_secret != settings.SSO_SERVICE_SECRET:
+def _require_service_caller(
+    request: Request,
+    x_service_secret: str | None = Header(default=None),
+) -> str:
+    caller = resolve_service_caller(x_service_secret)
+    if not caller:
+        log_audit(
+            "sso.provision.denied",
+            reason="invalid_service_secret",
+            **request_context(request),
+        )
         raise HTTPException(status_code=403, detail="Доступ запрещён")
+    return caller
 
 
 class ProvisionRequest(BaseModel):
@@ -112,28 +124,136 @@ def _upsert_user(
 @router.post("/services/staff")
 def provision_services_staff(
     data: ProvisionRequest,
-    _: None = Depends(_require_service_secret),
+    request: Request,
+    caller: str = Depends(_require_service_caller),
     db: DBSession = Depends(get_db),
 ):
-    user = _upsert_user(db=db, app="services", role="staff", data=data)
+    if caller != "services":
+        log_audit(
+            "sso.provision.denied",
+            reason="caller_not_allowed",
+            target_app="services",
+            target_role="staff",
+            **service_actor(caller),
+            **request_context(request),
+        )
+        raise HTTPException(status_code=403, detail="Недостаточно прав для provisioning staff")
+    try:
+        user = _upsert_user(db=db, app="services", role="staff", data=data)
+    except HTTPException as exc:
+        log_audit(
+            "sso.provision.denied",
+            reason="upsert_failed",
+            detail=str(exc.detail),
+            target_app="services",
+            target_role="staff",
+            entity_id=data.entity_id,
+            ruz_teacher_id=data.ruz_teacher_id,
+            **service_actor(caller),
+            **request_context(request),
+        )
+        raise
+    log_audit(
+        "sso.provision.succeeded",
+        target_app="services",
+        target_role="staff",
+        provisioned_user_id=user.id,
+        provisioned_username=user.username,
+        entity_id=user.entity_id,
+        ruz_teacher_id=user.ruz_teacher_id,
+        **service_actor(caller),
+        **request_context(request),
+    )
     return _serialize(user)
 
 
 @router.post("/services/executor")
 def provision_services_executor(
     data: ProvisionRequest,
-    _: None = Depends(_require_service_secret),
+    request: Request,
+    caller: str = Depends(_require_service_caller),
     db: DBSession = Depends(get_db),
 ):
-    user = _upsert_user(db=db, app="services", role="executor", data=data)
+    if caller != "services":
+        log_audit(
+            "sso.provision.denied",
+            reason="caller_not_allowed",
+            target_app="services",
+            target_role="executor",
+            **service_actor(caller),
+            **request_context(request),
+        )
+        raise HTTPException(status_code=403, detail="Недостаточно прав для provisioning executor")
+    try:
+        user = _upsert_user(db=db, app="services", role="executor", data=data)
+    except HTTPException as exc:
+        log_audit(
+            "sso.provision.denied",
+            reason="upsert_failed",
+            detail=str(exc.detail),
+            target_app="services",
+            target_role="executor",
+            entity_id=data.entity_id,
+            ruz_teacher_id=data.ruz_teacher_id,
+            **service_actor(caller),
+            **request_context(request),
+        )
+        raise
+    log_audit(
+        "sso.provision.succeeded",
+        target_app="services",
+        target_role="executor",
+        provisioned_user_id=user.id,
+        provisioned_username=user.username,
+        entity_id=user.entity_id,
+        ruz_teacher_id=user.ruz_teacher_id,
+        **service_actor(caller),
+        **request_context(request),
+    )
     return _serialize(user)
 
 
 @router.post("/traffic/teacher")
 def provision_traffic_teacher(
     data: ProvisionRequest,
-    _: None = Depends(_require_service_secret),
+    request: Request,
+    caller: str = Depends(_require_service_caller),
     db: DBSession = Depends(get_db),
 ):
-    user = _upsert_user(db=db, app="traffic", role="teacher", data=data)
+    if caller != "traffic":
+        log_audit(
+            "sso.provision.denied",
+            reason="caller_not_allowed",
+            target_app="traffic",
+            target_role="teacher",
+            **service_actor(caller),
+            **request_context(request),
+        )
+        raise HTTPException(status_code=403, detail="Недостаточно прав для provisioning teacher")
+    try:
+        user = _upsert_user(db=db, app="traffic", role="teacher", data=data)
+    except HTTPException as exc:
+        log_audit(
+            "sso.provision.denied",
+            reason="upsert_failed",
+            detail=str(exc.detail),
+            target_app="traffic",
+            target_role="teacher",
+            entity_id=data.entity_id,
+            ruz_teacher_id=data.ruz_teacher_id,
+            **service_actor(caller),
+            **request_context(request),
+        )
+        raise
+    log_audit(
+        "sso.provision.succeeded",
+        target_app="traffic",
+        target_role="teacher",
+        provisioned_user_id=user.id,
+        provisioned_username=user.username,
+        entity_id=user.entity_id,
+        ruz_teacher_id=user.ruz_teacher_id,
+        **service_actor(caller),
+        **request_context(request),
+    )
     return _serialize(user)

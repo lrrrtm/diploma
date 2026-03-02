@@ -12,7 +12,7 @@
 ## Required env vars
 
 - `BOT_TOKEN`
-- `SSO_SERVICE_SECRET`
+- `BOT_SSO_SERVICE_SECRET`
 - `SSO_API_URL` (default: `http://sso-backend:8000`)
 - `TRAFFIC_TEACHER_URL` (default: `https://traffic.poly.hex8d.space/teacher`)
 

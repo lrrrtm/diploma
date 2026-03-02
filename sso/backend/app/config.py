@@ -19,8 +19,13 @@ class Settings(BaseSettings):
     # Secret used to sign all SSO session tokens (shared with services and traffic)
     SSO_JWT_SECRET: str = "change-me-sso-jwt-secret"
 
-    # Secret used by app backends to call SSO user-management API
-    SSO_SERVICE_SECRET: str = "change-me-sso-service-secret"
+    # Service secrets for inter-service calls to SSO API (scoped by caller app).
+    SERVICES_SSO_SERVICE_SECRET: str = "change-me-services-sso-secret"
+    TRAFFIC_SSO_SERVICE_SECRET: str = "change-me-traffic-sso-secret"
+    BOT_SSO_SERVICE_SECRET: str = "change-me-bot-sso-secret"
+
+    # Secret used by SSO integrations router to call traffic internal endpoints.
+    TRAFFIC_INTERNAL_SERVICE_SECRET: str = "change-me-traffic-internal-secret"
 
     # Initial SSO super-admin credentials (bootstrapped on first startup)
     SSO_ADMIN_USERNAME: str = "admin"
@@ -28,6 +33,8 @@ class Settings(BaseSettings):
 
     # Token expiry
     SESSION_TOKEN_EXPIRE_HOURS: int = 24
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    SSO_REFRESH_TOKEN_SECRET: str = "change-me-sso-refresh-secret"
 
     # Internal URL of traffic backend for integrations (teacher sync control)
     TRAFFIC_API_URL: str = "http://traffic-backend:8000"

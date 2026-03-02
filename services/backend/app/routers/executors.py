@@ -19,7 +19,7 @@ router = APIRouter()
 def _sso_create_executor(executor_id: str, username: str, password: str, name: str) -> None:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.SERVICES_SSO_SERVICE_SECRET,
     )
     try:
         client.provision_services_executor(
@@ -37,7 +37,7 @@ def _sso_create_executor(executor_id: str, username: str, password: str, name: s
 def _sso_delete_by_entity(entity_id: str) -> None:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.SERVICES_SSO_SERVICE_SECRET,
     )
     try:
         client.delete_user_by_entity(entity_id=entity_id, app="services")

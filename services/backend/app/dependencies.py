@@ -1,9 +1,10 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from poly_shared.auth.launch_token import verify_student_session_token
 from poly_shared.auth.sso_token import decode_sso_token
 from poly_shared.errors import TokenValidationError
 
@@ -26,6 +27,24 @@ def get_current_auth(token: str | None = Depends(oauth2_scheme)) -> dict | None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Недействительный токен",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def get_current_student(student_token: str | None = Header(default=None, alias="X-Student-Token")) -> dict | None:
+    if not student_token:
+        return None
+    try:
+        identity = verify_student_session_token(
+            token=student_token,
+            secret=settings.STUDENT_SESSION_SECRET or settings.LAUNCH_TOKEN_SECRET,
+            algorithms=[settings.ALGORITHM],
+        )
+        return identity
+    except TokenValidationError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Недействительный токен студента",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

@@ -149,7 +149,7 @@ def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
 
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
     )
 
     try:

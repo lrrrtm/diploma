@@ -222,7 +222,7 @@ def get_current_session(
     db: DBSession = Depends(get_db),
 ):
     """Called by display page to get current session state.
-    qr_secret is only returned when tablet_secret matches the tablet's init_secret."""
+    qr_secret is only returned when tablet_secret matches the kiosk tablet_secret."""
     tablet = db.get(Tablet, device_id)
     if not tablet:
         return {"active": False}
@@ -248,7 +248,7 @@ def get_current_session(
     # Only authenticated display pages receive qr_secret
     authenticated = (
         tablet_secret is not None
-        and hmac.compare_digest(tablet_secret, tablet.display_pin)
+        and hmac.compare_digest(tablet_secret, tablet.tablet_secret)
     )
 
     result: dict = {

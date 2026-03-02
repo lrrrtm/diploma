@@ -12,15 +12,17 @@ export default function AuthCallbackPage() {
   const { loginFromToken } = useAuth();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    if (!token) {
+    const queryParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const token = queryParams.get("token") ?? hashParams.get("token");
+    const refreshToken = queryParams.get("refresh_token") ?? hashParams.get("refresh_token");
+    if (!token || !refreshToken) {
       navigate("/", { replace: true });
       return;
     }
 
-    window.history.replaceState({}, "", window.location.pathname);
-    loginFromToken(token);
+    window.history.replaceState({}, "", window.location.pathname + window.location.search);
+    loginFromToken(token, refreshToken);
 
     const payload = parseJwtPayload(token);
     const role = payload.role as string;

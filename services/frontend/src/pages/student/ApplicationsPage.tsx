@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { useStudent } from "@/context/StudentContext";
 import api from "@/api/client";
+import { downloadAttachment } from "@/lib/attachments";
 import type {
   ApplicationBrief,
   ApplicationDetail,
@@ -98,12 +99,18 @@ export default function ApplicationsPage() {
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [services, setServices] = useState<ServiceBrief[]>([]);
 
+  const handleDownload = async (attachmentId: string, filename: string) => {
+    try {
+      await downloadAttachment(attachmentId, filename);
+    } catch {
+      // noop
+    }
+  };
+
   const fetchApplications = () => {
     if (!student) return;
     api
-      .get<ApplicationBrief[]>("/applications/", {
-        params: { student_external_id: student.student_external_id },
-      })
+      .get<ApplicationBrief[]>("/applications/")
       .then((res) => {
         applicationsCache = res.data;
         setApplications(res.data);
@@ -139,9 +146,7 @@ export default function ApplicationsPage() {
     setSelectedApp(null);
     setDetailLoading(true);
     api
-      .get<ApplicationDetail>(`/applications/${app.id}`, {
-        params: { student_external_id: student?.student_external_id },
-      })
+      .get<ApplicationDetail>(`/applications/${app.id}`)
       .then((res) => {
         detailCache[app.id] = res.data;
         setSelectedApp(res.data);
@@ -298,16 +303,15 @@ export default function ApplicationsPage() {
                         Прикреплённые файлы
                       </p>
                       {selectedApp.attachments.map((att) => (
-                        <a
+                        <button
                           key={att.id}
-                          href={`/uploads/${att.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          type="button"
+                          onClick={() => handleDownload(att.id, att.filename)}
                           className="flex items-center gap-2 p-2 bg-secondary rounded-md text-sm hover:bg-secondary/80 transition-colors"
                         >
                           <Download className="h-4 w-4 text-muted-foreground shrink-0" />
                           {att.filename}
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </>

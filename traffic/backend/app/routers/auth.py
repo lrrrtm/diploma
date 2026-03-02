@@ -88,7 +88,7 @@ def _verify_telegram_init_data(init_data: str) -> dict:
 def _fetch_sso_user_by_telegram(telegram_id: int) -> dict:
     client = SSOClient(
         base_url=settings.SSO_API_URL,
-        service_secret=settings.SSO_SERVICE_SECRET,
+        service_secret=settings.TRAFFIC_SSO_SERVICE_SECRET,
     )
     try:
         user = client.get_user_by_telegram(telegram_id=telegram_id, app_filter="traffic")

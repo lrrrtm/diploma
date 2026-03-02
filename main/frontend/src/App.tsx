@@ -941,11 +941,22 @@ function HomePage() {
   const trafficSavedLength = useRef(0);
 
   useEffect(() => {
+    let page = "Главная";
+    if (trafficOpen) page = "Сканер";
+    else if (servicesOpen) page = "Услуги";
+    else if (profileOpen) page = "Профиль";
+    else if (tab === "schedule") page = "Расписание";
+    else if (tab === "gradebook") page = "Зачётка";
+    document.title = `Политехник.Студент - ${page}`;
+  }, [tab, servicesOpen, trafficOpen, profileOpen]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tokenFromUrl = params.get("token");
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const tokenFromUrl = params.get("token") ?? hashParams.get("token");
     if (tokenFromUrl) {
       localStorage.setItem("token", tokenFromUrl);
-      window.history.replaceState({}, "", window.location.pathname);
+      window.history.replaceState({}, "", window.location.pathname + window.location.search);
     }
 
     const token = localStorage.getItem("token");

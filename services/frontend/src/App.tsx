@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useStudent, useStudentLoading, useWasLaunchAttempted } from "@/context/StudentContext";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,7 +59,31 @@ function HomePage() {
   return <SSORedirect />;
 }
 
+const TITLE_PREFIX = "Политехник.Услуги";
+
+function resolvePageTitle(pathname: string): string {
+  if (pathname === "/auth/callback") return "Авторизация";
+  if (pathname === "/") return "Главная";
+  if (pathname.startsWith("/apply/")) return "Подача заявки";
+  if (pathname === "/applications") return "Мои заявки";
+  if (pathname.startsWith("/applications/")) return "Заявка";
+  if (pathname === "/staff") return "Панель сотрудника";
+  if (pathname.startsWith("/staff/applications/")) return "Заявка";
+  if (pathname === "/staff/services") return "Управление услугами";
+  if (pathname === "/staff/executors") return "Исполнители";
+  if (pathname === "/executor") return "Панель исполнителя";
+  if (pathname.startsWith("/executor/applications/")) return "Заявка";
+  if (pathname === "/admin/departments") return "Админка: Отделы";
+  return "Главная";
+}
+
 export default function App() {
+  const location = useLocation();
+
+  useEffect(() => {
+    document.title = `${TITLE_PREFIX} - ${resolvePageTitle(location.pathname)}`;
+  }, [location.pathname]);
+
   return (
     <Routes>
       {/* SSO callback */}

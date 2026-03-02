@@ -13,15 +13,21 @@ class Settings(BaseSettings):
 
     ALGORITHM: str = "HS256"
     UPLOAD_DIR: str = "/app/uploads"
+    MAX_UPLOAD_FILE_BYTES: int = 10 * 1024 * 1024
+    ALLOWED_UPLOAD_EXTENSIONS: str = ".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt"
 
     # Shared secret for verifying launch tokens from main app
     LAUNCH_TOKEN_SECRET: str = "change-me-launch-secret"
+    # Secret used to sign student session tokens after launch verification.
+    # Falls back to LAUNCH_TOKEN_SECRET when empty.
+    STUDENT_SESSION_SECRET: str = ""
+    STUDENT_SESSION_TTL_MINUTES: int = 720
 
     # Secret used to verify SSO tokens (shared with the SSO service)
     SSO_JWT_SECRET: str = "change-me-sso-jwt-secret"
 
-    # Secret used to authenticate inter-service calls to the SSO API
-    SSO_SERVICE_SECRET: str = "change-me-sso-service-secret"
+    # Secret used by services backend to authenticate to SSO API.
+    SERVICES_SSO_SERVICE_SECRET: str = "change-me-services-sso-secret"
 
     # Internal URL of the SSO backend reachable from this container
     SSO_API_URL: str = "http://sso-backend:8000"

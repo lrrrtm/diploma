@@ -22,8 +22,11 @@ class Settings(BaseSettings):
     # Secret used to verify SSO tokens (shared with the SSO service)
     SSO_JWT_SECRET: str = "change-me-sso-jwt-secret"
 
-    # Secret used to authenticate inter-service calls to the SSO API
-    SSO_SERVICE_SECRET: str = "change-me-sso-service-secret"
+    # Secret used by traffic backend to authenticate to SSO API.
+    TRAFFIC_SSO_SERVICE_SECRET: str = "change-me-traffic-sso-secret"
+
+    # Secret used by SSO integrations router to call traffic internal admin endpoints.
+    TRAFFIC_INTERNAL_SERVICE_SECRET: str = "change-me-traffic-internal-secret"
 
     # Internal URL of the SSO backend reachable from this container
     SSO_API_URL: str = "http://sso-backend:8000"

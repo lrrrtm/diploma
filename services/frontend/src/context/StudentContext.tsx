@@ -16,6 +16,10 @@ interface StudentContextValue {
 
 const StudentContext = createContext<StudentContextValue>({ student: null, isLoading: false, wasLaunchAttempted: false });
 
+interface VerifyLaunchResponse extends StudentInfo {
+  student_token: string;
+}
+
 export function StudentProvider({ children }: { children: ReactNode }) {
   const [student, setStudent] = useState<StudentInfo | null>(() => {
     const stored = sessionStorage.getItem("student");
@@ -32,6 +36,13 @@ export function StudentProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    if (!sessionStorage.getItem("student_token") && sessionStorage.getItem("student")) {
+      sessionStorage.removeItem("student");
+      setStudent(null);
+    }
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const launchToken = params.get("launch_token");
     if (!launchToken) return;
@@ -41,15 +52,21 @@ export function StudentProvider({ children }: { children: ReactNode }) {
 
     // Verify the launch token via backend
     api
-      .post("/auth/verify-launch", { token: launchToken })
+      .post<VerifyLaunchResponse>("/auth/verify-launch", { token: launchToken })
       .then((res) => {
-        const info: StudentInfo = res.data;
+        const info: StudentInfo = {
+          student_external_id: res.data.student_external_id,
+          student_name: res.data.student_name,
+          student_email: res.data.student_email,
+        };
         sessionStorage.setItem("student", JSON.stringify(info));
+        sessionStorage.setItem("student_token", res.data.student_token);
         setStudent(info);
       })
       .catch(() => {
         // Invalid or expired token — clear student context
         sessionStorage.removeItem("student");
+        sessionStorage.removeItem("student_token");
         setStudent(null);
       })
       .finally(() => {
