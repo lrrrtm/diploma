@@ -1,4 +1,11 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { isTelegramMiniApp } from "@/lib/telegram";
+import {
+  clearAllAuth,
+  clearPersistedAuth,
+  setMemoryToken,
+  shouldUseEphemeralTeacherSession,
+} from "@/lib/auth-token";
 
 type Role = "admin" | "teacher" | null;
 
@@ -28,8 +35,23 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 function loadState(): AuthState {
+  if (isTelegramMiniApp()) {
+    // Telegram mini-app always reauthenticates via initData on open.
+    clearPersistedAuth();
+    setMemoryToken(null);
+    return {
+      token: null,
+      role: null,
+      fullName: null,
+      teacherId: null,
+      teacherName: null,
+    };
+  }
+
+  const token = localStorage.getItem("traffic_token");
+  setMemoryToken(token);
   return {
-    token: localStorage.getItem("traffic_token"),
+    token,
     role: (localStorage.getItem("traffic_role") as Role) ?? null,
     fullName: localStorage.getItem("traffic_full_name"),
     teacherId: localStorage.getItem("traffic_teacher_id"),
@@ -51,14 +73,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const entityId = (payload.entity_id as string | null) ?? null;
     const fullName = (payload.full_name as string) ?? "";
     const isTeacher = role === "teacher";
+    const useEphemeral = shouldUseEphemeralTeacherSession(role);
 
-    localStorage.setItem("traffic_token", token);
-    localStorage.setItem("traffic_role", role);
-    localStorage.setItem("traffic_full_name", fullName);
-    if (isTeacher && entityId) localStorage.setItem("traffic_teacher_id", entityId);
-    else localStorage.removeItem("traffic_teacher_id");
-    if (isTeacher) localStorage.setItem("traffic_teacher_name", fullName);
-    else localStorage.removeItem("traffic_teacher_name");
+    setMemoryToken(token);
+
+    if (useEphemeral) {
+      clearPersistedAuth();
+    } else {
+      localStorage.setItem("traffic_token", token);
+      localStorage.setItem("traffic_role", role);
+      localStorage.setItem("traffic_full_name", fullName);
+      if (isTeacher && entityId) localStorage.setItem("traffic_teacher_id", entityId);
+      else localStorage.removeItem("traffic_teacher_id");
+      if (isTeacher) localStorage.setItem("traffic_teacher_name", fullName);
+      else localStorage.removeItem("traffic_teacher_name");
+    }
 
     setState({
       token,
@@ -70,11 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
-    localStorage.removeItem("traffic_token");
-    localStorage.removeItem("traffic_role");
-    localStorage.removeItem("traffic_full_name");
-    localStorage.removeItem("traffic_teacher_id");
-    localStorage.removeItem("traffic_teacher_name");
+    clearAllAuth();
     setState({ token: null, role: null, fullName: null, teacherId: null, teacherName: null });
   }
 

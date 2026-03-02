@@ -24,39 +24,46 @@ function RedirectScreen() {
 
 function RequireRole({ role: requiredRole, children }: { role: "admin" | "teacher"; children: ReactNode }) {
   const { isLoggedIn, role, login, logout } = useAuth();
+  const isTeacherMiniApp = requiredRole === "teacher" && isTelegramMiniApp();
   const [telegramAuthPending, setTelegramAuthPending] = useState(
-    requiredRole === "teacher" && isTelegramMiniApp()
+    isTeacherMiniApp && !isLoggedIn
   );
   const telegramAuthInFlightRef = useRef(false);
 
-  const runTelegramAuth = useCallback(async () => {
+  const runTelegramAuth = useCallback(async (showLoader: boolean) => {
     if (telegramAuthInFlightRef.current) return;
     telegramAuthInFlightRef.current = true;
-    setTelegramAuthPending(true);
+    if (showLoader) {
+      setTelegramAuthPending(true);
+    }
     try {
       const token = await loginTeacherViaTelegramMiniApp();
       if (token) {
         login(token);
-      } else {
+      } else if (!isLoggedIn) {
         logout();
       }
     } finally {
       telegramAuthInFlightRef.current = false;
-      setTelegramAuthPending(false);
+      if (showLoader) {
+        setTelegramAuthPending(false);
+      }
     }
-  }, [login, logout]);
+  }, [isLoggedIn, login, logout]);
 
   useEffect(() => {
-    if (requiredRole !== "teacher" || !isTelegramMiniApp()) {
+    if (!isTeacherMiniApp) {
       setTelegramAuthPending(false);
       return;
     }
 
-    void runTelegramAuth();
+    // Initial auth for mini-app (loader only if we don't have any session yet).
+    void runTelegramAuth(!isLoggedIn);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void runTelegramAuth();
+        // Background re-auth to refresh identity mapping without UI flicker.
+        void runTelegramAuth(false);
       }
     };
 
@@ -66,12 +73,15 @@ function RequireRole({ role: requiredRole, children }: { role: "admin" | "teache
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [requiredRole, runTelegramAuth]);
+  }, [isTeacherMiniApp, isLoggedIn, runTelegramAuth]);
 
   useEffect(() => {
     if (telegramAuthPending) return;
 
     if (!isLoggedIn) {
+      if (isTeacherMiniApp) {
+        return;
+      }
       goToSSOLogin();
       return;
     }
@@ -81,7 +91,7 @@ function RequireRole({ role: requiredRole, children }: { role: "admin" | "teache
       else if (role === "teacher") window.location.replace("/teacher/session");
       else goToSSOLogin();
     }
-  }, [isLoggedIn, role, requiredRole, telegramAuthPending]);
+  }, [isLoggedIn, role, requiredRole, telegramAuthPending, isTeacherMiniApp]);
 
   if (telegramAuthPending) return <RedirectScreen />;
   if (!isLoggedIn || role !== requiredRole) return <RedirectScreen />;
