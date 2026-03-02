@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Eye, EyeOff, Link2, Plus, QrCode, RefreshCw, Trash2, Unlink, Users } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -37,11 +37,27 @@ import {
 } from "@/components/ui/input-group";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import api from "@/api/client";
-import { useAdminData } from "@/context/AdminDataContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
 type LoginStatus = "idle" | "checking" | "available" | "taken" | "error";
+
+interface Teacher {
+  id: string;
+  username: string | null;
+  sso_user_id: string | null;
+  telegram_linked: boolean;
+  full_name: string;
+  created_at: string | null;
+}
+
+interface TeachersPageResponse {
+  items: Teacher[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
 
 const TRANS: Record<string, string> = {
   а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i",
@@ -83,10 +99,14 @@ function buildPaginationItems(currentPage: number, totalPages: number): Array<nu
 }
 
 export default function AdminTeachersPage() {
-  const { teachers, refresh } = useAdminData();
   const isMobile = useIsMobile();
+  const pageSize = isMobile ? 8 : 12;
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [teachers, setTeachers] = useState<Teacher[] | null>(null);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [pendingUnlinkTelegramId, setPendingUnlinkTelegramId] = useState<string | null>(null);
@@ -106,6 +126,37 @@ export default function AdminTeachersPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const usernameRequestIdRef = useRef(0);
+  const teachersRequestIdRef = useRef(0);
+
+  const loadTeachers = useCallback(async () => {
+    const requestId = ++teachersRequestIdRef.current;
+    setLoading(true);
+    try {
+      const response = await api.get<TeachersPageResponse>("/teachers/", {
+        params: {
+          page: currentPage,
+          page_size: pageSize,
+          search: debouncedSearch || undefined,
+        },
+      });
+      if (requestId !== teachersRequestIdRef.current) return;
+      setTeachers(response.data.items);
+      setTotalItems(response.data.total);
+      const nextTotalPages = Math.max(1, response.data.total_pages);
+      if (currentPage > nextTotalPages) {
+        setCurrentPage(nextTotalPages);
+      }
+    } catch {
+      if (requestId !== teachersRequestIdRef.current) return;
+      toast.error("Не удалось загрузить преподавателей");
+      setTeachers([]);
+      setTotalItems(0);
+    } finally {
+      if (requestId === teachersRequestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [currentPage, pageSize, debouncedSearch]);
 
   function resetDialogState() {
     setFullName("");
@@ -124,7 +175,7 @@ export default function AdminTeachersPage() {
     try {
       await api.delete(`/teachers/${pendingDeleteId}`);
       toast.success("Преподаватель удалён");
-      refresh();
+      await loadTeachers();
     } catch {
       toast.error("Не удалось удалить преподавателя");
     } finally {
@@ -137,7 +188,7 @@ export default function AdminTeachersPage() {
     try {
       await api.delete(`/teachers/${pendingUnlinkTelegramId}/telegram-link`);
       toast.success("Telegram успешно отвязан");
-      refresh();
+      await loadTeachers();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(detail ?? "Не удалось отвязать Telegram");
@@ -221,30 +272,23 @@ export default function AdminTeachersPage() {
     loginStatus === "available" &&
     !saving;
 
-  const pageSize = isMobile ? 8 : 12;
-  const filteredTeachers = useMemo(() => {
-    if (!teachers) return [];
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return teachers;
-    return teachers.filter((teacher) => {
-      const haystack = `${teacher.full_name} ${teacher.username ?? ""}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [teachers, searchQuery]);
-  const totalItems = filteredTeachers.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const paginationItems = buildPaginationItems(currentPage, totalPages);
-  const paginatedTeachers = filteredTeachers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
   useEffect(() => {
-    if (teachers === null) return;
-    const nextTotalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    setCurrentPage((prev) => Math.min(prev, nextTotalPages));
-  }, [teachers, pageSize, totalItems]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    void loadTeachers();
+  }, [loadTeachers]);
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
 
   async function handleCreateTeacher(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -262,7 +306,7 @@ export default function AdminTeachersPage() {
       toast.success("Преподаватель создан");
       setAddDialogOpen(false);
       resetDialogState();
-      refresh();
+      await loadTeachers();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setFormError(detail ?? "Не удалось создать преподавателя");
@@ -276,8 +320,8 @@ export default function AdminTeachersPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Преподаватели</h1>
         <div className="flex gap-1">
-          <Button size="icon" variant="ghost" onClick={refresh} title="Обновить">
-            <RefreshCw className="h-4 w-4" />
+          <Button size="icon" variant="ghost" onClick={() => void loadTeachers()} title="Обновить" disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button
             size="icon"
@@ -292,6 +336,16 @@ export default function AdminTeachersPage() {
         </div>
       </div>
 
+      {teachers !== null && (
+        <div className="mb-3">
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Поиск преподавателя или логина..."
+          />
+        </div>
+      )}
+
       {teachers === null ? (
         <div className="rounded-lg border bg-card p-3 space-y-2">
           {Array.from({ length: 4 }).map((_, index) => (
@@ -301,165 +355,153 @@ export default function AdminTeachersPage() {
       ) : teachers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2">
           <Users className="h-10 w-10 text-muted-foreground" />
-          <p className="text-muted-foreground text-sm">Нет преподавателей</p>
-          <p className="text-xs text-muted-foreground">Нажмите +, чтобы добавить преподавателя</p>
+          <p className="text-muted-foreground text-sm">
+            {debouncedSearch ? "По вашему запросу ничего не найдено" : "Нет преподавателей"}
+          </p>
+          {!debouncedSearch && (
+            <p className="text-xs text-muted-foreground">Нажмите +, чтобы добавить преподавателя</p>
+          )}
         </div>
       ) : (
         <>
-          <div className="mb-3">
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Поиск преподавателя или логина..."
-            />
+          <div className="rounded-lg border bg-card overflow-hidden">
+            <Table>
+              <TableHeader className={isMobile ? "sr-only" : undefined}>
+                <TableRow>
+                  <TableHead className="w-[42%]">Преподаватель</TableHead>
+                  <TableHead className="w-[30%]">Логин</TableHead>
+                  <TableHead className="w-[14%] text-center">Telegram</TableHead>
+                  <TableHead className="w-[14%] text-right">Действия</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teachers.map((teacher) => (
+                  <TableRow
+                    key={teacher.id}
+                    className={isMobile ? "block px-3 py-2 border-b last:border-b-0" : undefined}
+                  >
+                    <TableCell
+                      className={
+                        isMobile
+                          ? "flex items-center justify-between gap-3 px-0 py-1"
+                          : "font-medium"
+                      }
+                    >
+                      {isMobile && <span className="text-xs text-muted-foreground">Преподаватель</span>}
+                      <span className="text-right sm:text-left">{teacher.full_name}</span>
+                    </TableCell>
+                    <TableCell
+                      className={
+                        isMobile
+                          ? "flex items-center justify-between gap-3 px-0 py-1"
+                          : "font-mono text-xs"
+                      }
+                    >
+                      {isMobile && <span className="text-xs text-muted-foreground">Логин</span>}
+                      <span className="text-right sm:text-left break-all">
+                        {teacher.username ?? "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell
+                      className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "text-center"}
+                    >
+                      {isMobile && <span className="text-xs text-muted-foreground">Telegram</span>}
+                      <span
+                        className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                          teacher.telegram_linked ? "bg-emerald-500" : "bg-destructive"
+                        }`}
+                        title={teacher.telegram_linked ? "Привязан" : "Не привязан"}
+                      />
+                    </TableCell>
+                    <TableCell
+                      className={isMobile ? "flex justify-end px-0 pt-2 pb-1" : "text-right"}
+                    >
+                      <div className="inline-flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-primary"
+                          onClick={() => openTelegramLinkDialog(teacher.id, teacher.full_name)}
+                          title="QR для привязки Telegram"
+                          aria-label={`Показать QR для привязки Telegram ${teacher.full_name}`}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-amber-500"
+                          onClick={() => setPendingUnlinkTelegramId(teacher.id)}
+                          title="Отвязать Telegram"
+                          aria-label={`Отвязать Telegram у преподавателя ${teacher.full_name}`}
+                          disabled={!teacher.telegram_linked}
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => setPendingDeleteId(teacher.id)}
+                          title="Удалить преподавателя"
+                          aria-label={`Удалить преподавателя ${teacher.full_name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-
-          {filteredTeachers.length === 0 ? (
-            <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-              По вашему запросу ничего не найдено
-            </div>
-          ) : (
-            <>
-              <div className="rounded-lg border bg-card overflow-hidden">
-                <Table>
-                  <TableHeader className={isMobile ? "sr-only" : undefined}>
-                    <TableRow>
-                      <TableHead className="w-[42%]">Преподаватель</TableHead>
-                      <TableHead className="w-[30%]">Логин</TableHead>
-                      <TableHead className="w-[14%] text-center">Telegram</TableHead>
-                      <TableHead className="w-[14%] text-right">Действия</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedTeachers.map((teacher) => (
-                      <TableRow
-                        key={teacher.id}
-                        className={isMobile ? "block px-3 py-2 border-b last:border-b-0" : undefined}
+          <div className="flex flex-col gap-2 mt-3">
+            <p className="text-xs text-muted-foreground text-center sm:text-left">
+              Показаны {teachers.length} из {totalItems}
+            </p>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage((prev) => Math.max(1, prev - 1));
+                    }}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                  />
+                </PaginationItem>
+                {paginationItems.map((item, index) => (
+                  <PaginationItem key={`${item}-${index}`}>
+                    {typeof item === "number" ? (
+                      <PaginationLink
+                        href="#"
+                        isActive={item === currentPage}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setCurrentPage(item);
+                        }}
                       >
-                        <TableCell
-                          className={
-                            isMobile
-                              ? "flex items-center justify-between gap-3 px-0 py-1"
-                              : "font-medium"
-                          }
-                        >
-                          {isMobile && <span className="text-xs text-muted-foreground">Преподаватель</span>}
-                          <span className="text-right sm:text-left">{teacher.full_name}</span>
-                        </TableCell>
-                        <TableCell
-                          className={
-                            isMobile
-                              ? "flex items-center justify-between gap-3 px-0 py-1"
-                              : "font-mono text-xs"
-                          }
-                        >
-                          {isMobile && <span className="text-xs text-muted-foreground">Логин</span>}
-                          <span className="text-right sm:text-left break-all">
-                            {teacher.username ?? "—"}
-                          </span>
-                        </TableCell>
-                        <TableCell
-                          className={isMobile ? "flex items-center justify-between gap-3 px-0 py-1" : "text-center"}
-                        >
-                          {isMobile && <span className="text-xs text-muted-foreground">Telegram</span>}
-                          <span
-                            className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                              teacher.telegram_linked ? "bg-emerald-500" : "bg-destructive"
-                            }`}
-                            title={teacher.telegram_linked ? "Привязан" : "Не привязан"}
-                          />
-                        </TableCell>
-                        <TableCell
-                          className={isMobile ? "flex justify-end px-0 pt-2 pb-1" : "text-right"}
-                        >
-                          <div className="inline-flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-primary"
-                              onClick={() => openTelegramLinkDialog(teacher.id, teacher.full_name)}
-                              title="QR для привязки Telegram"
-                              aria-label={`Показать QR для привязки Telegram ${teacher.full_name}`}
-                            >
-                              <QrCode className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-amber-500"
-                              onClick={() => setPendingUnlinkTelegramId(teacher.id)}
-                              title="Отвязать Telegram"
-                              aria-label={`Отвязать Telegram у преподавателя ${teacher.full_name}`}
-                              disabled={!teacher.telegram_linked}
-                            >
-                              <Unlink className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-destructive"
-                              onClick={() => setPendingDeleteId(teacher.id)}
-                              title="Удалить преподавателя"
-                              aria-label={`Удалить преподавателя ${teacher.full_name}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="flex flex-col gap-2 mt-3">
-                <p className="text-xs text-muted-foreground text-center sm:text-left">
-                  Показаны {paginatedTeachers.length} из {totalItems}
-                </p>
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          setCurrentPage((prev) => Math.max(1, prev - 1));
-                        }}
-                        className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
-                      />
-                    </PaginationItem>
-                    {paginationItems.map((item, index) => (
-                      <PaginationItem key={`${item}-${index}`}>
-                        {typeof item === "number" ? (
-                          <PaginationLink
-                            href="#"
-                            isActive={item === currentPage}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              setCurrentPage(item);
-                            }}
-                          >
-                            {item}
-                          </PaginationLink>
-                        ) : (
-                          <PaginationEllipsis />
-                        )}
-                      </PaginationItem>
-                    ))}
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-                        }}
-                        className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            </>
-          )}
+                        {item}
+                      </PaginationLink>
+                    ) : (
+                      <PaginationEllipsis />
+                    )}
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                    }}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </>
       )}
 

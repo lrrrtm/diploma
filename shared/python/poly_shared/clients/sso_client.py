@@ -67,11 +67,32 @@ class SSOClient:
             )
         return bool(response.json().get("available", False))
 
-    def list_users(self, app_filter: str) -> list[dict[str, Any]]:
+    def list_users(
+        self,
+        app_filter: str,
+        *,
+        role_filter: str | None = None,
+        search: str | None = None,
+        entity_ids: list[str] | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"app_filter": app_filter}
+        if role_filter:
+            params["role_filter"] = role_filter
+        if search:
+            params["search"] = search
+        if entity_ids:
+            params["entity_ids"] = ",".join(entity_ids)
+        if page is not None:
+            params["page"] = page
+        if page_size is not None:
+            params["page_size"] = page_size
+
         response = self._request(
             "GET",
             "/api/users/",
-            params={"app_filter": app_filter},
+            params=params,
         )
         if response.status_code != 200:
             raise UpstreamRejected(
@@ -89,6 +110,14 @@ class SSOClient:
                 message="invalid json in users list response",
                 detail="Некорректный ответ SSO",
             )
+        if isinstance(data, list):
+            return data
+
+        if isinstance(data, dict):
+            items = data.get("items")
+            if isinstance(items, list):
+                return items
+
         if not isinstance(data, list):
             raise UpstreamRejected(
                 service="sso",

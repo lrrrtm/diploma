@@ -1,8 +1,9 @@
 import uuid
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DBSession
 
 from app.config import settings
@@ -48,13 +49,26 @@ def _sso_check_username(username: str) -> bool:
         raise HTTPException(status_code=400, detail=exc.detail or "Ошибка проверки логина в SSO")
 
 
-def _sso_fetch_teacher_users(*, strict: bool = False) -> dict[str, dict]:
+def _sso_fetch_teacher_users(
+    *,
+    strict: bool = False,
+    entity_ids: list[str] | None = None,
+    search: str | None = None,
+) -> dict[str, dict]:
+    if entity_ids is not None and len(entity_ids) == 0:
+        return {}
+
     client = SSOClient(
         base_url=settings.SSO_API_URL,
         service_secret=settings.SSO_SERVICE_SECRET,
     )
     try:
-        users = client.list_users(app_filter="traffic")
+        users = client.list_users(
+            app_filter="traffic",
+            role_filter="teacher",
+            entity_ids=entity_ids,
+            search=search,
+        )
     except (UpstreamUnavailable, UpstreamRejected) as exc:
         if strict:
             if isinstance(exc, UpstreamUnavailable):
@@ -65,8 +79,6 @@ def _sso_fetch_teacher_users(*, strict: bool = False) -> dict[str, dict]:
 
     users_by_entity: dict[str, dict] = {}
     for user in users:
-        if user.get("role") != "teacher":
-            continue
         entity_id = user.get("entity_id")
         username = user.get("username")
         sso_user_id = user.get("id")
@@ -127,10 +139,49 @@ def _sso_unlink_telegram(sso_user_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 @router.get("/")
-def list_teachers(db: DBSession = Depends(get_db), _: dict = Depends(require_admin)):
-    teachers = db.query(Teacher).order_by(Teacher.created_at).all()
-    users_by_entity = _sso_fetch_teacher_users()
-    return [_serialize(t, users_by_entity.get(t.id)) for t in teachers]
+def list_teachers(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
+    search: str | None = None,
+    db: DBSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    teachers_query = db.query(Teacher)
+
+    normalized_search = search.strip().lower() if isinstance(search, str) else ""
+    if normalized_search:
+        pattern = f"%{normalized_search}%"
+        sso_matches = _sso_fetch_teacher_users(search=normalized_search)
+        matched_entity_ids = list(sso_matches.keys())
+        if matched_entity_ids:
+            teachers_query = teachers_query.filter(
+                or_(
+                    func.lower(Teacher.full_name).like(pattern),
+                    Teacher.id.in_(matched_entity_ids),
+                )
+            )
+        else:
+            teachers_query = teachers_query.filter(func.lower(Teacher.full_name).like(pattern))
+
+    total = teachers_query.count()
+    teachers = (
+        teachers_query
+        .order_by(Teacher.created_at, Teacher.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    entity_ids = [teacher.id for teacher in teachers]
+    users_by_entity = _sso_fetch_teacher_users(entity_ids=entity_ids)
+
+    return {
+        "items": [_serialize(t, users_by_entity.get(t.id)) for t in teachers],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": max(1, (total + page_size - 1) // page_size),
+    }
 
 
 @router.get("/check-username")
@@ -152,7 +203,7 @@ def get_telegram_register_link(
     if not settings.TELEGRAM_BOT_USERNAME:
         raise HTTPException(status_code=400, detail="TELEGRAM_BOT_USERNAME не настроен")
 
-    users_by_entity = _sso_fetch_teacher_users()
+    users_by_entity = _sso_fetch_teacher_users(entity_ids=[teacher_id])
     user_info = users_by_entity.get(teacher_id)
     if not user_info or not user_info.get("sso_user_id"):
         raise HTTPException(status_code=404, detail="Учётка преподавателя в SSO не найдена")
@@ -209,7 +260,7 @@ def unlink_teacher_telegram(
     if not teacher:
         raise HTTPException(status_code=404, detail="Преподаватель не найден")
 
-    users_by_entity = _sso_fetch_teacher_users(strict=True)
+    users_by_entity = _sso_fetch_teacher_users(strict=True, entity_ids=[teacher_id])
     user_info = users_by_entity.get(teacher_id)
     sso_user_id = user_info.get("sso_user_id") if isinstance(user_info, dict) else None
     if not isinstance(sso_user_id, str):

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, ChevronsUpDown, Check, AlertCircle, ClipboardList, Star, GraduationCap, Clock, Layers } from "lucide-react";
+import { Pi, CalendarDays, BookOpen, FileText, User, QrCode, ChevronLeft, ChevronRight, Sun, Moon, Monitor, AlertCircle, ClipboardList, Star, GraduationCap, Clock, Layers } from "lucide-react";
 import { fetchMe, fetchMiniApps, fetchLaunchToken, fetchResolveGroup, fetchSchedule, fetchGradebook } from "./api";
 import type { MiniApp, Student, WeekSchedule, DaySchedule, GradeEntry, GradebookResponse } from "./types";
 import LoginPage from "./DevLoginPage";
@@ -13,7 +13,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
@@ -117,22 +116,33 @@ function ServicesSheet({
   app,
   open,
   onClose,
+  theme,
 }: {
   app: MiniApp | undefined;
   open: boolean;
   onClose: () => void;
+  theme: Theme;
 }) {
   const [href, setHref] = useState<string | null>(null);
   const [loaded, onLoad] = useIframeLoader(open);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     if (!open || !app) return;
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
-      setHref(`${app.url}?launch_token=${encodeURIComponent(launchToken)}`);
+      const iframeUrl = new URL(app.url, window.location.origin);
+      iframeUrl.searchParams.set("launch_token", launchToken);
+      iframeUrl.searchParams.set("theme", theme);
+      setHref(iframeUrl.toString());
     });
-  }, [open, app]);
+  }, [open, app, theme]);
+
+  useEffect(() => {
+    if (!open || !iframeRef.current?.contentWindow) return;
+    iframeRef.current.contentWindow.postMessage({ type: "poly:set-theme", theme }, "*");
+  }, [theme, open, href]);
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -141,10 +151,14 @@ function ServicesSheet({
         <div className="relative flex-1 min-h-0">
           {href && (
             <iframe
+              ref={iframeRef}
               src={href}
               className="absolute inset-0 w-full h-full border-0"
               title="Заявки"
-              onLoad={onLoad}
+              onLoad={() => {
+                onLoad();
+                iframeRef.current?.contentWindow?.postMessage({ type: "poly:set-theme", theme }, "*");
+              }}
             />
           )}
           <IframeLoadOverlay app={app} loaded={loaded} />
@@ -162,22 +176,34 @@ function TrafficSheet({
   app,
   open,
   onClose,
+  theme,
 }: {
   app: MiniApp | undefined;
   open: boolean;
   onClose: () => void;
+  theme: Theme;
 }) {
   const [href, setHref] = useState<string | null>(null);
   const [loaded, onLoad] = useIframeLoader(open);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     if (!open || !app) return;
     const token = localStorage.getItem("token");
     if (!token) return;
     fetchLaunchToken(token).then((launchToken) => {
-      setHref(`${app.url}/scan?launch_token=${encodeURIComponent(launchToken)}`);
+      const trafficBase = app.url.replace(/\/+$/, "");
+      const iframeUrl = new URL(`${trafficBase}/scan`, window.location.origin);
+      iframeUrl.searchParams.set("launch_token", launchToken);
+      iframeUrl.searchParams.set("theme", theme);
+      setHref(iframeUrl.toString());
     });
-  }, [open, app]);
+  }, [open, app, theme]);
+
+  useEffect(() => {
+    if (!open || !iframeRef.current?.contentWindow) return;
+    iframeRef.current.contentWindow.postMessage({ type: "poly:set-theme", theme }, "*");
+  }, [theme, open, href]);
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -186,55 +212,21 @@ function TrafficSheet({
         <div className="relative flex-1 min-h-0">
           {href && (
             <iframe
+              ref={iframeRef}
               src={href}
               allow="camera"
               className="absolute inset-0 w-full h-full border-0"
               title="Посещаемость"
-              onLoad={onLoad}
+              onLoad={() => {
+                onLoad();
+                iframeRef.current?.contentWindow?.postMessage({ type: "poly:set-theme", theme }, "*");
+              }}
             />
           )}
           <IframeLoadOverlay app={app} loaded={loaded} />
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Mini-app card (Home tab)
-// ---------------------------------------------------------------------------
-
-function MiniAppCard({ app }: { app: MiniApp }) {
-  const handleClick = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    try {
-      const launchToken = await fetchLaunchToken(token);
-      window.open(`${app.url}?launch_token=${encodeURIComponent(launchToken)}`, "_blank");
-    } catch {
-      // silently ignore — user can tap again
-    }
-  };
-
-  return (
-    <Card
-      className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all duration-200"
-      onClick={handleClick}
-    >
-      <CardContent className="p-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <FileText className="h-5 w-5 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground truncate">{app.name}</p>
-            {app.description && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{app.description}</p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -789,12 +781,10 @@ function GradebookTab({ student }: { student: Student }) {
 
 function HomeTab({
   student,
-  miniapps,
   onScan,
   onProfile,
 }: {
   student: Student;
-  miniapps: MiniApp[];
   onScan: () => void;
   onProfile: () => void;
 }) {
@@ -834,16 +824,6 @@ function HomeTab({
           </Button>
         </div>
       </div>
-
-      {miniapps.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Сервисы недоступны</p>
-      ) : (
-        <div className="space-y-3">
-          {miniapps.map((app) => (
-            <MiniAppCard key={app.id} app={app} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -854,50 +834,27 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: React.ElementType }[] 
   { value: "system", label: "Системная", icon: Monitor },
 ];
 
-function ThemeCombobox() {
+function ThemeSwitch() {
   const { theme, setTheme } = useTheme();
-  const [open, setOpen] = useState(false);
-  const current = THEME_OPTIONS.find((o) => o.value === theme)!;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
+    <div className="flex gap-1 p-1 bg-muted rounded-lg">
+      {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+        <button
+          key={value}
+          onClick={() => setTheme(value)}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+            theme === value
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
         >
-          <span className="flex items-center gap-2">
-            <current.icon className="h-4 w-4" />
-            {current.label}
-          </span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandList>
-            <CommandGroup>
-              {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
-                <CommandItem
-                  key={value}
-                  value={value}
-                  onSelect={() => {
-                    setTheme(value);
-                    setOpen(false);
-                  }}
-                >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {label}
-                  <Check className={cn("ml-auto h-4 w-4", theme === value ? "opacity-100" : "opacity-0")} />
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+          <Icon className="h-4 w-4" />
+          <span className="hidden sm:inline">{label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -942,7 +899,7 @@ function ProfileSheet({ student, open, onClose }: { student: Student; open: bool
 
           <div className="mt-6">
             <p className="text-sm font-medium text-foreground mb-2">Тема оформления</p>
-            <ThemeCombobox />
+            <ThemeSwitch />
           </div>
 
           <Button
@@ -973,6 +930,7 @@ export default function App() {
 }
 
 function HomePage() {
+  const { theme } = useTheme();
   const [student, setStudent] = useState<Student | null>(null);
   const [miniapps, setMiniApps] = useState<MiniApp[]>([]);
   const [tab, setTab] = useState<Tab>("home");
@@ -1073,7 +1031,7 @@ function HomePage() {
   return (
     <div className="h-screen overflow-hidden bg-background">
       <div className={`h-full ${tab === "schedule" || tab === "gradebook" ? "overflow-hidden" : "overflow-y-auto pb-20"}`}>
-        {tab === "home"      && <HomeTab student={student} miniapps={miniapps} onScan={() => setTrafficOpen(true)} onProfile={() => setProfileOpen(true)} />}
+        {tab === "home"      && <HomeTab student={student} onScan={() => setTrafficOpen(true)} onProfile={() => setProfileOpen(true)} />}
         {tab === "schedule"  && <ScheduleTab student={student} />}
         {tab === "gradebook" && <GradebookTab student={student} />}
       </div>
@@ -1085,11 +1043,13 @@ function HomePage() {
         app={servicesApp}
         open={servicesOpen}
         onClose={() => setServicesOpen(false)}
+        theme={theme}
       />
       <TrafficSheet
         app={trafficApp}
         open={trafficOpen}
         onClose={() => setTrafficOpen(false)}
+        theme={theme}
       />
     </div>
   );

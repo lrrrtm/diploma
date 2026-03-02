@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, RefreshCw, Trash2, Users, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,14 @@ interface SSOUser {
   entity_id: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+interface SSOUsersPageResponse {
+  items: SSOUser[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
 
 interface TeacherSyncFailedSampleItem {
@@ -152,6 +160,9 @@ export default function AdminPage() {
 
   const [users, setUsers] = useState<SSOUser[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SSOUser | null>(null);
   const [creating, setCreating] = useState(false);
@@ -166,16 +177,38 @@ export default function AdminPage() {
   const [syncStatus, setSyncStatus] = useState<TeacherSyncStatus | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncStarting, setSyncStarting] = useState(false);
+  const usersRequestIdRef = useRef(0);
+  const pageSize = isMobile ? 8 : 12;
 
-  const loadUsers = () => {
-    api
-      .get<SSOUser[]>("/users/")
-      .then((r) => setUsers(r.data))
-      .catch(() => {
-        toast.error("Не удалось загрузить пользователей");
-        setUsers([]);
+  const loadUsers = useCallback(async () => {
+    const requestId = ++usersRequestIdRef.current;
+    setUsersLoading(true);
+    try {
+      const response = await api.get<SSOUsersPageResponse>("/users/", {
+        params: {
+          page: currentPage,
+          page_size: pageSize,
+          search: debouncedSearch || undefined,
+        },
       });
-  };
+      if (requestId !== usersRequestIdRef.current) return;
+      setUsers(response.data.items);
+      setTotalUsers(response.data.total);
+      const nextTotalPages = Math.max(1, response.data.total_pages);
+      if (currentPage > nextTotalPages) {
+        setCurrentPage(nextTotalPages);
+      }
+    } catch {
+      if (requestId !== usersRequestIdRef.current) return;
+      toast.error("Не удалось загрузить пользователей");
+      setUsers([]);
+      setTotalUsers(0);
+    } finally {
+      if (requestId === usersRequestIdRef.current) {
+        setUsersLoading(false);
+      }
+    }
+  }, [currentPage, pageSize, debouncedSearch]);
 
   const loadSyncStatus = async (silent = false) => {
     setSyncLoading(true);
@@ -212,9 +245,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isLoggedIn) { navigate("/"); return; }
-    loadUsers();
     void loadSyncStatus(true);
   }, [isLoggedIn, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    void loadUsers();
+  }, [isLoggedIn, loadUsers]);
 
   useEffect(() => {
     if (!syncStatus?.running) return;
@@ -224,30 +261,19 @@ export default function AdminPage() {
     return () => clearInterval(timer);
   }, [syncStatus?.running]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pageSize = isMobile ? 8 : 12;
-  const filteredUsers = useMemo(() => {
-    if (!users) return [];
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return users;
-    return users.filter((user) => {
-      const haystack = `${user.full_name} ${user.username} ${APP_LABELS[user.app] ?? user.app} ${ROLE_LABELS[user.role] ?? user.role}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [users, searchQuery]);
-  const totalUsers = filteredUsers.length;
-  const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
-  const paginationItems = buildPaginationItems(currentPage, totalPages);
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
   useEffect(() => {
-    if (users === null) return;
-    const nextTotalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
-    setCurrentPage((prev) => Math.min(prev, nextTotalPages));
-  }, [users, pageSize, totalUsers]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [debouncedSearch]);
+
+  const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
 
   // Auto-generate and check username whenever fullName changes (unless manually overridden)
   useEffect(() => {
@@ -308,8 +334,7 @@ export default function AdminPage() {
       toast.success("Администратор создан");
       setCreateOpen(false);
       resetCreateForm();
-      setUsers(null);
-      loadUsers();
+      await loadUsers();
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
@@ -326,7 +351,7 @@ export default function AdminPage() {
       await api.delete(`/users/${deleteTarget.id}`);
       toast.success("Пользователь удалён");
       setDeleteTarget(null);
-      setUsers((prev) => prev?.filter((u) => u.id !== deleteTarget.id) ?? null);
+      await loadUsers();
     } catch {
       toast.error("Не удалось удалить пользователя");
     }
@@ -342,12 +367,13 @@ export default function AdminPage() {
             size="icon"
             variant="ghost"
             onClick={() => {
-              loadUsers();
+              void loadUsers();
               void loadSyncStatus();
             }}
             title="Обновить"
+            disabled={usersLoading || syncLoading}
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${usersLoading || syncLoading ? "animate-spin" : ""}`} />
           </Button>
           <Button size="icon" onClick={() => setCreateOpen(true)} title="Добавить администратора">
             <Plus className="h-4 w-4" />
@@ -412,6 +438,16 @@ export default function AdminPage() {
         )}
       </div>
 
+      {users !== null && (
+        <div className="mb-3">
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Поиск пользователя..."
+          />
+        </div>
+      )}
+
       {users === null ? (
         <div className="rounded-lg border bg-card p-3 space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -421,118 +457,106 @@ export default function AdminPage() {
       ) : users.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2">
           <Users className="h-10 w-10 text-muted-foreground" />
-          <p className="text-muted-foreground text-sm">Нет пользователей</p>
-          <p className="text-xs text-muted-foreground">Нажмите +, чтобы добавить администратора</p>
+          <p className="text-muted-foreground text-sm">
+            {debouncedSearch ? "По вашему запросу ничего не найдено" : "Нет пользователей"}
+          </p>
+          {!debouncedSearch && (
+            <p className="text-xs text-muted-foreground">Нажмите +, чтобы добавить администратора</p>
+          )}
         </div>
       ) : (
         <>
-          <div className="mb-3">
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Поиск пользователя..."
-            />
+          <div className="rounded-lg border bg-card overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Пользователь</TableHead>
+                  <TableHead>Приложение</TableHead>
+                  <TableHead>Роль</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.id} className={!u.is_active ? "opacity-50" : ""}>
+                    <TableCell>
+                      <p className="text-sm font-medium">{u.full_name}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{u.username}</p>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${APP_BADGE_CLASS[u.app] ?? ""}`}
+                      >
+                        {APP_LABELS[u.app] ?? u.app}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {ROLE_LABELS[u.role] ?? u.role}
+                    </TableCell>
+                    <TableCell>
+                      {!(u.app === "sso" && u.role === "admin") && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(u)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-
-          {filteredUsers.length === 0 ? (
-            <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-              По вашему запросу ничего не найдено
-            </div>
-          ) : (
-            <>
-              <div className="rounded-lg border bg-card overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Пользователь</TableHead>
-                      <TableHead>Приложение</TableHead>
-                      <TableHead>Роль</TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedUsers.map((u) => (
-                      <TableRow key={u.id} className={!u.is_active ? "opacity-50" : ""}>
-                        <TableCell>
-                          <p className="text-sm font-medium">{u.full_name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{u.username}</p>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${APP_BADGE_CLASS[u.app] ?? ""}`}
-                          >
-                            {APP_LABELS[u.app] ?? u.app}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {ROLE_LABELS[u.role] ?? u.role}
-                        </TableCell>
-                        <TableCell>
-                          {!(u.app === "sso" && u.role === "admin") && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteTarget(u)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="flex flex-col gap-2 mt-3">
-                <p className="text-xs text-muted-foreground text-center sm:text-left">
-                  Показаны {paginatedUsers.length} из {totalUsers}
-                </p>
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
+          <div className="flex flex-col gap-2 mt-3">
+            <p className="text-xs text-muted-foreground text-center sm:text-left">
+              Показаны {users.length} из {totalUsers}
+            </p>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage((prev) => Math.max(1, prev - 1));
+                    }}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
+                  />
+                </PaginationItem>
+                {paginationItems.map((item, index) => (
+                  <PaginationItem key={`${item}-${index}`}>
+                    {typeof item === "number" ? (
+                      <PaginationLink
                         href="#"
+                        isActive={item === currentPage}
                         onClick={(event) => {
                           event.preventDefault();
-                          setCurrentPage((prev) => Math.max(1, prev - 1));
+                          setCurrentPage(item);
                         }}
-                        className={currentPage <= 1 ? "pointer-events-none opacity-50" : undefined}
-                      />
-                    </PaginationItem>
-                    {paginationItems.map((item, index) => (
-                      <PaginationItem key={`${item}-${index}`}>
-                        {typeof item === "number" ? (
-                          <PaginationLink
-                            href="#"
-                            isActive={item === currentPage}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              setCurrentPage(item);
-                            }}
-                          >
-                            {item}
-                          </PaginationLink>
-                        ) : (
-                          <PaginationEllipsis />
-                        )}
-                      </PaginationItem>
-                    ))}
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-                        }}
-                        className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            </>
-          )}
+                      >
+                        {item}
+                      </PaginationLink>
+                    ) : (
+                      <PaginationEllipsis />
+                    )}
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                    }}
+                    className={currentPage >= totalPages ? "pointer-events-none opacity-50" : undefined}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </>
       )}
 

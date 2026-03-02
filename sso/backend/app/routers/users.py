@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DBSession, joinedload
 
 from app.config import settings
@@ -94,16 +95,59 @@ def check_username(
 @router.get("/")
 def list_users(
     app_filter: str | None = None,
+    role_filter: str | None = None,
+    search: str | None = None,
+    entity_ids: str | None = None,
+    page: int | None = Query(default=None, ge=1),
+    page_size: int | None = Query(default=None, ge=1, le=500),
     caller: str = Depends(_require_sso_admin_or_service),
     db: DBSession = Depends(get_db),
 ):
     if caller == "service" and not app_filter:
         raise HTTPException(status_code=400, detail="Для service-запроса требуется app_filter")
+
     q = db.query(User).options(joinedload(User.telegram_link))
+
     if app_filter:
         q = q.filter(User.app == app_filter)
-    users = q.order_by(User.app, User.role, User.created_at).all()
-    return [_serialize(u) for u in users]
+    if role_filter:
+        q = q.filter(User.role == role_filter)
+    if entity_ids:
+        values = [value.strip() for value in entity_ids.split(",") if value.strip()]
+        if values:
+            q = q.filter(User.entity_id.in_(values))
+    normalized_search = search.strip().lower() if isinstance(search, str) else ""
+    if normalized_search:
+        pattern = f"%{normalized_search}%"
+        q = q.filter(
+            or_(
+                func.lower(User.full_name).like(pattern),
+                func.lower(User.username).like(pattern),
+            )
+        )
+
+    q = q.order_by(User.app, User.role, User.created_at, User.id)
+
+    use_pagination = page is not None or page_size is not None
+    if not use_pagination:
+        users = q.all()
+        return [_serialize(u) for u in users]
+
+    resolved_page = page or 1
+    resolved_page_size = page_size or 20
+    total = q.count()
+    users = (
+        q.offset((resolved_page - 1) * resolved_page_size)
+        .limit(resolved_page_size)
+        .all()
+    )
+    return {
+        "items": [_serialize(u) for u in users],
+        "total": total,
+        "page": resolved_page,
+        "page_size": resolved_page_size,
+        "total_pages": max(1, (total + resolved_page_size - 1) // resolved_page_size),
+    }
 
 
 @router.get("/by-telegram/{telegram_id}")
