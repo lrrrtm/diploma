@@ -42,8 +42,14 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(() => {
     setTablets(null);
     setTeachers(null);
-    api.get<Tablet[]>("/tablets/").then((r) => setTablets(r.data)).catch(() => setTablets([]));
-    api.get<Teacher[]>("/teachers/").then((r) => setTeachers(r.data)).catch(() => setTeachers([]));
+    // Minimum 1.5s skeleton so fast responses don't flash
+    const delay = new Promise<void>((r) => setTimeout(r, 1500));
+    Promise.all([api.get<Tablet[]>("/tablets/"), delay])
+      .then(([r]) => setTablets(r.data))
+      .catch(() => setTablets([]));
+    Promise.all([api.get<Teacher[]>("/teachers/"), delay])
+      .then(([r]) => setTeachers(r.data))
+      .catch(() => setTeachers([]));
   }, []);
 
   useEffect(() => {

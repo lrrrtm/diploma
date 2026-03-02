@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,35 +36,56 @@ function generateLogin(fullName: string): string {
 
 export default function AdminAddTeacherPage() {
   const navigate = useNavigate();
-  const { teachers, refresh } = useAdminData();
+  const { refresh } = useAdminData();
 
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
-  const [usernameManual, setUsernameManual] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "taken">("idle");
+  const checkAbortRef = useRef<AbortController | null>(null);
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-generate username from fullName with local collision check
+  // Auto-generate username and check availability against SSO via backend proxy
   useEffect(() => {
-    if (usernameManual) return;
     const base = generateLogin(fullName);
-    if (!base) { setUsername(""); return; }
-
-    const taken = new Set((teachers ?? []).map((t) => t.username));
-    if (!taken.has(base)) {
-      setUsername(base);
+    if (!base) {
+      setUsername("");
+      setUsernameStatus("idle");
+      if (checkAbortRef.current) { checkAbortRef.current.abort(); checkAbortRef.current = null; }
       return;
     }
-    for (let i = 2; i <= 20; i++) {
-      const candidate = `${base}${i}`;
-      if (!taken.has(candidate)) {
-        setUsername(candidate);
-        return;
+
+    setUsernameStatus("checking");
+    if (checkAbortRef.current) checkAbortRef.current.abort();
+    const ctrl = new AbortController();
+    checkAbortRef.current = ctrl;
+
+    (async () => {
+      let candidate = base;
+      let suffix = 2;
+      try {
+        while (true) {
+          const res = await api.get<{ available: boolean }>(
+            `/teachers/check-username?username=${encodeURIComponent(candidate)}`,
+            { signal: ctrl.signal },
+          );
+          if (res.data.available) {
+            setUsername(candidate);
+            setUsernameStatus("idle");
+            return;
+          }
+          if (suffix > 20) break;
+          candidate = `${base}${suffix++}`;
+        }
+        // All 20 variants taken — show base, server will reject on conflict
+        setUsername(base);
+        setUsernameStatus("taken");
+      } catch {
+        // aborted — do nothing
       }
-    }
-    setUsername(base); // all suffixes taken — backend will reject with error
-  }, [fullName, usernameManual, teachers]);
+    })();
+  }, [fullName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -115,13 +136,15 @@ export default function AdminAddTeacherPage() {
           <Input
             id="username"
             value={username}
-            onChange={(e) => { setUsername(e.target.value); setUsernameManual(true); }}
-            required
-            placeholder="ivanov.i"
-            autoComplete="off"
+            readOnly
+            placeholder={usernameStatus === "checking" ? "Подбор логина..." : "Будет сгенерирован по ФИО"}
+            className="bg-muted/40 cursor-default select-all"
           />
-          {!usernameManual && username && (
-            <p className="text-xs text-muted-foreground">Сгенерировано автоматически</p>
+          {usernameStatus === "checking" && (
+            <p className="text-xs text-muted-foreground">Проверка доступности...</p>
+          )}
+          {usernameStatus === "taken" && (
+            <p className="text-xs text-yellow-600 dark:text-yellow-400">Не удалось подобрать свободный логин</p>
           )}
         </div>
         <div className="space-y-1.5">
@@ -154,7 +177,7 @@ export default function AdminAddTeacherPage() {
         )}
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || usernameStatus === "checking" || !username}>
             {saving ? "Создание..." : "Создать"}
           </Button>
           <Button type="button" variant="ghost" onClick={() => navigate(-1)}>
