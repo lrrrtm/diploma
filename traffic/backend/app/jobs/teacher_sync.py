@@ -11,6 +11,7 @@ import httpx
 
 from app.config import settings
 from app.database import SessionLocal
+from app.models.session import Session as TrackingSession
 from app.models.teacher import Teacher
 from poly_shared.clients.sso_client import SSOClient
 from poly_shared.errors import UpstreamRejected, UpstreamUnavailable
@@ -140,6 +141,7 @@ def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
     db = SessionLocal()
     created_local = 0
     updated_local = 0
+    removed_local = 0
     created_or_linked_sso = 0
     skipped = 0
     failed = 0
@@ -169,6 +171,8 @@ def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
                 sso_by_entity[entity_id] = user
             if isinstance(ruz_teacher_id, int):
                 sso_by_ruz[ruz_teacher_id] = user
+
+        source_ids = {teacher_id for teacher_id, _ in teachers}
 
         for ruz_teacher_id, full_name in teachers:
             teacher = local_by_ruz.get(ruz_teacher_id)
@@ -221,10 +225,33 @@ def _sync_to_traffic_and_sso(teachers: list[tuple[int, str]]) -> dict[str, int]:
                     )
                 logger.exception("Failed to provision SSO teacher for ruz_teacher_id=%s", ruz_teacher_id)
 
+        stale_teachers = [
+            teacher
+            for teacher in db.query(Teacher).filter(Teacher.ruz_teacher_id.isnot(None)).all()
+            if isinstance(teacher.ruz_teacher_id, int) and teacher.ruz_teacher_id not in source_ids
+        ]
+        for stale in stale_teachers:
+            try:
+                db.query(TrackingSession).filter(TrackingSession.teacher_id == stale.id).update(
+                    {TrackingSession.teacher_id: None},
+                    synchronize_session=False,
+                )
+                db.delete(stale)
+                db.commit()
+                removed_local += 1
+                try:
+                    client.delete_user_by_entity(entity_id=stale.id, app="traffic")
+                except (UpstreamRejected, UpstreamUnavailable):
+                    logger.warning("Failed to delete stale SSO user by entity %s", stale.id)
+            except Exception:
+                db.rollback()
+                logger.exception("Failed to remove stale teacher id=%s ruz_teacher_id=%s", stale.id, stale.ruz_teacher_id)
+
         return {
             "fetched": len(teachers),
             "created_local": created_local,
             "updated_local": updated_local,
+            "removed_local": removed_local,
             "created_or_linked_sso": created_or_linked_sso,
             "skipped": skipped,
             "failed": failed,
@@ -310,11 +337,13 @@ async def run_teacher_sync_forever() -> None:
             logger.info(
                 (
                     "Traffic teacher sync completed: fetched=%s created_local=%s "
-                    "updated_local=%s created_or_linked_sso=%s skipped=%s failed=%s"
+                    "updated_local=%s removed_local=%s created_or_linked_sso=%s "
+                    "skipped=%s failed=%s"
                 ),
                 stats["fetched"],
                 stats["created_local"],
                 stats["updated_local"],
+                stats["removed_local"],
                 stats["created_or_linked_sso"],
                 stats["skipped"],
                 stats["failed"],

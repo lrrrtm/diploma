@@ -70,7 +70,7 @@ def _lesson_teacher_ids(lesson: dict) -> set[int]:
     for teacher in lesson.get("teachers") or []:
         if not isinstance(teacher, dict):
             continue
-        for key in ("id", "teacher_id", "ruz_teacher_id", "oid"):
+        for key in ("id", "teacher_id", "ruz_teacher_id"):
             raw = teacher.get(key)
             if isinstance(raw, int):
                 result.add(raw)
@@ -161,24 +161,6 @@ def get_session_start_options(
 
     candidate_teacher_ids: set[int] = {teacher.ruz_teacher_id}
     teacher_full_name = _normalize_name(teacher.full_name)
-    try:
-        teachers_payload = schedule_client.get_teachers()
-        teachers_raw = teachers_payload.get("teachers", []) if isinstance(teachers_payload, dict) else []
-        if isinstance(teachers_raw, list):
-            for item in teachers_raw:
-                if not isinstance(item, dict):
-                    continue
-                schedule_id = item.get("id")
-                schedule_oid = item.get("oid")
-                if schedule_id == teacher.ruz_teacher_id or schedule_oid == teacher.ruz_teacher_id:
-                    if isinstance(schedule_id, int):
-                        candidate_teacher_ids.add(schedule_id)
-                    if isinstance(schedule_oid, int):
-                        candidate_teacher_ids.add(schedule_oid)
-                    break
-    except (UpstreamUnavailable, UpstreamRejected):
-        # Fallbacks (ID and full name) still work even if teacher dictionary is unavailable.
-        pass
 
     days = scheduler.get("days", []) if isinstance(scheduler, dict) else []
     if not isinstance(days, list):
