@@ -6,18 +6,34 @@ class TabletRealtimeHub:
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
         self.online_tablets: set[str] = set()
+        self._tablet_connections: dict[str, int] = defaultdict(int)
         self._status_subscribers: set[asyncio.Queue[str]] = set()
         self._tablet_subscribers: dict[str, set[asyncio.Queue[str]]] = defaultdict(set)
 
     async def set_online(self, tablet_id: str) -> None:
+        should_publish = False
         async with self._lock:
-            self.online_tablets.add(tablet_id)
-        await self.publish_status()
+            self._tablet_connections[tablet_id] += 1
+            # Publish only on real transition offline -> online.
+            if self._tablet_connections[tablet_id] == 1:
+                self.online_tablets.add(tablet_id)
+                should_publish = True
+        if should_publish:
+            await self.publish_status()
 
     async def set_offline(self, tablet_id: str) -> None:
+        should_publish = False
         async with self._lock:
-            self.online_tablets.discard(tablet_id)
-        await self.publish_status()
+            current = self._tablet_connections.get(tablet_id, 0)
+            if current <= 1:
+                self._tablet_connections.pop(tablet_id, None)
+                if tablet_id in self.online_tablets:
+                    self.online_tablets.discard(tablet_id)
+                    should_publish = True
+            else:
+                self._tablet_connections[tablet_id] = current - 1
+        if should_publish:
+            await self.publish_status()
 
     async def subscribe_status(self) -> asyncio.Queue[str]:
         queue: asyncio.Queue[str] = asyncio.Queue()
